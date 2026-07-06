@@ -6,3 +6,4 @@ node_modules/
 /profiles/
 .DS_Store
 *.log
+.superpowers/
