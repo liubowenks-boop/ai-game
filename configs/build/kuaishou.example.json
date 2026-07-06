@@ -1,0 +1,7 @@
+{
+  "platform": "kuaishou",
+  "appid": "YOUR_KUAISHOU_APP_ID",
+  "orientation": "portrait",
+  "buildPath": "build/kuaishou",
+  "debug": false
+}

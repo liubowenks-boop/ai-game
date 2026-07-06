@@ -1,0 +1,19 @@
+{
+  "name": "legend-bullseye-td",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:mvp": "tsx tools/mvp-model.test.ts",
+    "format": "prettier --write .",
+    "lint": "echo \"lint not configured yet\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
+  },
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "3ce02411-3161-4810-9949-4510e67a1ba3"
+}

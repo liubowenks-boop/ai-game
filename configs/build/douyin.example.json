@@ -1,0 +1,7 @@
+{
+  "platform": "douyin",
+  "appid": "YOUR_DOUYIN_APP_ID",
+  "orientation": "portrait",
+  "buildPath": "build/douyin",
+  "debug": false
+}
