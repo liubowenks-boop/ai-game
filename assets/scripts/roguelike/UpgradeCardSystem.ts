@@ -2,39 +2,65 @@
 import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
 
 import { BattleMvpModel, UpgradeCardState } from '../battle/BattleMvpModel';
+import { BattleUiTokens } from '../ui/BattleUiTokens';
+import { BattleUiV4Layout } from '../ui/BattleUiLayout';
+import { createUiArtSkinNode, UpgradeCardView } from '../ui/BattleUiComponents';
 
 interface CardView {
-  node: Node;
-  titleLabel: Label;
-  descLabel: Label;
+  card: UpgradeCardView;
 }
 
 export class UpgradeCardSystem {
   private readonly root: Node;
   private readonly cards: CardView[] = [];
+  private readonly recruitHintLabel?: Label;
 
   public constructor(
     parent: Node,
     private readonly model: BattleMvpModel,
     private readonly onPicked: () => void,
+    private readonly onRecruit?: () => void,
   ) {
     this.root = new Node('UpgradeCardSystem');
     this.setUiLayer(this.root);
 
     const transform = this.root.addComponent(UITransform);
-    transform.setContentSize(640, 250);
-    this.root.setPosition(0, 70, 0);
+    transform.setContentSize(BattleUiV4Layout.upgradePanel.width, BattleUiV4Layout.upgradePanel.height);
+    this.root.setPosition(BattleUiV4Layout.upgradePanel.x, BattleUiV4Layout.upgradePanel.y, 0);
     parent.addChild(this.root);
 
     const panel = this.root.addComponent(Graphics);
-    panel.fillColor = new Color(20, 24, 32, 230);
-    panel.strokeColor = new Color(255, 214, 112, 255);
+    panel.fillColor = BattleUiTokens.colors.panelBase;
+    panel.strokeColor = BattleUiTokens.colors.strokeGold;
     panel.lineWidth = 3;
-    panel.roundRect(-320, -125, 640, 250, 8);
+    panel.roundRect(
+      -BattleUiV4Layout.upgradePanel.width / 2,
+      -BattleUiV4Layout.upgradePanel.height / 2,
+      BattleUiV4Layout.upgradePanel.width,
+      BattleUiV4Layout.upgradePanel.height,
+      8,
+    );
     panel.fill();
     panel.stroke();
+    createUiArtSkinNode(
+      this.root,
+      'card_panel_bg_final.png',
+      BattleUiV4Layout.upgradePanel.width,
+      BattleUiV4Layout.upgradePanel.height,
+      'UpgradePanelSkin',
+    );
+    const titleSkin = createUiArtSkinNode(this.root, 'card_panel_title_final.png', 290, 42, 'UpgradeTitleSkin');
+    titleSkin.setPosition(0, 92, 0);
 
-    const title = this.createLabel('选择一个强化', 0, 92, 28, new Color(255, 245, 190, 255), 260, 40);
+    const title = this.createLabel(
+      '选择强化效果',
+      0,
+      91,
+      24,
+      BattleUiTokens.colors.textPrimary,
+      300,
+      34,
+    );
     this.root.addChild(title.node);
 
     this.root.active = false;
@@ -45,12 +71,11 @@ export class UpgradeCardSystem {
     this.root.active = true;
 
     const cards = this.model.pendingUpgradeCards;
-    const positions = [-200, 0, 200];
+    const positions = [-194, 0, 194];
 
     cards.forEach((card, index) => {
-      const view = this.createCard(card, positions[index], -20);
+      const view = this.createCard(card, positions[index], -8);
       this.cards.push(view);
-      this.root.addChild(view.node);
     });
   }
 
@@ -59,47 +84,81 @@ export class UpgradeCardSystem {
     this.clearCards();
   }
 
+  public isShowing(): boolean {
+    return this.root.active;
+  }
+
   private createCard(card: UpgradeCardState, x: number, y: number): CardView {
-    const node = new Node(card.id);
-    this.setUiLayer(node);
-
-    const transform = node.addComponent(UITransform);
-    transform.setContentSize(170, 140);
-    node.setPosition(x, y, 0);
-
-    const graphics = node.addComponent(Graphics);
-    graphics.fillColor = new Color(72, 66, 44, 255);
-    graphics.strokeColor = new Color(255, 220, 128, 255);
-    graphics.lineWidth = 3;
-    graphics.roundRect(-85, -70, 170, 140, 6);
-    graphics.fill();
-    graphics.stroke();
-
-    node.addComponent(Button);
-    node.on(Button.EventType.CLICK, () => {
-      this.model.applyUpgradeCard(card.id);
-      this.hide();
-      this.onPicked();
-    });
-
-    const title = this.createLabel(card.title, 0, 32, 22, new Color(255, 255, 255, 255), 150, 40);
-    const desc = this.createLabel(card.description, 0, -26, 16, new Color(230, 230, 230, 255), 150, 70);
-    node.addChild(title.node);
-    node.addChild(desc.node);
+    const view = new UpgradeCardView(
+      {
+        id: card.id,
+        title: card.title,
+        description: card.description,
+        school: card.school,
+        rarity: this.getCardRarity(card),
+      },
+      x,
+      y,
+      () => {
+        this.model.applyUpgradeCard(card.id);
+        this.hide();
+        this.onPicked();
+      },
+    );
+    this.root.addChild(view.node);
 
     return {
-      node,
-      titleLabel: title.label,
-      descLabel: desc.label,
+      card: view,
     };
   }
 
   private clearCards(): void {
     for (const card of this.cards) {
-      card.node.destroy();
+      card.card.destroy();
     }
 
     this.cards.length = 0;
+  }
+
+  private createSmallButton(
+    text: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): {
+    node: Node;
+    label: Label;
+  } {
+    const node = new Node(text);
+    this.setUiLayer(node);
+
+    const transform = node.addComponent(UITransform);
+    transform.setContentSize(width, height);
+    node.setPosition(x, y, 0);
+
+    const graphics = node.addComponent(Graphics);
+    graphics.fillColor = BattleUiTokens.colors.summonGreen;
+    graphics.strokeColor = BattleUiTokens.colors.strokeGold;
+    graphics.lineWidth = 2;
+    graphics.roundRect(-width / 2, -height / 2, width, height, 6);
+    graphics.fill();
+    graphics.stroke();
+    createUiArtSkinNode(node, 'ui_button_green_normal.png', width, height, 'RecruitButtonSkin');
+    node.addComponent(Button);
+
+    const labelView = this.createLabel(
+      text,
+      0,
+      -7,
+      20,
+      BattleUiTokens.colors.textPrimary,
+      width,
+      height,
+    );
+    node.addChild(labelView.node);
+
+    return { node, label: labelView.label };
   }
 
   private createLabel(
@@ -129,5 +188,17 @@ export class UpgradeCardSystem {
 
   private setUiLayer(node: Node): void {
     node.layer = Layers.Enum.UI_2D;
+  }
+
+  private getCardRarity(card: UpgradeCardState): 'normal' | 'rare' | 'epic' | 'legendary' {
+    if (card.school === 'summon') {
+      return 'epic';
+    }
+
+    if (card.school === 'thunder') {
+      return 'rare';
+    }
+
+    return 'normal';
   }
 }

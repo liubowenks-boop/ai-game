@@ -7,6 +7,6 @@ export class WaveSystem {
   public constructor(private readonly waveLabel: Label) {}
 
   public refresh(model: BattleMvpModel): void {
-    this.waveLabel.string = `当前波次：${model.wave}`;
+    this.waveLabel.string = model.wave > 0 ? model.getWaveLabel() : '当前波次：0';
   }
 }

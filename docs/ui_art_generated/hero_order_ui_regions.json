@@ -1,0 +1,50 @@
+{
+  "canvas": {
+    "x": 0,
+    "y": 0,
+    "w": 720,
+    "h": 1280
+  },
+  "safe_area_top": {
+    "x": 0,
+    "y": 0,
+    "w": 720,
+    "h": 60
+  },
+  "safe_area_bottom": {
+    "x": 0,
+    "y": 1232,
+    "w": 720,
+    "h": 48
+  },
+  "TopHudLayer": {
+    "x": 0,
+    "y": 0,
+    "w": 720,
+    "h": 120
+  },
+  "BattleLayer": {
+    "x": 0,
+    "y": 120,
+    "w": 720,
+    "h": 780
+  },
+  "MidStatusLayer": {
+    "x": 0,
+    "y": 760,
+    "w": 720,
+    "h": 140
+  },
+  "UpgradePanelLayer_reference_crop": {
+    "x": 30,
+    "y": 560,
+    "w": 660,
+    "h": 440
+  },
+  "BottomHudLayer": {
+    "x": 0,
+    "y": 1120,
+    "w": 720,
+    "h": 160
+  }
+}

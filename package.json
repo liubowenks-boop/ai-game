@@ -4,6 +4,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test:mvp": "tsx tools/mvp-model.test.ts",
+    "test:ui-layout": "tsx tools/ui-layout-v4.test.ts",
+    "preview:portrait": "node tools/set-cocos-preview-portrait.mjs",
     "format": "prettier --write .",
     "lint": "echo \"lint not configured yet\""
   },

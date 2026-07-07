@@ -6,8 +6,7 @@ import { BattleMvpModel, BattleTickResult } from './BattleMvpModel';
 export class PlayerAutoAttackSystem {
   private readonly graphics: Graphics;
   private effectTimeLeft = 0;
-  private from = new Vec3();
-  private to = new Vec3();
+  private readonly segments: { from: Vec3; to: Vec3; color: Color; width: number }[] = [];
 
   public constructor(
     effectLayer: Node,
@@ -20,14 +19,30 @@ export class PlayerAutoAttackSystem {
   }
 
   public refresh(result: BattleTickResult, model: BattleMvpModel): void {
-    const attackEvent = result.attackEvents.find((event) => event.source === 'main');
+    const attackEvents = result.attackEvents.filter(
+      (event) => event.source === 'main' || event.source === 'thunder_chain',
+    );
 
-    if (!attackEvent) {
+    if (attackEvents.length === 0) {
       return;
     }
 
-    this.from = this.playerNode.position.clone();
-    this.to = new Vec3(attackEvent.enemyPosition.x, attackEvent.enemyPosition.y, 0);
+    this.segments.length = 0;
+
+    for (const event of attackEvents) {
+      this.segments.push({
+        from: this.playerNode.position.clone(),
+        to: new Vec3(event.enemyPosition.x, event.enemyPosition.y, 0),
+        color:
+          event.source === 'thunder_chain'
+            ? new Color(100, 230, 255, 230)
+            : event.critical
+              ? new Color(255, 196, 74, 255)
+              : new Color(255, 238, 92, 220),
+        width: event.source === 'thunder_chain' ? 4 : event.critical ? 9 : 5,
+      });
+    }
+
     this.effectTimeLeft = 0.12;
     this.draw(model);
   }
@@ -49,10 +64,41 @@ export class PlayerAutoAttackSystem {
 
   private draw(model: BattleMvpModel): void {
     this.graphics.clear();
-    this.graphics.strokeColor = new Color(255, 238, 92, 220);
-    this.graphics.lineWidth = model.mainAttackDamage >= 20 ? 8 : 5;
-    this.graphics.moveTo(this.from.x, this.from.y);
-    this.graphics.lineTo(this.to.x, this.to.y);
-    this.graphics.stroke();
+
+    const crowded = model.enemies.length >= 10;
+
+    for (const segment of this.segments) {
+      const mutedAlpha = crowded && segment.width <= 5 ? 120 : segment.color.a;
+      const color = new Color(segment.color.r, segment.color.g, segment.color.b, mutedAlpha);
+      const lineWidth = Math.max(segment.width, model.mainAttackDamage >= 20 ? 7 : segment.width);
+
+      this.graphics.strokeColor = new Color(color.r, color.g, color.b, Math.floor(color.a * 0.32));
+      this.graphics.lineWidth = lineWidth + 8;
+      this.graphics.moveTo(segment.from.x, segment.from.y);
+      this.graphics.lineTo(segment.to.x, segment.to.y);
+      this.graphics.stroke();
+
+      if (segment.width <= 4) {
+        this.graphics.strokeColor = new Color(
+          color.r,
+          color.g,
+          color.b,
+          Math.floor(color.a * 0.55),
+        );
+        this.graphics.lineWidth = 2;
+        this.graphics.moveTo(segment.from.x - 4, segment.from.y + 2);
+        this.graphics.lineTo(segment.to.x - 4, segment.to.y + 2);
+        this.graphics.stroke();
+        this.graphics.moveTo(segment.from.x + 4, segment.from.y - 2);
+        this.graphics.lineTo(segment.to.x + 4, segment.to.y - 2);
+        this.graphics.stroke();
+      }
+
+      this.graphics.strokeColor = color;
+      this.graphics.lineWidth = lineWidth;
+      this.graphics.moveTo(segment.from.x, segment.from.y);
+      this.graphics.lineTo(segment.to.x, segment.to.y);
+      this.graphics.stroke();
+    }
   }
 }

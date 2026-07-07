@@ -1,0 +1,1471 @@
+{
+  "source": "ai_source_sheets",
+  "atlases": {
+    "ui_common": {
+      "source": "docs/ui_art_generated/ai_source_sheets/ui_common_ai_sheet.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "grid": {
+        "cols": 4,
+        "rows": 4,
+        "x_bounds": [
+          0,
+          314,
+          627,
+          940,
+          1254
+        ],
+        "y_bounds": [
+          0,
+          314,
+          627,
+          940,
+          1254
+        ]
+      },
+      "assets": [
+        {
+          "filename": "ui_panel_dark_gold.png",
+          "size": [
+            512,
+            256
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            65,
+            2,
+            446,
+            253
+          ]
+        },
+        {
+          "filename": "ui_panel_dark_translucent.png",
+          "size": [
+            512,
+            256
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            92,
+            2,
+            419,
+            253
+          ]
+        },
+        {
+          "filename": "ui_panel_card_inner.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            23,
+            2,
+            233,
+            253
+          ]
+        },
+        {
+          "filename": "ui_border_gold_thin.png",
+          "size": [
+            256,
+            64
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            2,
+            20,
+            253,
+            44
+          ]
+        },
+        {
+          "filename": "ui_border_gold_glow.png",
+          "size": [
+            256,
+            64
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            2,
+            6,
+            253,
+            57
+          ]
+        },
+        {
+          "filename": "ui_divider_gold.png",
+          "size": [
+            320,
+            16
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            80,
+            0,
+            239,
+            16
+          ]
+        },
+        {
+          "filename": "ui_shadow_soft.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            10,
+            105,
+            246,
+            151
+          ]
+        },
+        {
+          "filename": "ui_mask_dim.png",
+          "size": [
+            16,
+            16
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            0,
+            0,
+            15,
+            15
+          ]
+        },
+        {
+          "filename": "ui_button_red_normal.png",
+          "size": [
+            256,
+            96
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            8,
+            1,
+            248,
+            95
+          ]
+        },
+        {
+          "filename": "ui_button_red_pressed.png",
+          "size": [
+            256,
+            96
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            9,
+            1,
+            246,
+            95
+          ]
+        },
+        {
+          "filename": "ui_button_red_disabled.png",
+          "size": [
+            256,
+            96
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            8,
+            1,
+            247,
+            95
+          ]
+        },
+        {
+          "filename": "ui_button_blue_normal.png",
+          "size": [
+            256,
+            96
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            8,
+            1,
+            248,
+            95
+          ]
+        },
+        {
+          "filename": "ui_button_green_normal.png",
+          "size": [
+            256,
+            96
+          ],
+          "source_cell": 12,
+          "alpha_bbox": [
+            8,
+            1,
+            248,
+            95
+          ]
+        },
+        {
+          "filename": "ui_badge_round_dark.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 13,
+          "alpha_bbox": [
+            3,
+            1,
+            125,
+            126
+          ]
+        },
+        {
+          "filename": "ui_badge_round_gold.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 14,
+          "alpha_bbox": [
+            3,
+            1,
+            125,
+            126
+          ]
+        }
+      ]
+    },
+    "ui_hud": {
+      "source": "docs/ui_art_generated/ai_source_sheets/ui_hud_ai_sheet.png",
+      "source_size": [
+        1374,
+        1145
+      ],
+      "grid": {
+        "cols": 6,
+        "rows": 5,
+        "x_bounds": [
+          0,
+          285,
+          526,
+          766,
+          970,
+          1170,
+          1374
+        ],
+        "y_bounds": [
+          0,
+          232,
+          464,
+          690,
+          914,
+          1145
+        ]
+      },
+      "assets": [
+        {
+          "filename": "hud_top_frame.png",
+          "size": [
+            680,
+            96
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            215,
+            1,
+            465,
+            95
+          ]
+        },
+        {
+          "filename": "hud_mid_status_frame.png",
+          "size": [
+            520,
+            88
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            106,
+            1,
+            413,
+            87
+          ]
+        },
+        {
+          "filename": "hud_bottom_frame.png",
+          "size": [
+            680,
+            116
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            146,
+            1,
+            533,
+            115
+          ]
+        },
+        {
+          "filename": "hud_resource_chip.png",
+          "size": [
+            160,
+            48
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            16,
+            0,
+            143,
+            47
+          ]
+        },
+        {
+          "filename": "hud_wave_plate.png",
+          "size": [
+            220,
+            64
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            83,
+            0,
+            136,
+            63
+          ]
+        },
+        {
+          "filename": "hud_boss_nameplate.png",
+          "size": [
+            360,
+            56
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            121,
+            0,
+            239,
+            55
+          ]
+        },
+        {
+          "filename": "hud_boss_hp_bg.png",
+          "size": [
+            420,
+            40
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            130,
+            0,
+            290,
+            39
+          ]
+        },
+        {
+          "filename": "hud_boss_hp_fill.png",
+          "size": [
+            420,
+            40
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            130,
+            0,
+            290,
+            39
+          ]
+        },
+        {
+          "filename": "hud_boss_hp_flash.png",
+          "size": [
+            460,
+            56
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            124,
+            0,
+            336,
+            55
+          ]
+        },
+        {
+          "filename": "hud_city_hp_bg.png",
+          "size": [
+            360,
+            44
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            142,
+            0,
+            218,
+            43
+          ]
+        },
+        {
+          "filename": "hud_city_hp_fill_green.png",
+          "size": [
+            360,
+            44
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            142,
+            0,
+            217,
+            43
+          ]
+        },
+        {
+          "filename": "hud_city_hp_fill_yellow.png",
+          "size": [
+            360,
+            44
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            142,
+            0,
+            218,
+            43
+          ]
+        },
+        {
+          "filename": "hud_city_hp_fill_red.png",
+          "size": [
+            360,
+            44
+          ],
+          "source_cell": 12,
+          "alpha_bbox": [
+            141,
+            0,
+            218,
+            43
+          ]
+        },
+        {
+          "filename": "hud_city_hit_flash.png",
+          "size": [
+            392,
+            60
+          ],
+          "source_cell": 13,
+          "alpha_bbox": [
+            158,
+            0,
+            233,
+            59
+          ]
+        },
+        {
+          "filename": "hud_combo_plate.png",
+          "size": [
+            300,
+            76
+          ],
+          "source_cell": 14,
+          "alpha_bbox": [
+            67,
+            1,
+            232,
+            75
+          ]
+        },
+        {
+          "filename": "hud_combo_burst_glow.png",
+          "size": [
+            360,
+            120
+          ],
+          "source_cell": 15,
+          "alpha_bbox": [
+            110,
+            5,
+            249,
+            115
+          ]
+        },
+        {
+          "filename": "hud_ultimate_button_bg.png",
+          "size": [
+            144,
+            144
+          ],
+          "source_cell": 16,
+          "alpha_bbox": [
+            14,
+            1,
+            130,
+            142
+          ]
+        },
+        {
+          "filename": "hud_ultimate_button_disabled.png",
+          "size": [
+            144,
+            144
+          ],
+          "source_cell": 17,
+          "alpha_bbox": [
+            13,
+            1,
+            130,
+            142
+          ]
+        },
+        {
+          "filename": "hud_ultimate_energy_ring.png",
+          "size": [
+            160,
+            160
+          ],
+          "source_cell": 18,
+          "alpha_bbox": [
+            7,
+            6,
+            153,
+            153
+          ]
+        },
+        {
+          "filename": "hud_ultimate_ready_glow.png",
+          "size": [
+            192,
+            192
+          ],
+          "source_cell": 19,
+          "alpha_bbox": [
+            7,
+            21,
+            184,
+            170
+          ]
+        },
+        {
+          "filename": "hud_avatar_slot_empty.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 20,
+          "alpha_bbox": [
+            2,
+            1,
+            94,
+            95
+          ]
+        },
+        {
+          "filename": "hud_avatar_frame_normal.png",
+          "size": [
+            112,
+            112
+          ],
+          "source_cell": 21,
+          "alpha_bbox": [
+            10,
+            1,
+            102,
+            111
+          ]
+        },
+        {
+          "filename": "hud_avatar_frame_focus.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 22,
+          "alpha_bbox": [
+            11,
+            1,
+            116,
+            126
+          ]
+        },
+        {
+          "filename": "hud_level_badge.png",
+          "size": [
+            56,
+            32
+          ],
+          "source_cell": 23,
+          "alpha_bbox": [
+            15,
+            0,
+            41,
+            31
+          ]
+        },
+        {
+          "filename": "hud_auto_button.png",
+          "size": [
+            128,
+            72
+          ],
+          "source_cell": 24,
+          "alpha_bbox": [
+            29,
+            0,
+            99,
+            71
+          ]
+        },
+        {
+          "filename": "hud_bond_button.png",
+          "size": [
+            128,
+            72
+          ],
+          "source_cell": 25,
+          "alpha_bbox": [
+            25,
+            0,
+            103,
+            71
+          ]
+        }
+      ]
+    },
+    "ui_cards": {
+      "source": "docs/ui_art_generated/ai_source_sheets/ui_cards_ai_sheet.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "grid": {
+        "cols": 4,
+        "rows": 4,
+        "x_bounds": [
+          0,
+          314,
+          626,
+          937,
+          1254
+        ],
+        "y_bounds": [
+          0,
+          376,
+          744,
+          980,
+          1254
+        ]
+      },
+      "assets": [
+        {
+          "filename": "card_bg_fire.png",
+          "size": [
+            220,
+            300
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            23,
+            3,
+            196,
+            297
+          ]
+        },
+        {
+          "filename": "card_bg_thunder.png",
+          "size": [
+            220,
+            300
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            24,
+            3,
+            195,
+            297
+          ]
+        },
+        {
+          "filename": "card_bg_summon.png",
+          "size": [
+            220,
+            300
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            23,
+            3,
+            196,
+            297
+          ]
+        },
+        {
+          "filename": "card_frame_normal.png",
+          "size": [
+            240,
+            320
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            27,
+            3,
+            213,
+            317
+          ]
+        },
+        {
+          "filename": "card_frame_rare.png",
+          "size": [
+            240,
+            320
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            20,
+            3,
+            220,
+            317
+          ]
+        },
+        {
+          "filename": "card_frame_epic.png",
+          "size": [
+            240,
+            320
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            20,
+            3,
+            219,
+            317
+          ]
+        },
+        {
+          "filename": "card_frame_legendary.png",
+          "size": [
+            240,
+            320
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            22,
+            3,
+            217,
+            317
+          ]
+        },
+        {
+          "filename": "card_selected_glow.png",
+          "size": [
+            280,
+            360
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            3,
+            11,
+            277,
+            349
+          ]
+        },
+        {
+          "filename": "card_icon_slot.png",
+          "size": [
+            80,
+            80
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            1,
+            1,
+            79,
+            79
+          ]
+        },
+        {
+          "filename": "card_tag_fire.png",
+          "size": [
+            132,
+            34
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            18,
+            0,
+            114,
+            33
+          ]
+        },
+        {
+          "filename": "card_tag_thunder.png",
+          "size": [
+            132,
+            34
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            17,
+            0,
+            114,
+            33
+          ]
+        },
+        {
+          "filename": "card_tag_summon.png",
+          "size": [
+            132,
+            34
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            17,
+            0,
+            115,
+            33
+          ]
+        },
+        {
+          "filename": "card_panel_title.png",
+          "size": [
+            420,
+            72
+          ],
+          "source_cell": 12,
+          "alpha_bbox": [
+            141,
+            0,
+            278,
+            71
+          ]
+        },
+        {
+          "filename": "card_panel_bg.png",
+          "size": [
+            680,
+            360
+          ],
+          "source_cell": 13,
+          "alpha_bbox": [
+            123,
+            3,
+            557,
+            356
+          ]
+        }
+      ]
+    },
+    "ui_icons": {
+      "source": "docs/ui_art_generated/ai_source_sheets/ui_icons_ai_sheet.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "grid": {
+        "cols": 4,
+        "rows": 4,
+        "x_bounds": [
+          0,
+          314,
+          627,
+          940,
+          1254
+        ],
+        "y_bounds": [
+          0,
+          314,
+          627,
+          940,
+          1254
+        ]
+      },
+      "assets": [
+        {
+          "filename": "icon_gold.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            7,
+            5,
+            121,
+            123
+          ]
+        },
+        {
+          "filename": "icon_spirit_stone.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            11,
+            5,
+            117,
+            123
+          ]
+        },
+        {
+          "filename": "icon_pause.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            6,
+            4,
+            90,
+            92
+          ]
+        },
+        {
+          "filename": "icon_speed.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            5,
+            4,
+            90,
+            92
+          ]
+        },
+        {
+          "filename": "icon_auto.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            8,
+            4,
+            87,
+            92
+          ]
+        },
+        {
+          "filename": "icon_bond.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            5,
+            4,
+            91,
+            92
+          ]
+        },
+        {
+          "filename": "icon_ultimate.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            12,
+            5,
+            116,
+            123
+          ]
+        },
+        {
+          "filename": "icon_school_fire.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            7,
+            5,
+            121,
+            123
+          ]
+        },
+        {
+          "filename": "icon_school_thunder.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            7,
+            5,
+            121,
+            123
+          ]
+        },
+        {
+          "filename": "icon_school_summon.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            7,
+            5,
+            121,
+            123
+          ]
+        },
+        {
+          "filename": "icon_warning.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            4,
+            7,
+            92,
+            88
+          ]
+        },
+        {
+          "filename": "icon_boss.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            8,
+            5,
+            120,
+            123
+          ]
+        },
+        {
+          "filename": "icon_lock.png",
+          "size": [
+            96,
+            96
+          ],
+          "source_cell": 12,
+          "alpha_bbox": [
+            7,
+            4,
+            89,
+            92
+          ]
+        }
+      ]
+    },
+    "ui_portraits": {
+      "source": "docs/ui_art_generated/ai_source_sheets/ui_portraits_ai_sheet.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "grid": {
+        "cols": 4,
+        "rows": 4,
+        "x_bounds": [
+          0,
+          312,
+          626,
+          940,
+          1254
+        ],
+        "y_bounds": [
+          0,
+          329,
+          656,
+          978,
+          1254
+        ]
+      },
+      "assets": [
+        {
+          "filename": "portrait_hero_archer.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            16,
+            10,
+            240,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_gunner.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            20,
+            10,
+            236,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_ice_mage.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            20,
+            10,
+            235,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_poisoner.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            20,
+            10,
+            236,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_guard.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            21,
+            10,
+            235,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_drummer.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            21,
+            10,
+            235,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_healer.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            21,
+            10,
+            235,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_hero_warlock.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            20,
+            10,
+            236,
+            246
+          ]
+        },
+        {
+          "filename": "portrait_enemy_normal.png",
+          "size": [
+            192,
+            192
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            15,
+            7,
+            176,
+            184
+          ]
+        },
+        {
+          "filename": "portrait_enemy_fast.png",
+          "size": [
+            192,
+            192
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            15,
+            7,
+            176,
+            184
+          ]
+        },
+        {
+          "filename": "portrait_enemy_tank.png",
+          "size": [
+            192,
+            192
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            13,
+            7,
+            179,
+            184
+          ]
+        },
+        {
+          "filename": "portrait_enemy_ranged.png",
+          "size": [
+            192,
+            192
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            16,
+            7,
+            176,
+            184
+          ]
+        },
+        {
+          "filename": "portrait_enemy_boss_sandlord.png",
+          "size": [
+            320,
+            320
+          ],
+          "source_cell": 12,
+          "alpha_bbox": [
+            13,
+            13,
+            306,
+            307
+          ]
+        }
+      ]
+    },
+    "battle_fx_common": {
+      "source": "docs/ui_art_generated/ai_source_sheets/battle_fx_common_ai_sheet.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "grid": {
+        "cols": 4,
+        "rows": 3,
+        "x_bounds": [
+          0,
+          314,
+          627,
+          940,
+          1254
+        ],
+        "y_bounds": [
+          0,
+          418,
+          836,
+          1254
+        ]
+      },
+      "assets": [
+        {
+          "filename": "fx_glow_gold_soft.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 0,
+          "alpha_bbox": [
+            26,
+            10,
+            229,
+            246
+          ]
+        },
+        {
+          "filename": "fx_glow_red_burst.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 1,
+          "alpha_bbox": [
+            32,
+            10,
+            224,
+            246
+          ]
+        },
+        {
+          "filename": "fx_glow_blue_thunder.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 2,
+          "alpha_bbox": [
+            33,
+            10,
+            223,
+            246
+          ]
+        },
+        {
+          "filename": "fx_glow_green_summon.png",
+          "size": [
+            256,
+            256
+          ],
+          "source_cell": 3,
+          "alpha_bbox": [
+            30,
+            10,
+            226,
+            246
+          ]
+        },
+        {
+          "filename": "fx_hit_flash_white.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 4,
+          "alpha_bbox": [
+            16,
+            5,
+            112,
+            123
+          ]
+        },
+        {
+          "filename": "fx_warning_banner_glow.png",
+          "size": [
+            512,
+            128
+          ],
+          "source_cell": 5,
+          "alpha_bbox": [
+            116,
+            5,
+            396,
+            123
+          ]
+        },
+        {
+          "filename": "fx_fire_small.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 6,
+          "alpha_bbox": [
+            16,
+            5,
+            111,
+            123
+          ]
+        },
+        {
+          "filename": "fx_thunder_line.png",
+          "size": [
+            256,
+            64
+          ],
+          "source_cell": 7,
+          "alpha_bbox": [
+            111,
+            2,
+            144,
+            61
+          ]
+        },
+        {
+          "filename": "fx_poison_dot.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 8,
+          "alpha_bbox": [
+            8,
+            5,
+            120,
+            123
+          ]
+        },
+        {
+          "filename": "fx_heal_plus.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 9,
+          "alpha_bbox": [
+            18,
+            5,
+            110,
+            123
+          ]
+        },
+        {
+          "filename": "fx_slow_snowflake.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 10,
+          "alpha_bbox": [
+            13,
+            5,
+            115,
+            123
+          ]
+        },
+        {
+          "filename": "fx_vulnerable_break.png",
+          "size": [
+            128,
+            128
+          ],
+          "source_cell": 11,
+          "alpha_bbox": [
+            9,
+            5,
+            119,
+            123
+          ]
+        }
+      ]
+    }
+  }
+}

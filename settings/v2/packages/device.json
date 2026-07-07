@@ -1,3 +1,14 @@
 {
-  "__version__": "1.0.1"
+  "__version__": "1.0.1",
+  "custom": [
+    {
+      "name": "Sandgate Portrait 720x1280",
+      "width": 720,
+      "height": 1280,
+      "ratio": 1
+    }
+  ],
+  "enableDevice": {
+    "Sandgate Portrait 720x1280": true
+  }
 }

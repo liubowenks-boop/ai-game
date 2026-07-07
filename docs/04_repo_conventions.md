@@ -12,7 +12,7 @@
 
 - `assets/scenes/`：Cocos 场景文件。
 - `assets/scripts/core/`：基础设施和生命周期。
-- `assets/scripts/battle/`：局内战斗模块，当前阶段不放具体实现。
+- `assets/scripts/battle/`：局内战斗模块，包含当前原型的战斗模型和 Cocos 表现同步类。
 - `assets/scripts/roguelike/`：强化和局内成长模块。
 - `assets/scripts/ui/`：UI 控制与表现逻辑。
 - `assets/scripts/platform/`：平台适配层。
