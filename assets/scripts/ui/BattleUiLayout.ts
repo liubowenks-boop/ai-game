@@ -30,7 +30,7 @@ export const BattleUiV4Layout = {
   upgradePanel: fromTopLeft(29, 922, 576, 198),
   rightActionRail: fromTopLeft(626, 922, 72, 326),
   autoButton: fromTopLeft(626, 979, 76, 76),
-  heroBar: fromTopLeft(108, 1144, 439, 96),
+  heroBar: fromTopLeft(150, 1144, 420, 96),
   ultimateButton: fromTopLeft(576, 1134, 123, 123),
   bottomStatus: fromTopLeft(180, 1248, 360, 28),
 } as const;

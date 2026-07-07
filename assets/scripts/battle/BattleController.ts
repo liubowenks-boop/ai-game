@@ -238,13 +238,13 @@ export class BattleController extends Component {
     this.remainingEnemiesLabel = remainView.label;
     this.topHudLayer.addChild(remainView.node);
 
-    this.bossHealthBarView = new BossHealthBarView(-38, 592, 288, this.topHudLayer);
-    this.goldChipView = new ResourceChipView('金币', 188, 606, 118, 32, this.topHudLayer);
-    this.stoneChipView = new ResourceChipView('灵石', 188, 574, 118, 32, this.topHudLayer);
+    this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer);
+    this.goldChipView = new ResourceChipView('金币', 224, 606, 100, 32, this.topHudLayer);
+    this.stoneChipView = new ResourceChipView('灵石', 224, 574, 100, 32, this.topHudLayer);
 
     this.pauseButtonView = new UiButtonView(
       '暂停',
-      288,
+      310,
       606,
       54,
       42,
@@ -259,7 +259,7 @@ export class BattleController extends Component {
     );
     this.speedButtonView = new UiButtonView(
       'x1',
-      288,
+      310,
       558,
       54,
       42,
@@ -276,7 +276,7 @@ export class BattleController extends Component {
     const startButton = new UiButtonView(
       '开始战斗',
       0,
-      516,
+      506,
       160,
       52,
       BattleUiTokens.colors.primaryRed,
@@ -295,15 +295,6 @@ export class BattleController extends Component {
   }
 
   private createMidStatusLayer(): { statusLabel: Label } {
-    createPanelNode(
-      'MidStatusFrame',
-      0,
-      BattleUiV4Layout.cityHp.y,
-      520,
-      66,
-      this.midStatusLayer,
-      148,
-    );
     this.cityHealthBarView = new CityHealthBarView(
       BattleUiV4Layout.cityHp.x - 92,
       BattleUiV4Layout.cityHp.y,
@@ -404,7 +395,7 @@ export class BattleController extends Component {
     );
     this.bondButtonView = new UiButtonView(
       '羁绊',
-      -302,
+      -278,
       BattleUiV4Layout.ultimateButton.y,
       76,
       76,
@@ -556,16 +547,30 @@ export class BattleController extends Component {
       .filter((event) => event.damage >= 1 || event.critical || event.source === 'thunder_chain')
       .slice(-8);
 
+    const chainEvents = visibleEvents.filter((event) => event.source === 'thunder_chain');
+    const mainEvent = visibleEvents.find((event) => event.source === 'main');
+
+    if (chainEvents.length >= 1 && mainEvent) {
+      this.spawnFloatingText(
+        `连锁 ×${chainEvents.length}`,
+        mainEvent.enemyPosition.x + 36,
+        mainEvent.enemyPosition.y + 60,
+        26,
+        new Color(118, 238, 255, 255),
+        0.72,
+        76,
+        120,
+      );
+    }
+
     for (const event of visibleEvents) {
-      const fontSize = event.critical ? 30 : event.source === 'thunder_chain' ? 24 : 20;
+      const fontSize = event.critical ? 30 : event.source === 'thunder_chain' ? 22 : 20;
       const color = this.getDamageTextColor(event);
       const prefix = event.critical
         ? '暴击 '
-        : event.source === 'thunder_chain'
-          ? '连锁 '
-          : event.source === 'hero_dps'
-            ? '英雄 '
-            : '';
+        : event.source === 'hero_dps'
+          ? '英雄 '
+          : '';
       this.spawnFloatingText(
         `${prefix}${Math.ceil(event.damage)}`,
         event.enemyPosition.x,

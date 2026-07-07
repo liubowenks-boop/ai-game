@@ -11,6 +11,7 @@ interface EnemyNodeView {
   label: Label;
   lastHp: number;
   flashTimeLeft: number;
+  statusIcons: Map<string, Node>;
 }
 
 export type VisualFocusTarget = 'none' | 'boss' | 'city' | 'combo' | 'output';
@@ -19,8 +20,16 @@ export interface EnemyVisualContext {
   focus: VisualFocusTarget;
 }
 
+interface StatusIconSpec {
+  key: string;
+  filename: string;
+  active: boolean;
+}
+
 export class EnemySystem {
   private readonly enemyViews = new Map<number, EnemyNodeView>();
+  private static readonly STATUS_ICON_SIZE = 22;
+  private static readonly STATUS_ICON_GAP = 4;
 
   public constructor(private readonly parent: Node) {}
 
@@ -116,6 +125,7 @@ export class EnemySystem {
       label,
       lastHp: enemy.hp,
       flashTimeLeft: 0,
+      statusIcons: new Map<string, Node>(),
     };
     this.drawEnemy(enemy, view, false, { focus: 'none' });
     this.enemyViews.set(enemy.id, view);
@@ -183,6 +193,7 @@ export class EnemySystem {
     }
 
     this.drawHealthBar(enemy, view, muted);
+    this.refreshStatusIcons(enemy, view, muted);
 
     if (view.flashTimeLeft > 0) {
       view.flashTimeLeft = Math.max(0, view.flashTimeLeft - 1 / 60);
@@ -221,6 +232,70 @@ export class EnemySystem {
     view.healthBar.stroke();
   }
 
+  private refreshStatusIcons(enemy: EnemyState, view: EnemyNodeView, muted: boolean): void {
+    const specs: StatusIconSpec[] = [
+      {
+        key: 'burn',
+        filename: 'fx_fire_small.png',
+        active: enemy.burnStacks > 0,
+      },
+      {
+        key: 'poison',
+        filename: 'fx_poison_dot.png',
+        active: enemy.poisonStacks > 0,
+      },
+      {
+        key: 'slow',
+        filename: 'fx_slow_snowflake.png',
+        active: enemy.slowTimeLeft > 0,
+      },
+      {
+        key: 'vulnerable',
+        filename: 'fx_vulnerable_break.png',
+        active: enemy.vulnerableTimeLeft > 0,
+      },
+    ];
+
+    const activeSpecs = specs.filter((spec) => spec.active);
+    const inactiveKeys = specs.filter((spec) => !spec.active).map((spec) => spec.key);
+
+    for (const key of inactiveKeys) {
+      const iconNode = view.statusIcons.get(key);
+      if (iconNode) {
+        iconNode.destroy();
+        view.statusIcons.delete(key);
+      }
+    }
+
+    if (activeSpecs.length === 0) {
+      return;
+    }
+
+    const iconSize = EnemySystem.STATUS_ICON_SIZE;
+    const gap = EnemySystem.STATUS_ICON_GAP;
+    const totalWidth = activeSpecs.length * iconSize + (activeSpecs.length - 1) * gap;
+    const startX = -totalWidth / 2 + iconSize / 2;
+    const iconY = enemy.kind === 'boss' ? 62 : enemy.radius + 30;
+
+    activeSpecs.forEach((spec, index) => {
+      let iconNode = view.statusIcons.get(spec.key);
+      if (!iconNode) {
+        iconNode = createUiArtSkinNode(
+          view.node,
+          spec.filename,
+          iconSize,
+          iconSize,
+          `Status_${spec.key}`,
+        );
+        iconNode.setSiblingIndex(view.node.children.length - 1);
+        view.statusIcons.set(spec.key, iconNode);
+      }
+
+      iconNode.setPosition(startX + index * (iconSize + gap), iconY, 0);
+      iconNode.setScale(1, 1, 1);
+    });
+  }
+
   private setUiLayer(node: Node): void {
     node.layer = Layers.Enum.UI_2D;
   }
@@ -232,12 +307,20 @@ export class EnemySystem {
       return `${enemy.label}\n${hp}/${Math.ceil(enemy.maxHp)}`;
     }
 
-    const status =
-      enemy.burnStacks > 0
-        ? ` 火${enemy.burnStacks}`
-        : enemy.poisonStacks > 0
-          ? ` 毒${enemy.poisonStacks}`
-          : '';
+    const statuses: string[] = [];
+    if (enemy.burnStacks > 0) {
+      statuses.push(`火${enemy.burnStacks}`);
+    }
+    if (enemy.poisonStacks > 0) {
+      statuses.push(`毒${enemy.poisonStacks}`);
+    }
+    if (enemy.slowTimeLeft > 0) {
+      statuses.push('缓');
+    }
+    if (enemy.vulnerableTimeLeft > 0) {
+      statuses.push('破');
+    }
+    const status = statuses.length > 0 ? ` ${statuses.join(' ')}` : '';
     return `${enemy.label}\n${hp}${status}`;
   }
 

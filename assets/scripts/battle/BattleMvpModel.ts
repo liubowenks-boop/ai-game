@@ -132,17 +132,17 @@ interface SpawnEnemyParams {
 
 const DEFAULT_OPTIONS: BattleMvpOptions = {
   cityMaxHealth: 100,
-  enemyDamage: 0.65,
+  enemyDamage: 0.5,
   enemyStartY: 470,
   cityLineY: -210,
-  enemyBaseHp: 28,
-  enemyBaseSpeed: 48,
+  enemyBaseHp: 20,
+  enemyBaseSpeed: 34,
   enemyWallHoldSeconds: 3,
-  waveInterval: 2,
-  upgradeInterval: 8,
-  mainAttackDamage: 12,
-  mainAttackInterval: 0.9,
-  heroBaseDps: 4,
+  waveInterval: 3,
+  upgradeInterval: 10,
+  mainAttackDamage: 20,
+  mainAttackInterval: 0.7,
+  heroBaseDps: 5,
   playerPosition: { x: 0, y: -405 },
   random: Math.random,
 };
@@ -240,12 +240,12 @@ export class BattleMvpModel {
     const spawned: EnemyState[] = [];
 
     if (phase === 'boss') {
-      spawned.push(this.spawnWaveEnemy('boss', 0, 1 + cycle * 0.45));
+      spawned.push(this.spawnWaveEnemy('boss', 0, 1 + cycle * 0.3));
       return spawned;
     }
 
     const waveIndex = ((this.wave - 1) % 5) + 1;
-    const power = 0.72 + cycle * 0.22 + waveIndex * 0.06;
+    const power = 0.6 + cycle * 0.16 + waveIndex * 0.05;
 
     if (phase === 'elite') {
       spawned.push(this.spawnWaveEnemy('tank', -170, power));
@@ -472,11 +472,11 @@ export class BattleMvpModel {
     const speed =
       this.options.enemyBaseSpeed *
       config.speedMultiplier *
-      (1 + Math.floor((this.wave - 1) / 5) * 0.08);
+      (1 + Math.floor((this.wave - 1) / 5) * 0.05);
     const damage =
       this.options.enemyDamage *
       config.damageMultiplier *
-      (1 + Math.floor((this.wave - 1) / 5) * 0.25);
+      (1 + Math.floor((this.wave - 1) / 5) * 0.18);
 
     return this.spawnEnemy({
       kind,
@@ -486,7 +486,7 @@ export class BattleMvpModel {
       maxHp: hp,
       speed,
       damage,
-      armor: config.armor + Math.floor((this.wave - 1) / 5) * 0.35,
+      armor: config.armor + Math.floor((this.wave - 1) / 5) * 0.22,
     });
   }
 
