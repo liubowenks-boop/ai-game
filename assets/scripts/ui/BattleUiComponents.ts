@@ -533,21 +533,26 @@ export class ResourceChipView {
     private readonly width: number,
     private readonly height: number,
     parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
   ) {
-    this.node = new Node(`${title}Chip`);
+    this.node = options.hostNode ?? new Node(`${title}Chip`);
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, height);
-    this.graphics = this.node.addComponent(Graphics);
-    createUiArtSkinNode(this.node, 'hud_resource_chip.png', width, height, 'ResourceChipSkin');
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    bindOrCreateUiArtSkinNode(this.node, 'hud_resource_chip.png', width, height, 'ResourceChipSkin');
     const iconFilename = title === '金币' ? 'icon_gold.png' : 'icon_spirit_stone.png';
-    const icon = createUiArtSkinNode(this.node, iconFilename, 26, 26, 'ResourceChipIcon');
+    const icon = bindOrCreateUiArtSkinNode(this.node, iconFilename, 26, 26, 'ResourceChipIcon');
     icon.setPosition(-width / 2 + 22, 0, 0);
     icon.setSiblingIndex(2);
 
-    const labelView = createLabel(
+    const labelView = bindOrCreateLabel(
+      this.node,
+      'ResourceChipLabel',
       `${title} 0`,
       15,
       -1,
@@ -557,8 +562,9 @@ export class ResourceChipView {
       height,
     );
     this.label = labelView.label;
-    this.node.addChild(labelView.node);
-    parent.addChild(this.node);
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
     this.draw();
   }
 
@@ -818,17 +824,26 @@ export class ComboView {
   private readonly graphics: Graphics;
   private readonly label: Label;
 
-  public constructor(x: number, y: number, parent: Node) {
-    this.node = new Node('ComboView');
+  public constructor(
+    x: number,
+    y: number,
+    parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
+  ) {
+    this.node = options.hostNode ?? new Node('ComboView');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(260, 58);
-    this.graphics = this.node.addComponent(Graphics);
-    const comboSkin = createUiArtSkinNode(this.node, 'hud_combo_plate.png', 260, 58, 'ComboSkin');
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    const comboSkin = bindOrCreateUiArtSkinNode(this.node, 'hud_combo_plate.png', 260, 58, 'ComboSkin');
     comboSkin.active = false;
-    const labelView = createLabel(
+    const labelView = bindOrCreateLabel(
+      this.node,
+      'ComboLabel',
       '',
       0,
       -1,
@@ -838,8 +853,9 @@ export class ComboView {
       56,
     );
     this.label = labelView.label;
-    this.node.addChild(labelView.node);
-    parent.addChild(this.node);
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
     this.clear();
   }
 

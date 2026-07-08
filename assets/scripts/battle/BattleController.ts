@@ -14,11 +14,11 @@ import {
 
 import { UpgradeCardSystem } from '../roguelike/UpgradeCardSystem';
 import {
+  bindOrCreateLabel,
   BossHealthBarView,
   CityHealthBarView,
   ComboView,
   createUiArtSkinNode,
-  createLabel as createUiLabel,
   createPanelNode,
   HeroAvatarSlotView,
   ResourceChipView,
@@ -47,6 +47,7 @@ interface FloatingTextView extends TextView {
   timeLeft: number;
   totalTime: number;
   velocityY: number;
+  pooled?: boolean;
 }
 
 interface OutputFocus {
@@ -93,6 +94,7 @@ export class BattleController extends Component {
   private readonly heroAvatarViews: HeroAvatarSlotView[] = [];
   private noticeLabel!: Label;
   private readonly floatingTexts: FloatingTextView[] = [];
+  private readonly floatingTextSlots: Node[] = [];
   private comboCount = 0;
   private comboTimeLeft = 0;
   private noticeTimeLeft = 0;
@@ -163,7 +165,7 @@ export class BattleController extends Component {
     const hudViews = this.createTopHudLayer();
     const midViews = this.createMidStatusLayer();
     this.createBottomHudLayer();
-    this.createReadabilityUi(this.midStatusLayer);
+    this.createReadabilityUi(this.feedbackLayer);
 
     this.enemySystem = new EnemySystem(this.battleLayer);
     this.cityHealthSystem = new CityHealthSystem(this.cityHealthBarView, midViews.statusLabel);
@@ -214,7 +216,9 @@ export class BattleController extends Component {
       218,
     );
 
-    const waveView = createUiLabel(
+    const waveView = bindOrCreateLabel(
+      this.topHudLayer,
+      'WaveLabel',
       '当前波次：0',
       -270,
       606,
@@ -223,9 +227,10 @@ export class BattleController extends Component {
       145,
       34,
     );
-    this.topHudLayer.addChild(waveView.node);
 
-    const remainView = createUiLabel(
+    const remainView = bindOrCreateLabel(
+      this.topHudLayer,
+      'RemainingEnemiesLabel',
       '剩余 0',
       -270,
       574,
@@ -235,13 +240,16 @@ export class BattleController extends Component {
       30,
     );
     this.remainingEnemiesLabel = remainView.label;
-    this.topHudLayer.addChild(remainView.node);
 
     this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer, {
       hostNode: this.topHudLayer.getChildByName('BossHealthBarPrefab'),
     });
-    this.goldChipView = new ResourceChipView('金币', 224, 606, 100, 32, this.topHudLayer);
-    this.stoneChipView = new ResourceChipView('灵石', 224, 574, 100, 32, this.topHudLayer);
+    this.goldChipView = new ResourceChipView('金币', 224, 606, 100, 32, this.topHudLayer, {
+      hostNode: this.topHudLayer.getChildByName('GoldChipPrefab'),
+    });
+    this.stoneChipView = new ResourceChipView('灵石', 224, 574, 100, 32, this.topHudLayer, {
+      hostNode: this.topHudLayer.getChildByName('StoneChipPrefab'),
+    });
 
     this.pauseButtonView = new UiButtonView(
       '暂停',
@@ -256,6 +264,8 @@ export class BattleController extends Component {
         iconSize: 26,
         iconX: -13,
         labelOffsetX: 10,
+        hostNode: this.topHudLayer.getChildByName('PauseButtonPrefab'),
+        labelName: 'PauseLabel',
       },
     );
     this.speedButtonView = new UiButtonView(
@@ -271,6 +281,8 @@ export class BattleController extends Component {
         iconSize: 26,
         iconX: -13,
         labelOffsetX: 10,
+        hostNode: this.topHudLayer.getChildByName('SpeedButtonPrefab'),
+        labelName: 'SpeedLabel',
       },
     );
 
@@ -287,6 +299,8 @@ export class BattleController extends Component {
         iconSize: 28,
         iconX: -50,
         labelOffsetX: 18,
+        hostNode: this.topHudLayer.getChildByName('StartBattleButtonPrefab'),
+        labelName: 'StartBattleLabel',
       },
     );
     this.startButtonLabel = startButton.label;
@@ -305,9 +319,13 @@ export class BattleController extends Component {
         hostNode: this.midStatusLayer.getChildByName('CityHealthBarPrefab'),
       },
     );
-    this.comboView = new ComboView(98, BattleUiV4Layout.cityHp.y, this.midStatusLayer);
+    this.comboView = new ComboView(98, BattleUiV4Layout.cityHp.y, this.midStatusLayer, {
+      hostNode: this.midStatusLayer.getChildByName('ComboView'),
+    });
 
-    const statusView = createUiLabel(
+    const statusView = bindOrCreateLabel(
+      this.midStatusLayer,
+      'StatusLabel',
       '待开始',
       250,
       BattleUiV4Layout.cityHp.y + 14,
@@ -316,9 +334,10 @@ export class BattleController extends Component {
       126,
       28,
     );
-    this.midStatusLayer.addChild(statusView.node);
 
-    const buildHintView = createUiLabel(
+    const buildHintView = bindOrCreateLabel(
+      this.midStatusLayer,
+      'BuildHintLabel',
       '流派：未成型',
       250,
       BattleUiV4Layout.cityHp.y - 14,
@@ -328,7 +347,6 @@ export class BattleController extends Component {
       28,
     );
     this.buildHintLabel = buildHintView.label;
-    this.midStatusLayer.addChild(buildHintView.node);
 
     new UiButtonView(
       '箭塔\n3/3',
@@ -340,6 +358,8 @@ export class BattleController extends Component {
       this.midStatusLayer,
       {
         skinFilename: 'hud_tower_button_final.png',
+        hostNode: this.midStatusLayer.getChildByName('TowerButtonPrefab'),
+        labelName: 'TowerLabel',
       },
     );
     new UiButtonView(
@@ -352,6 +372,8 @@ export class BattleController extends Component {
       this.midStatusLayer,
       {
         skinFilename: 'hud_oil_button_final.png',
+        hostNode: this.midStatusLayer.getChildByName('OilButtonPrefab'),
+        labelName: 'OilLabel',
       },
     );
 
@@ -515,10 +537,52 @@ export class BattleController extends Component {
   }
 
   private createReadabilityUi(parent: Node): void {
-    const notice = this.createLabel('', 0, 278, 34, BattleUiTokens.colors.highlight, 520, 50);
-    notice.node.setPosition(0, 386, 0);
+    const feedbackPool = parent.getChildByName('BattleFeedbackPool') ?? new Node('BattleFeedbackPool');
+    this.setUiLayer(feedbackPool);
+    feedbackPool.setPosition(0, 0, 0);
+
+    if (!feedbackPool.parent) {
+      parent.addChild(feedbackPool);
+    }
+
+    const notice = bindOrCreateLabel(
+      feedbackPool,
+      'NoticeLabel',
+      '',
+      0,
+      386,
+      34,
+      BattleUiTokens.colors.highlight,
+      520,
+      50,
+    );
     this.noticeLabel = notice.label;
-    parent.addChild(notice.node);
+    this.floatingTextSlots.length = 0;
+
+    for (let index = 1; index <= 3; index += 1) {
+      const slotName = `FloatingTextSlot${index}`;
+      const slot = feedbackPool.getChildByName(slotName) ?? new Node(slotName);
+      this.setUiLayer(slot);
+      slot.setPosition(0, 0, 0);
+      slot.active = false;
+
+      if (!slot.parent) {
+        feedbackPool.addChild(slot);
+      }
+
+      bindOrCreateLabel(
+        slot,
+        'FloatingTextLabel',
+        '',
+        0,
+        0,
+        BattleUiTokens.font.body,
+        BattleUiTokens.colors.textPrimary,
+        180,
+        52,
+      );
+      this.floatingTextSlots.push(slot);
+    }
   }
 
   private processReadabilityResult(result: BattleTickResult): void {
@@ -886,7 +950,11 @@ export class BattleController extends Component {
       );
 
       if (view.timeLeft <= 0) {
-        view.node.destroy();
+        if (view.pooled) {
+          view.node.active = false;
+        } else {
+          view.node.destroy();
+        }
         this.floatingTexts.splice(index, 1);
       }
     }
@@ -981,16 +1049,54 @@ export class BattleController extends Component {
     velocityY: number,
     width: number,
   ): void {
-    const view = this.createLabel(text, x, y, fontSize, color, width, 52);
+    const pooledNode = this.getAvailableFloatingTextSlot();
+    const view = pooledNode
+      ? this.bindFloatingTextSlot(pooledNode, text, x, y, fontSize, color, width)
+      : this.createLabel(text, x, y, fontSize, color, width, 52);
     this.feedbackLayer.setSiblingIndex(this.battleLayer.children.length - 1);
-    this.feedbackLayer.addChild(view.node);
+    if (!view.node.parent) {
+      this.feedbackLayer.addChild(view.node);
+    }
     this.floatingTexts.push({
       ...view,
       baseColor: color,
       timeLeft: time,
       totalTime: time,
       velocityY,
+      pooled: Boolean(pooledNode),
     });
+  }
+
+  private getAvailableFloatingTextSlot(): Node | undefined {
+    return this.floatingTextSlots.find(
+      (slot) => !slot.active && !this.floatingTexts.some((view) => view.node === slot),
+    );
+  }
+
+  private bindFloatingTextSlot(
+    node: Node,
+    text: string,
+    x: number,
+    y: number,
+    fontSize: number,
+    color: Color,
+    width: number,
+  ): TextView {
+    node.active = true;
+    node.setPosition(x, y, 0);
+
+    const labelView = bindOrCreateLabel(
+      node,
+      'FloatingTextLabel',
+      text,
+      0,
+      0,
+      fontSize,
+      color,
+      width,
+      52,
+    );
+    return { node, label: labelView.label };
   }
 
   private getDamageTextColor(event: AttackEvent): Color {
@@ -1028,7 +1134,11 @@ export class BattleController extends Component {
 
   private clearReadabilityFeedback(): void {
     for (const view of this.floatingTexts) {
-      view.node.destroy();
+      if (view.pooled) {
+        view.node.active = false;
+      } else {
+        view.node.destroy();
+      }
     }
 
     this.floatingTexts.length = 0;
