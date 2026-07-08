@@ -4,7 +4,12 @@ import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
 import { BattleMvpModel, UpgradeCardState } from '../battle/BattleMvpModel';
 import { BattleUiTokens } from '../ui/BattleUiTokens';
 import { BattleUiV4Layout } from '../ui/BattleUiLayout';
-import { createUiArtSkinNode, UpgradeCardView } from '../ui/BattleUiComponents';
+import {
+  bindOrCreateLabel,
+  bindOrCreateUiArtSkinNode,
+  createUiArtSkinNode,
+  UpgradeCardView,
+} from '../ui/BattleUiComponents';
 
 interface CardView {
   card: UpgradeCardView;
@@ -21,15 +26,17 @@ export class UpgradeCardSystem {
     private readonly onPicked: () => void,
     private readonly onRecruit?: () => void,
   ) {
-    this.root = new Node('UpgradeCardSystem');
+    this.root = parent.getChildByName('UpgradeCardSystem') ?? new Node('UpgradeCardSystem');
     this.setUiLayer(this.root);
 
-    const transform = this.root.addComponent(UITransform);
+    const transform = this.root.getComponent(UITransform) ?? this.root.addComponent(UITransform);
     transform.setContentSize(BattleUiV4Layout.upgradePanel.width, BattleUiV4Layout.upgradePanel.height);
     this.root.setPosition(BattleUiV4Layout.upgradePanel.x, BattleUiV4Layout.upgradePanel.y, 0);
-    parent.addChild(this.root);
+    if (!this.root.parent) {
+      parent.addChild(this.root);
+    }
 
-    const panel = this.root.addComponent(Graphics);
+    const panel = this.root.getComponent(Graphics) ?? this.root.addComponent(Graphics);
     panel.fillColor = BattleUiTokens.colors.panelBase;
     panel.strokeColor = BattleUiTokens.colors.strokeGold;
     panel.lineWidth = 3;
@@ -42,17 +49,25 @@ export class UpgradeCardSystem {
     );
     panel.fill();
     panel.stroke();
-    createUiArtSkinNode(
+    bindOrCreateUiArtSkinNode(
       this.root,
       'card_panel_bg_final.png',
       BattleUiV4Layout.upgradePanel.width,
       BattleUiV4Layout.upgradePanel.height,
       'UpgradePanelSkin',
     );
-    const titleSkin = createUiArtSkinNode(this.root, 'card_panel_title_final.png', 290, 42, 'UpgradeTitleSkin');
+    const titleSkin = bindOrCreateUiArtSkinNode(
+      this.root,
+      'card_panel_title_final.png',
+      290,
+      42,
+      'UpgradeTitleSkin',
+    );
     titleSkin.setPosition(0, 92, 0);
 
-    const title = this.createLabel(
+    bindOrCreateLabel(
+      this.root,
+      'UpgradeTitleLabel',
       '选择强化效果',
       0,
       91,
@@ -61,7 +76,6 @@ export class UpgradeCardSystem {
       300,
       34,
     );
-    this.root.addChild(title.node);
 
     this.root.active = false;
   }
@@ -74,7 +88,7 @@ export class UpgradeCardSystem {
     const positions = [-194, 0, 194];
 
     cards.forEach((card, index) => {
-      const view = this.createCard(card, positions[index], -8);
+      const view = this.createCard(card, positions[index], -8, index);
       this.cards.push(view);
     });
   }
@@ -88,7 +102,8 @@ export class UpgradeCardSystem {
     return this.root.active;
   }
 
-  private createCard(card: UpgradeCardState, x: number, y: number): CardView {
+  private createCard(card: UpgradeCardState, x: number, y: number, index: number): CardView {
+    const hostNode = this.root.getChildByName(`UpgradeCardSlot${index + 1}`);
     const view = new UpgradeCardView(
       {
         id: card.id,
@@ -104,8 +119,13 @@ export class UpgradeCardSystem {
         this.hide();
         this.onPicked();
       },
+      {
+        hostNode,
+      },
     );
-    this.root.addChild(view.node);
+    if (!view.node.parent) {
+      this.root.addChild(view.node);
+    }
 
     return {
       card: view,

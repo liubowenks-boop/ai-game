@@ -11,6 +11,7 @@ type SceneEntry = {
   _name?: string;
   _children?: Array<{ __id__: number }>;
   _components?: Array<{ __id__: number }>;
+  _parent?: { __id__: number } | null;
   _id?: string;
   scene?: { __id__: number };
   node?: { __id__: number };
@@ -51,7 +52,7 @@ const battleLayerId = childByName(canvasId, 'BattleLayer');
 childByName(battleLayerId, 'BattleFeedbackLayer');
 const topHudLayerId = childByName(canvasId, 'TopHudLayer');
 const midStatusLayerId = childByName(canvasId, 'MidStatusLayer');
-childByName(canvasId, 'UpgradePanelLayer');
+const upgradePanelLayerId = childByName(canvasId, 'UpgradePanelLayer');
 childByName(canvasId, 'BottomHudLayer');
 
 const bossHealthBarPrefabId = childByName(topHudLayerId, 'BossHealthBarPrefab');
@@ -65,5 +66,31 @@ childByName(cityHealthBarPrefabId, 'CityHpLabel');
 childByName(cityHealthBarPrefabId, 'CityHpBarBg');
 childByName(cityHealthBarPrefabId, 'CityHpBarFill');
 childByName(cityHealthBarPrefabId, 'CityHpHitFlash');
+
+const upgradeCardSystemId = childByName(upgradePanelLayerId, 'UpgradeCardSystem');
+childByName(upgradeCardSystemId, 'UpgradePanelSkin');
+childByName(upgradeCardSystemId, 'UpgradeTitleSkin');
+childByName(upgradeCardSystemId, 'UpgradeTitleLabel');
+
+for (const slotName of ['UpgradeCardSlot1', 'UpgradeCardSlot2', 'UpgradeCardSlot3']) {
+  const slotId = childByName(upgradeCardSystemId, slotName);
+  childByName(slotId, 'CardSkin');
+  childByName(slotId, 'CardFrame');
+  childByName(slotId, 'CardTitleLabel');
+  childByName(slotId, 'IconPlaceholder');
+  childByName(slotId, 'CardDescriptionLabel');
+  childByName(slotId, 'CardStarLabel');
+  childByName(slotId, 'CardSchoolTagLabel');
+}
+
+scene.forEach((parent, parentId) => {
+  for (const child of parent._children ?? []) {
+    assert.equal(
+      entry(child.__id__)._parent?.__id__,
+      parentId,
+      `${entry(child.__id__)._name ?? child.__id__} has mismatched parent reference`,
+    );
+  }
+});
 
 console.log('pass: BattleMain scene has the expected editable layer skeleton');

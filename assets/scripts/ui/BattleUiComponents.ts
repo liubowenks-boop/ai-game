@@ -220,6 +220,41 @@ export function createUiArtSkinNode(
   return node;
 }
 
+export function bindOrCreateUiArtSkinNode(
+  parent: Node,
+  filename: string,
+  width: number,
+  height: number,
+  name = 'UiArtSkin',
+): Node {
+  const node = parent.getChildByName(name) ?? new Node(name);
+  setUiLayer(node);
+  node.setPosition(0, 0, 0);
+
+  const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+  transform.setContentSize(width, height);
+
+  const sprite = node.getComponent(Sprite) ?? node.addComponent(Sprite);
+  sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+
+  const spec = getUiArtAsset(filename);
+  sprite.type = spec?.nineSlice ? Sprite.Type.SLICED : Sprite.Type.SIMPLE;
+
+  if (!node.parent) {
+    parent.addChild(node);
+  }
+
+  node.setSiblingIndex(0);
+
+  loadUiSpriteFrame(filename, (frame) => {
+    if (frame && node.isValid) {
+      sprite.spriteFrame = frame;
+    }
+  });
+
+  return node;
+}
+
 export function createProgramLayer(
   name: string,
   parent: Node,
@@ -971,6 +1006,7 @@ export class UpgradeCardView {
   public readonly node: Node;
   private readonly graphics: Graphics;
   private readonly iconGraphics: Graphics;
+  private readonly ownsNode: boolean;
   private selected = false;
 
   public constructor(
@@ -978,17 +1014,22 @@ export class UpgradeCardView {
     x: number,
     y: number,
     private readonly onPicked: (cardId: string) => void,
+    viewOptions: {
+      hostNode?: Node | null;
+    } = {},
   ) {
-    this.node = new Node(`UpgradeCardView_${options.id}`);
+    this.ownsNode = !viewOptions.hostNode;
+    this.node = viewOptions.hostNode ?? new Node(`UpgradeCardView_${options.id}`);
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
+    this.node.active = true;
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(178, 178);
-    this.graphics = this.node.addComponent(Graphics);
-    this.node.addComponent(Button);
-    createUiArtSkinNode(this.node, this.getCardSkin(), 178, 178, 'CardSkin');
-    const frame = createUiArtSkinNode(
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    this.node.getComponent(Button) ?? this.node.addComponent(Button);
+    bindOrCreateUiArtSkinNode(this.node, this.getCardSkin(), 178, 178, 'CardSkin');
+    const frame = bindOrCreateUiArtSkinNode(
       this.node,
       'card_frame_legendary_final.png',
       186,
@@ -996,12 +1037,15 @@ export class UpgradeCardView {
       'CardFrame',
     );
     frame.setSiblingIndex(1);
+    this.node.off(Button.EventType.CLICK);
     this.node.on(Button.EventType.CLICK, () => {
       this.setSelected(true);
       this.onPicked(this.options.id);
     });
 
-    const title = createLabel(
+    const title = bindOrCreateLabel(
+      this.node,
+      'CardTitleLabel',
       options.title,
       0,
       58,
@@ -1010,16 +1054,14 @@ export class UpgradeCardView {
       160,
       24,
     );
-    this.addTextOutline(title.node, 3);
-    this.node.addChild(title.node);
 
-    const icon = new Node('IconPlaceholder');
+    const icon = ensureNamedUiChild(this.node, 'IconPlaceholder', 0, 16, 58, 58);
     setUiLayer(icon);
-    const iconTransform = icon.addComponent(UITransform);
+    const iconTransform = icon.getComponent(UITransform) ?? icon.addComponent(UITransform);
     iconTransform.setContentSize(58, 58);
     icon.setPosition(0, 16, 0);
-    this.iconGraphics = icon.addComponent(Graphics);
-    const schoolIcon = createUiArtSkinNode(
+    this.iconGraphics = icon.getComponent(Graphics) ?? icon.addComponent(Graphics);
+    const schoolIcon = bindOrCreateUiArtSkinNode(
       icon,
       getSchoolIconFilename(options.school),
       50,
@@ -1027,9 +1069,10 @@ export class UpgradeCardView {
       'SchoolIcon',
     );
     schoolIcon.setSiblingIndex(1);
-    this.node.addChild(icon);
 
-    const desc = createLabel(
+    const desc = bindOrCreateLabel(
+      this.node,
+      'CardDescriptionLabel',
       options.description,
       0,
       -34,
@@ -1038,10 +1081,10 @@ export class UpgradeCardView {
       150,
       38,
     );
-    this.addTextOutline(desc.node, 2);
-    this.node.addChild(desc.node);
 
-    const stars = createLabel(
+    const stars = bindOrCreateLabel(
+      this.node,
+      'CardStarLabel',
       '★★★★★',
       0,
       -66,
@@ -1050,10 +1093,10 @@ export class UpgradeCardView {
       140,
       20,
     );
-    this.addTextOutline(stars.node, 2);
-    this.node.addChild(stars.node);
 
-    const tag = createLabel(
+    const tag = bindOrCreateLabel(
+      this.node,
+      'CardSchoolTagLabel',
       this.getSchoolLabel(options.school),
       0,
       -84,
@@ -1062,8 +1105,6 @@ export class UpgradeCardView {
       108,
       20,
     );
-    this.addTextOutline(tag.node, 2);
-    this.node.addChild(tag.node);
     this.redraw();
   }
 
@@ -1073,7 +1114,15 @@ export class UpgradeCardView {
   }
 
   public destroy(): void {
-    this.node.destroy();
+    this.node.off(Button.EventType.CLICK);
+    this.selected = false;
+
+    if (this.ownsNode) {
+      this.node.destroy();
+      return;
+    }
+
+    this.node.active = false;
   }
 
   private redraw(): void {
