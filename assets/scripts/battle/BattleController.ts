@@ -822,19 +822,59 @@ export class BattleController extends Component {
     }
 
     this.playerGraphics.clear();
-    this.playerGraphics.fillColor =
+
+    // Ground shadow (ellipse below feet)
+    this.playerGraphics.fillColor = new Color(0, 0, 0, 90);
+    this.playerGraphics.ellipse(0, -40, 34, 10);
+    this.playerGraphics.fill();
+
+    // Base body color
+    const baseColor =
       highlightStrength > 0
         ? new Color(78, 164, 255, 255)
         : majorFocusActive
           ? new Color(58, 116, 186, 215)
           : new Color(70, 148, 242, 255);
+
+    // Bottom darker layer (depth shadow)
+    this.playerGraphics.fillColor = new Color(
+      Math.max(0, baseColor.r - 45),
+      Math.max(0, baseColor.g - 45),
+      Math.max(0, baseColor.b - 35),
+      baseColor.a,
+    );
+    this.playerGraphics.roundRect(-36, -36, 72, 40, 10);
+    this.playerGraphics.fill();
+
+    // Main body
+    this.playerGraphics.fillColor = baseColor;
+    this.playerGraphics.roundRect(-36, -18, 72, 54, 10);
+    this.playerGraphics.fill();
+
+    // Top highlight layer (lighter, gives gradient feel)
+    this.playerGraphics.fillColor = new Color(
+      Math.min(255, baseColor.r + 55),
+      Math.min(255, baseColor.g + 55),
+      Math.min(255, baseColor.b + 40),
+      Math.floor(baseColor.a * 0.55),
+    );
+    this.playerGraphics.roundRect(-34, -14, 68, 22, 8);
+    this.playerGraphics.fill();
+
+    // Outline
     this.playerGraphics.strokeColor =
       highlightStrength > 0
         ? new Color(255, 248, 168, 255)
         : new Color(255, 255, 255, majorFocusActive ? 150 : 230);
     this.playerGraphics.lineWidth = highlightStrength > 0 ? 6 : 4;
     this.playerGraphics.roundRect(-36, -36, 72, 72, 10);
-    this.playerGraphics.fill();
+    this.playerGraphics.stroke();
+
+    // Top edge highlight (specular)
+    this.playerGraphics.strokeColor = new Color(255, 255, 255, 110);
+    this.playerGraphics.lineWidth = 2;
+    this.playerGraphics.moveTo(-28, 30);
+    this.playerGraphics.lineTo(28, 30);
     this.playerGraphics.stroke();
   }
 

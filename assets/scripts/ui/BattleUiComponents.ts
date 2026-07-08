@@ -258,8 +258,16 @@ export function createLabel(
   label.color = color;
   label.horizontalAlign = Label.HorizontalAlign.CENTER;
   label.verticalAlign = Label.VerticalAlign.CENTER;
+  applyLabelOutline(label, fontSize);
 
   return { node, label };
+}
+
+export function applyLabelOutline(label: Label, fontSize: number): void {
+  const outline = label.node.getComponent(LabelOutline) ?? label.node.addComponent(LabelOutline);
+  const width = Math.max(2, Math.round(fontSize * 0.14));
+  outline.width = width;
+  outline.color = uiColor(Color.BLACK, 205);
 }
 
 export function createPanelNode(

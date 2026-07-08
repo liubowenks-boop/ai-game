@@ -12,6 +12,8 @@ interface EnemyNodeView {
   lastHp: number;
   flashTimeLeft: number;
   statusIcons: Map<string, Node>;
+  bobPhase: number;
+  bobOffset: number;
 }
 
 export type VisualFocusTarget = 'none' | 'boss' | 'city' | 'combo' | 'output';
@@ -30,10 +32,12 @@ export class EnemySystem {
   private readonly enemyViews = new Map<number, EnemyNodeView>();
   private static readonly STATUS_ICON_SIZE = 22;
   private static readonly STATUS_ICON_GAP = 4;
+  private timeAccumulator = 0;
 
   public constructor(private readonly parent: Node) {}
 
   public sync(enemies: EnemyState[], visualContext: EnemyVisualContext = { focus: 'none' }): void {
+    this.timeAccumulator += 1 / 60;
     const aliveIds = new Set(enemies.map((enemy) => enemy.id));
     const crowded = enemies.length >= 10;
 
@@ -46,7 +50,9 @@ export class EnemySystem {
 
     for (const enemy of enemies) {
       const view = this.enemyViews.get(enemy.id) ?? this.createEnemyView(enemy);
-      view.node.setPosition(enemy.position.x, enemy.position.y, 0);
+      const bob = this.computeBobOffset(enemy, view.bobPhase);
+      view.bobOffset = bob;
+      view.node.setPosition(enemy.position.x, enemy.position.y + bob, 0);
       view.label.string = this.getEnemyLabel(enemy);
       view.label.color = this.getLabelColor(enemy, crowded, visualContext);
 
@@ -126,6 +132,8 @@ export class EnemySystem {
       lastHp: enemy.hp,
       flashTimeLeft: 0,
       statusIcons: new Map<string, Node>(),
+      bobPhase: Math.random() * Math.PI * 2,
+      bobOffset: 0,
     };
     this.drawEnemy(enemy, view, false, { focus: 'none' });
     this.enemyViews.set(enemy.id, view);
@@ -145,13 +153,19 @@ export class EnemySystem {
     const focusOnBurst = visualContext.focus === 'combo';
     const muted = (!important && crowded) || (!important && (focusOnP0 || focusOnBurst));
     const alpha = this.getEnemyAlpha(enemy, muted, focusOnP0 || focusOnBurst);
-    const fillColor = this.getEnemyColor(enemy, alpha);
+    const fillColorRaw = this.getEnemyColor(enemy, alpha);
     const flash = view.flashTimeLeft > 0;
     const bossFocused = enemy.kind === 'boss' && visualContext.focus === 'boss';
     const scale = this.getEnemyScale(enemy, flash, bossFocused, muted);
 
     view.node.setScale(scale, scale, 1);
     view.graphics.clear();
+
+    // Ground shadow (stays on ground, doesn't bob with body)
+    const shadowAlpha = Math.min(alpha, 110);
+    view.graphics.fillColor = new Color(0, 0, 0, shadowAlpha);
+    view.graphics.ellipse(0, -size / 2 - 4, size * 0.55, size * 0.18);
+    view.graphics.fill();
 
     if (enemy.kind === 'boss') {
       view.graphics.strokeColor = new Color(255, 72, 72, bossFocused ? 165 : 105);
@@ -165,9 +179,36 @@ export class EnemySystem {
       view.graphics.stroke();
     }
 
-    view.graphics.fillColor = flash
+    const fillColor = flash
       ? new Color(255, 246, 210, enemy.kind === 'boss' ? 255 : 220)
-      : fillColor;
+      : fillColorRaw;
+
+    // Bottom darker layer (depth shadow on lower half)
+    view.graphics.fillColor = new Color(
+      Math.max(0, fillColor.r - 50),
+      Math.max(0, fillColor.g - 50),
+      Math.max(0, fillColor.b - 40),
+      fillColor.a,
+    );
+    view.graphics.roundRect(-size / 2, -size / 2, size, size * 0.6, enemy.kind === 'boss' ? 12 : 8);
+    view.graphics.fill();
+
+    // Main body
+    view.graphics.fillColor = fillColor;
+    view.graphics.roundRect(-size / 2, -size / 2 + size * 0.2, size, size * 0.8, enemy.kind === 'boss' ? 12 : 8);
+    view.graphics.fill();
+
+    // Top highlight layer (lighter, gives gradient feel)
+    view.graphics.fillColor = new Color(
+      Math.min(255, fillColor.r + 50),
+      Math.min(255, fillColor.g + 50),
+      Math.min(255, fillColor.b + 40),
+      Math.floor(fillColor.a * 0.5),
+    );
+    view.graphics.roundRect(-size / 2 + 4, -size / 2 + 4, size - 8, size * 0.35, enemy.kind === 'boss' ? 10 : 6);
+    view.graphics.fill();
+
+    // Outline
     view.graphics.strokeColor = flash
       ? new Color(255, 255, 255, 255)
       : important
@@ -175,7 +216,6 @@ export class EnemySystem {
         : new Color(255, 230, 160, Math.min(alpha, 210));
     view.graphics.lineWidth = enemy.kind === 'boss' ? 6 : important ? 4 : 3;
     view.graphics.roundRect(-size / 2, -size / 2, size, size, enemy.kind === 'boss' ? 12 : 8);
-    view.graphics.fill();
     view.graphics.stroke();
 
     if (enemy.burnStacks > 0) {
@@ -298,6 +338,23 @@ export class EnemySystem {
 
   private setUiLayer(node: Node): void {
     node.layer = Layers.Enum.UI_2D;
+  }
+
+  private computeBobOffset(enemy: EnemyState, phase: number): number {
+    // Only bob while moving (alive and not at wall)
+    const moving = enemy.alive && enemy.position.y > this.options_cityLineY(enemy);
+    if (!moving) {
+      return 0;
+    }
+    // Speed-based bob frequency; faster enemies bob quicker
+    const speedFactor = Math.max(0.5, Math.min(2.5, enemy.speed / 40));
+    const amplitude = enemy.kind === 'boss' ? 2 : 3;
+    return Math.sin(this.timeAccumulator * speedFactor * 6 + phase) * amplitude;
+  }
+
+  private options_cityLineY(enemy: EnemyState): number {
+    // Approximate city line for bob gating; actual value comes from model options
+    return -210;
   }
 
   private getEnemyLabel(enemy: EnemyState): string {

@@ -87,7 +87,7 @@ runTest('default enemy tuning is slower and less punishing for readable mobile c
   assert.equal(model.options.enemyBaseSpeed, 34);
   assert.equal(model.options.enemyDamage, 0.5);
   assert.equal(model.options.enemyBaseHp, 20);
-  assert.equal(model.options.mainAttackDamage, 20);
+  assert.equal(model.options.mainAttackDamage, 16);
   assert.equal(model.options.waveInterval, 3);
   assert.ok((fast?.speedMultiplier ?? 99) <= 1.12);
   assert.ok((boss?.damageMultiplier ?? 99) <= 4.5);
