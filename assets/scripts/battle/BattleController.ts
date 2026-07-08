@@ -301,6 +301,9 @@ export class BattleController extends Component {
       BattleUiV4Layout.cityHp.y,
       292,
       this.midStatusLayer,
+      {
+        hostNode: this.midStatusLayer.getChildByName('CityHealthBarPrefab'),
+      },
     );
     this.comboView = new ComboView(98, BattleUiV4Layout.cityHp.y, this.midStatusLayer);
 

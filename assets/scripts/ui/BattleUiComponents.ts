@@ -670,17 +670,22 @@ export class CityHealthBarView {
     y: number,
     private readonly width: number,
     parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
   ) {
-    this.node = new Node('CityHealthBarView');
+    this.node = options.hostNode ?? new Node('CityHealthBarView');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, 46);
-    this.graphics = this.node.addComponent(Graphics);
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
     createUiArtSkinNode(this.node, 'hud_city_hp_bg.png', width, 44, 'CityHpSkin');
 
-    const labelView = createLabel(
+    const labelView = bindOrCreateLabel(
+      this.node,
+      'CityHpLabel',
       '城池 100/100',
       0,
       -1,
@@ -690,8 +695,14 @@ export class CityHealthBarView {
       44,
     );
     this.label = labelView.label;
-    this.node.addChild(labelView.node);
-    parent.addChild(this.node);
+
+    ensureNamedUiChild(this.node, 'CityHpBarBg', 0, 0, width, 30);
+    ensureNamedUiChild(this.node, 'CityHpBarFill', 0, 0, width, 30);
+    ensureNamedUiChild(this.node, 'CityHpHitFlash', 0, 0, width + 12, 42);
+
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
   }
 
   public refresh(current: number, max: number, focused: boolean): void {

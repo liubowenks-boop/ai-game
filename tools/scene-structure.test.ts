@@ -50,7 +50,7 @@ const canvasId = childByName(battleRootId, 'BattleMainCanvas');
 const battleLayerId = childByName(canvasId, 'BattleLayer');
 childByName(battleLayerId, 'BattleFeedbackLayer');
 const topHudLayerId = childByName(canvasId, 'TopHudLayer');
-childByName(canvasId, 'MidStatusLayer');
+const midStatusLayerId = childByName(canvasId, 'MidStatusLayer');
 childByName(canvasId, 'UpgradePanelLayer');
 childByName(canvasId, 'BottomHudLayer');
 
@@ -59,5 +59,11 @@ childByName(bossHealthBarPrefabId, 'BossNameLabel');
 childByName(bossHealthBarPrefabId, 'BossHpBarBg');
 childByName(bossHealthBarPrefabId, 'BossHpBarFill');
 childByName(bossHealthBarPrefabId, 'BossHpValueLabel');
+
+const cityHealthBarPrefabId = childByName(midStatusLayerId, 'CityHealthBarPrefab');
+childByName(cityHealthBarPrefabId, 'CityHpLabel');
+childByName(cityHealthBarPrefabId, 'CityHpBarBg');
+childByName(cityHealthBarPrefabId, 'CityHpBarFill');
+childByName(cityHealthBarPrefabId, 'CityHpHitFlash');
 
 console.log('pass: BattleMain scene has the expected editable layer skeleton');
