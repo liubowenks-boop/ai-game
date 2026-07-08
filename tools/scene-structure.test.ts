@@ -53,7 +53,7 @@ childByName(battleLayerId, 'BattleFeedbackLayer');
 const topHudLayerId = childByName(canvasId, 'TopHudLayer');
 const midStatusLayerId = childByName(canvasId, 'MidStatusLayer');
 const upgradePanelLayerId = childByName(canvasId, 'UpgradePanelLayer');
-childByName(canvasId, 'BottomHudLayer');
+const bottomHudLayerId = childByName(canvasId, 'BottomHudLayer');
 
 const bossHealthBarPrefabId = childByName(topHudLayerId, 'BossHealthBarPrefab');
 childByName(bossHealthBarPrefabId, 'BossNameLabel');
@@ -82,6 +82,27 @@ for (const slotName of ['UpgradeCardSlot1', 'UpgradeCardSlot2', 'UpgradeCardSlot
   childByName(slotId, 'CardStarLabel');
   childByName(slotId, 'CardSchoolTagLabel');
 }
+
+childByName(bottomHudLayerId, 'BottomHudFrame');
+
+for (const slotName of ['HeroAvatarSlot1', 'HeroAvatarSlot2', 'HeroAvatarSlot3']) {
+  const slotId = childByName(bottomHudLayerId, slotName);
+  childByName(slotId, 'AvatarSkin');
+  childByName(slotId, 'AvatarPortrait');
+  childByName(slotId, 'AvatarLabel');
+}
+
+const ultimateButtonPrefabId = childByName(bottomHudLayerId, 'UltimateButtonPrefab');
+childByName(ultimateButtonPrefabId, 'ButtonSkin');
+childByName(ultimateButtonPrefabId, 'UltimateLabel');
+
+const autoButtonPrefabId = childByName(bottomHudLayerId, 'AutoButtonPrefab');
+childByName(autoButtonPrefabId, 'ButtonSkin');
+childByName(autoButtonPrefabId, 'AutoLabel');
+
+const bondButtonPrefabId = childByName(bottomHudLayerId, 'BondButtonPrefab');
+childByName(bondButtonPrefabId, 'ButtonSkin');
+childByName(bondButtonPrefabId, 'BondLabel');
 
 scene.forEach((parent, parentId) => {
   for (const child of parent._children ?? []) {

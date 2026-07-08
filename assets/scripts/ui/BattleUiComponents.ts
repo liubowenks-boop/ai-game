@@ -370,22 +370,24 @@ export function createPanelNode(
   parent: Node,
   alpha = 226,
 ): { node: Node; graphics: Graphics } {
-  const node = new Node(name);
+  const node = parent.getChildByName(name) ?? new Node(name);
   setUiLayer(node);
 
-  const transform = node.addComponent(UITransform);
+  const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
   transform.setContentSize(width, height);
   node.setPosition(x, y, 0);
 
-  const graphics = node.addComponent(Graphics);
+  const graphics = node.getComponent(Graphics) ?? node.addComponent(Graphics);
   drawPanel(graphics, width, height, alpha);
-  parent.addChild(node);
+  if (!node.parent) {
+    parent.addChild(node);
+  }
   const panelSkinMap: Record<string, string> = {
     TopHudFrame: 'hud_top_frame.png',
     MidStatusFrame: 'hud_mid_status_frame.png',
     BottomHudFrame: 'hud_bottom_hero_bar_final.png',
   };
-  createUiArtSkinNode(node, panelSkinMap[name] ?? 'ui_panel_dark_gold.png', width, height);
+  bindOrCreateUiArtSkinNode(node, panelSkinMap[name] ?? 'ui_panel_dark_gold.png', width, height);
   return { node, graphics };
 }
 
@@ -419,18 +421,20 @@ export class UiButtonView {
       iconSize?: number;
       iconX?: number;
       labelOffsetX?: number;
+      hostNode?: Node | null;
+      labelName?: string;
     } = {},
   ) {
-    this.node = new Node(text || 'UiButton');
+    this.node = this.options.hostNode ?? new Node(text || 'UiButton');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, height);
-    this.graphics = this.node.addComponent(Graphics);
-    this.node.addComponent(Button);
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    this.node.getComponent(Button) ?? this.node.addComponent(Button);
     this.draw(false);
-    createUiArtSkinNode(
+    bindOrCreateUiArtSkinNode(
       this.node,
       this.options.skinFilename ?? this.getSkinFilename(),
       width,
@@ -440,12 +444,20 @@ export class UiButtonView {
 
     if (this.options.iconFilename) {
       const iconSize = this.options.iconSize ?? Math.min(height - 16, 34);
-      const icon = createUiArtSkinNode(this.node, this.options.iconFilename, iconSize, iconSize, 'ButtonIcon');
+      const icon = bindOrCreateUiArtSkinNode(
+        this.node,
+        this.options.iconFilename,
+        iconSize,
+        iconSize,
+        'ButtonIcon',
+      );
       icon.setPosition(this.options.iconX ?? -width * 0.26, 0, 0);
       icon.setSiblingIndex(2);
     }
 
-    const labelView = createLabel(
+    const labelView = bindOrCreateLabel(
+      this.node,
+      this.options.labelName ?? 'ButtonLabel',
       text,
       this.options.labelOffsetX ?? (this.options.iconFilename ? width * 0.12 : 0),
       -1,
@@ -455,8 +467,9 @@ export class UiButtonView {
       height,
     );
     this.label = labelView.label;
-    this.node.addChild(labelView.node);
-    parent.addChild(this.node);
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
   }
 
   public onClick(handler: () => void): void {
@@ -867,9 +880,18 @@ export class ComboView {
 export class UltimateButtonView {
   public readonly button: UiButtonView;
 
-  public constructor(x: number, y: number, parent: Node) {
+  public constructor(
+    x: number,
+    y: number,
+    parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
+  ) {
     this.button = new UiButtonView('绝', x, y, 123, 123, BattleUiTokens.colors.primaryRed, parent, {
       skinFilename: 'hud_ultimate_button_final.png',
+      hostNode: options.hostNode,
+      labelName: 'UltimateLabel',
     });
     this.button.label.fontSize = 36;
     this.button.label.lineHeight = 40;
@@ -889,16 +911,21 @@ export class HeroAvatarSlotView {
     y: number,
     private readonly size: number,
     parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
   ) {
-    this.node = new Node('HeroAvatarSlotView');
+    this.node = options.hostNode ?? new Node('HeroAvatarSlotView');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(size, size);
-    this.graphics = this.node.addComponent(Graphics);
-    createUiArtSkinNode(this.node, 'hud_avatar_slot_empty.png', size, size, 'AvatarSkin');
-    const labelView = createLabel(
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    bindOrCreateUiArtSkinNode(this.node, 'hud_avatar_slot_empty.png', size, size, 'AvatarSkin');
+    const labelView = bindOrCreateLabel(
+      this.node,
+      'AvatarLabel',
       '空',
       0,
       -4,
@@ -908,8 +935,9 @@ export class HeroAvatarSlotView {
       size,
     );
     this.label = labelView.label;
-    this.node.addChild(labelView.node);
-    parent.addChild(this.node);
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
     this.refresh('', 0, false);
   }
 
@@ -964,6 +992,7 @@ export class HeroAvatarSlotView {
 
   private refreshPortrait(heroName: string): void {
     const filename = getHeroPortraitFilename(heroName) ?? '';
+    this.portraitNode = this.portraitNode ?? this.node.getChildByName('AvatarPortrait') ?? undefined;
 
     if (!filename) {
       if (this.portraitNode) {
@@ -978,12 +1007,8 @@ export class HeroAvatarSlotView {
       return;
     }
 
-    if (this.portraitNode) {
-      this.portraitNode.destroy();
-    }
-
     this.portraitFilename = filename;
-    this.portraitNode = createUiArtSkinNode(
+    this.portraitNode = bindOrCreateUiArtSkinNode(
       this.node,
       filename,
       this.size - 12,

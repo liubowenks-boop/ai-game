@@ -374,9 +374,11 @@ export class BattleController extends Component {
       BattleUiV4Layout.heroBar.x,
       BattleUiV4Layout.heroBar.x + 144,
     ];
-    avatarXs.forEach((x) => {
+    avatarXs.forEach((x, index) => {
       this.heroAvatarViews.push(
-        new HeroAvatarSlotView(x, BattleUiV4Layout.heroBar.y, 72, this.bottomHudLayer),
+        new HeroAvatarSlotView(x, BattleUiV4Layout.heroBar.y, 72, this.bottomHudLayer, {
+          hostNode: this.bottomHudLayer.getChildByName(`HeroAvatarSlot${index + 1}`),
+        }),
       );
     });
 
@@ -384,6 +386,9 @@ export class BattleController extends Component {
       BattleUiV4Layout.ultimateButton.x,
       BattleUiV4Layout.ultimateButton.y,
       this.bottomHudLayer,
+      {
+        hostNode: this.bottomHudLayer.getChildByName('UltimateButtonPrefab'),
+      },
     );
     this.autoButtonView = new UiButtonView(
       '自动',
@@ -395,6 +400,8 @@ export class BattleController extends Component {
       this.bottomHudLayer,
       {
         skinFilename: 'hud_right_action_button_final.png',
+        hostNode: this.bottomHudLayer.getChildByName('AutoButtonPrefab'),
+        labelName: 'AutoLabel',
       },
     );
     this.bondButtonView = new UiButtonView(
@@ -407,6 +414,8 @@ export class BattleController extends Component {
       this.bottomHudLayer,
       {
         skinFilename: 'hud_right_action_button_final.png',
+        hostNode: this.bottomHudLayer.getChildByName('BondButtonPrefab'),
+        labelName: 'BondLabel',
       },
     );
   }
