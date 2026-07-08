@@ -2,11 +2,13 @@
 
 ## 技术栈
 
-项目使用 **Cocos Creator 3.8 + TypeScript**。当前阶段是《英雄令》v0.2 可玩性构筑版本，只做可运行原型闭环和局内构筑差异，不接平台 API，不导入美术资源。
+项目使用 **Cocos Creator 3.8 + TypeScript**。当前阶段是《英雄令》局内表现与商业 UI v4 准备阶段：保持可运行战斗闭环，逐步把程序 UI 迁移到 Cocos 场景和后续预制体承载层，不接平台 API。
 
 ## 当前代码结构
 
-- `assets/scripts/battle/BattleController.ts`：Cocos 入口组件。运行时动态创建 Canvas、基础按钮、标签、敌人色块、主角节点和棋盘按钮。
+- `assets/scenes/BattleMain.scene`：正式局内入口场景。保留 `BattleRoot` 和 `BattleMainCanvas` 下的 UI Layer 骨架。
+- `assets/scenes/BattleMvp.scene`：旧原型兼容场景。仍可用于快速验证。
+- `assets/scripts/battle/BattleController.ts`：Cocos 入口组件。优先复用场景中已有的 Canvas 和 Layer；缺失时自动创建兜底节点。
 - `assets/scripts/battle/BattleMvpModel.ts`：纯 TypeScript 规则模型，不依赖 Cocos。负责核心战斗状态、三流派构筑、波次节奏、英雄 DPS 和敌人状态，便于用 Node 直接测试。
 - `assets/scripts/data/BattleConfig.ts`：英雄、敌人、强化卡静态配置。后续调数值优先修改该文件。
 - `assets/scripts/battle/EnemySystem.ts`：根据模型中的敌人状态创建、移动和销毁原型敌人节点。
@@ -15,7 +17,14 @@
 - `assets/scripts/battle/CityHealthSystem.ts`：刷新城池血量和失败状态。
 - `assets/scripts/battle/GridPlacementSystem.ts`：招募按钮、前排 3 格、后排 2 格、放置和合成后的显示刷新。
 - `assets/scripts/roguelike/UpgradeCardSystem.ts`：三选一强化卡片显示和点击生效。
+- `assets/scripts/ui/BattleUiComponents.ts`：Boss 血条、城池血条、Combo、按钮、头像槽、资源条、通用美术加载等 UI 承载组件。
+- `assets/scripts/ui/BattleUiLayout.ts`：`720x1280` 竖屏布局常量和安全区测试入口。
+- `assets/scripts/ui/BattleUiTokens.ts`：红金、雷系、召唤系、字号、描边、圆角等视觉 token。
+- `assets/scripts/ui/BattleUiSceneBindings.ts`：场景节点绑定辅助，连接 `BattleMain.scene` 与运行时自动兜底。
+- `assets/scripts/ui/UiArtManifest.ts`：运行 UI 美术资源索引。
 - `tools/mvp-model.test.ts`：规则测试，覆盖刷怪、城血、最近目标、三流派强化、火烧、雷链、Boss 波次和同名合成。
+- `tools/ui-layout-v4.test.ts`：检查 720x1280 UI 安全区和基础对齐。
+- `tools/scene-structure.test.ts`：检查 `BattleMain.scene` 层级结构和入口组件。
 
 ## 模块职责
 
@@ -33,7 +42,7 @@
 
 ### ui
 
-当前没有单独 UI 组件文件。MVP UI 由 `BattleController` 和系统类动态创建，后续正式 UI 再拆到该目录。
+当前已有 UI token、布局常量、通用组件和场景绑定辅助。第一轮仍由 TypeScript 生成大部分具体节点，但节点会优先挂在 `BattleMain.scene` 中的固定 Layer 下。`BossHealthBarView` 已完成场景内 `BossHealthBarPrefab` 占位绑定；后续继续把 `CityHealthBarView`、`UpgradeCardView`、`UltimateButtonView`、`HeroAvatarSlotView` 迁移为 Prefab。
 
 ### platform
 
@@ -47,16 +56,18 @@
 
 当前未新增工具函数。后续可放随机、数学、格式化等无业务状态工具。
 
-## 当前 MVP 运行流
+## 当前运行流
 
-1. Cocos 场景中挂载 `BattleController`。
-2. `BattleController.start()` 动态创建原型 Canvas、战场层和 UI 层。
-3. 玩家点击“开始战斗”后调用 `BattleMvpModel.startBattle()`。
-4. 每帧由 `BattleMvpModel.tick(deltaTime)` 推进规则。
-5. `EnemySystem` 将敌人状态同步为原型色块节点。
-6. `PlayerAutoAttackSystem` 展示主角攻击连线。
-7. `UpgradeCardSystem` 在模型触发强化时显示 3 张流派卡片。
-8. `GridPlacementSystem` 处理招募、放置、同格/相邻合成、上阵数量和英雄 DPS 显示。
+1. Cocos 打开 `assets/scenes/BattleMain.scene`。
+2. `BattleRoot` 上挂载 `BattleController`。
+3. `BattleController.start()` 复用 `BattleMainCanvas` 下的 `BattleLayer`、`TopHudLayer`、`MidStatusLayer`、`UpgradePanelLayer`、`BottomHudLayer`。
+4. 如果临时场景缺失这些节点，`BattleUiSceneBindings` 会自动创建同名节点作为兜底。
+5. 玩家点击“开始战斗”后调用 `BattleMvpModel.startBattle()`。
+6. 每帧由 `BattleMvpModel.tick(deltaTime)` 推进规则。
+7. `EnemySystem` 将敌人状态同步为原型节点。
+8. `PlayerAutoAttackSystem` 展示主角攻击连线。
+9. `UpgradeCardSystem` 在模型触发强化时显示 3 张流派卡片。
+10. `GridPlacementSystem` 处理招募、放置、同格/相邻合成、上阵数量和英雄 DPS 显示。
 
 ## v0.2 规则边界
 
@@ -68,7 +79,7 @@
 
 ## 资源与平台策略
 
-- 当前不使用真实资源，不新增图片、音频、字体。
+- UI 与背景资源已按 `assets/bundles/` 下的规划目录接入一批运行占位图。后续正式高保真资源继续保持同名替换。
 - 当前不生成平台构建，不接入抖音或快手 SDK。
 - 后续资源分包仍保留 `assets/bundles/` 下的规划目录。
 - 后续平台能力必须通过 `platform` 模块适配，不让战斗代码直接依赖 `tt` 或 `ks`。
@@ -87,9 +98,14 @@ npm run test:mvp
 npm run typecheck
 ```
 
+运行场景结构测试：
+
+```bash
+npm run test:scene
+```
+
 在 Cocos Creator 中运行：
 
 1. 打开项目根目录。
-2. 创建空场景和空节点。
-3. 将 `BattleController` 挂到空节点。
-4. 预览并点击“开始战斗”。
+2. 打开 `assets/scenes/BattleMain.scene`。
+3. 预览并点击“开始战斗”。

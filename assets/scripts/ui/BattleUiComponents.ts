@@ -263,6 +263,62 @@ export function createLabel(
   return { node, label };
 }
 
+export function bindOrCreateLabel(
+  parent: Node,
+  name: string,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  color: Color,
+  width: number,
+  height: number,
+): TextNodeView {
+  const node = parent.getChildByName(name) ?? new Node(name);
+  setUiLayer(node);
+
+  const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+  transform.setContentSize(width, height);
+  node.setPosition(x, y, 0);
+
+  const label = node.getComponent(Label) ?? node.addComponent(Label);
+  label.string = text;
+  label.fontSize = fontSize;
+  label.lineHeight = fontSize + 5;
+  label.color = color;
+  label.horizontalAlign = Label.HorizontalAlign.CENTER;
+  label.verticalAlign = Label.VerticalAlign.CENTER;
+  applyLabelOutline(label, fontSize);
+
+  if (!node.parent) {
+    parent.addChild(node);
+  }
+
+  return { node, label };
+}
+
+export function ensureNamedUiChild(
+  parent: Node,
+  name: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Node {
+  const node = parent.getChildByName(name) ?? new Node(name);
+  setUiLayer(node);
+  node.setPosition(x, y, 0);
+
+  const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+  transform.setContentSize(width, height);
+
+  if (!node.parent) {
+    parent.addChild(node);
+  }
+
+  return node;
+}
+
 export function applyLabelOutline(label: Label, fontSize: number): void {
   const outline = label.node.getComponent(LabelOutline) ?? label.node.addComponent(LabelOutline);
   const width = Math.max(2, Math.round(fontSize * 0.14));
@@ -492,17 +548,22 @@ export class BossHealthBarView {
     y: number,
     private readonly width: number,
     parent: Node,
+    options: {
+      hostNode?: Node | null;
+    } = {},
   ) {
-    this.node = new Node('BossHealthBarView');
+    this.node = options.hostNode ?? new Node('BossHealthBarView');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
 
-    const transform = this.node.addComponent(UITransform);
+    const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, 58);
-    this.graphics = this.node.addComponent(Graphics);
+    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
     createUiArtSkinNode(this.node, 'hud_boss_hp_bg.png', width, 40, 'BossHpSkin');
 
-    const nameView = createLabel(
+    const nameView = bindOrCreateLabel(
+      this.node,
+      'BossNameLabel',
       'Boss 未出现',
       0,
       13,
@@ -512,9 +573,10 @@ export class BossHealthBarView {
       24,
     );
     this.nameLabel = nameView.label;
-    this.node.addChild(nameView.node);
 
-    const valueView = createLabel(
+    const valueView = bindOrCreateLabel(
+      this.node,
+      'BossHpValueLabel',
       '',
       0,
       -14,
@@ -524,8 +586,14 @@ export class BossHealthBarView {
       22,
     );
     this.valueLabel = valueView.label;
-    this.node.addChild(valueView.node);
-    parent.addChild(this.node);
+
+    ensureNamedUiChild(this.node, 'BossHpBarBg', 0, -12, width - 34, 18);
+    ensureNamedUiChild(this.node, 'BossHpBarFill', 0, -12, width - 34, 18);
+
+    if (!this.node.parent) {
+      parent.addChild(this.node);
+    }
+
     this.refresh('Boss 未出现', 0, 1, false);
   }
 

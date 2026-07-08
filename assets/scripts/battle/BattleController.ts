@@ -1,8 +1,6 @@
 // @ts-nocheck
 import {
   _decorator,
-  Camera,
-  Canvas,
   Color,
   Component,
   Graphics,
@@ -28,6 +26,7 @@ import {
   UltimateButtonView,
 } from '../ui/BattleUiComponents';
 import { BattleUiV4Layout } from '../ui/BattleUiLayout';
+import { ensureSceneCanvas, ensureSceneLayer } from '../ui/BattleUiSceneBindings';
 import { BattleUiTokens } from '../ui/BattleUiTokens';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
@@ -238,7 +237,9 @@ export class BattleController extends Component {
     this.remainingEnemiesLabel = remainView.label;
     this.topHudLayer.addChild(remainView.node);
 
-    this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer);
+    this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer, {
+      hostNode: this.topHudLayer.getChildByName('BossHealthBarPrefab'),
+    });
     this.goldChipView = new ResourceChipView('金币', 224, 606, 100, 32, this.topHudLayer);
     this.stoneChipView = new ResourceChipView('灵石', 224, 574, 100, 32, this.topHudLayer);
 
@@ -408,35 +409,11 @@ export class BattleController extends Component {
   }
 
   private createCanvas(): Node {
-    const canvas = new Node('MvpVerticalSliceCanvas');
-    this.setUiLayer(canvas);
-
-    const transform = canvas.addComponent(UITransform);
-    transform.setContentSize(this.stageWidth, this.stageHeight);
-    const canvasComponent = canvas.addComponent(Canvas);
-
-    const cameraNode = new Node('MvpUiCamera');
-    this.setUiLayer(cameraNode);
-    const camera = cameraNode.addComponent(Camera);
-    camera.projection = Camera.ProjectionType.ORTHO;
-    camera.visibility = Layers.Enum.UI_2D;
-    camera.clearFlags = Camera.ClearFlag.DEPTH_ONLY;
-    camera.priority = 100;
-    canvas.addChild(cameraNode);
-    canvasComponent.cameraComponent = camera;
-
-    this.node.addChild(canvas);
-    return canvas;
+    return ensureSceneCanvas(this.node, this.stageWidth, this.stageHeight);
   }
 
   private createLayer(name: string, parent: Node): Node {
-    const layer = new Node(name);
-    this.setUiLayer(layer);
-
-    const transform = layer.addComponent(UITransform);
-    transform.setContentSize(this.stageWidth, this.stageHeight);
-    parent.addChild(layer);
-    return layer;
+    return ensureSceneLayer(parent, name, this.stageWidth, this.stageHeight);
   }
 
   private drawBackground(parent: Node): void {
