@@ -12,17 +12,19 @@ import {
   SpriteFrame,
   Texture2D,
   UITransform,
+  Widget,
 } from 'cc';
 
+import { applyBattleFontRole, BattleFontRole } from './BattleFontResources';
 import {
   BattleUiSchool,
   BattleUiTokens,
-  getRarityColor,
   getSchoolAccentColor,
   getSchoolColor,
   uiColor,
   UpgradeCardRarity,
 } from './BattleUiTokens';
+import { t } from './BattleTextResources';
 import { getUiArtAsset } from './UiArtManifest';
 
 export interface TextNodeView {
@@ -30,11 +32,54 @@ export interface TextNodeView {
   label: Label;
 }
 
+export interface BattleLabelStyleOptions {
+  wrap?: boolean;
+  overflow?: 'clamp' | 'shrink' | 'resizeHeight';
+  lineHeightMultiplier?: number;
+  fontFamily?: string;
+  fontRole?: BattleFontRole;
+  outline?: boolean;
+  horizontalAlign?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'center' | 'bottom';
+}
+
+export interface WidgetAlignmentOptions {
+  left?: number;
+  right?: number;
+  top?: number;
+  bottom?: number;
+  alignMode?: 'once' | 'onWindowResize' | 'always';
+}
+
 export function setUiLayer(node: Node): void {
   node.layer = Layers.Enum.UI_2D;
 }
 
 const spriteFrameCache = new Map<string, SpriteFrame>();
+
+export const UpgradeCardVisualMetrics = {
+  width: 178,
+  height: 238,
+  frameWidth: 192,
+  frameHeight: 262,
+  selectedGlowWidth: 206,
+  selectedGlowHeight: 272,
+  titleY: 58,
+  titleWidth: 150,
+  titleHeight: 30,
+  iconY: 2,
+  iconSlotSize: 62,
+  iconSize: 48,
+  descY: -58,
+  descWidth: 150,
+  descHeight: 44,
+  starsY: -91,
+  starsWidth: 140,
+  starsHeight: 18,
+  tagY: -114,
+  tagWidth: 112,
+  tagHeight: 24,
+} as const;
 
 export function getHeroPortraitFilename(heroName: string): string | null {
   const portraits: Record<string, string> = {
@@ -277,6 +322,7 @@ export function createLabel(
   color: Color,
   width: number,
   height: number,
+  options: BattleLabelStyleOptions = {},
 ): TextNodeView {
   const node = new Node(text || 'Label');
   setUiLayer(node);
@@ -286,13 +332,7 @@ export function createLabel(
   node.setPosition(x, y, 0);
 
   const label = node.addComponent(Label);
-  label.string = text;
-  label.fontSize = fontSize;
-  label.lineHeight = fontSize + 5;
-  label.color = color;
-  label.horizontalAlign = Label.HorizontalAlign.CENTER;
-  label.verticalAlign = Label.VerticalAlign.CENTER;
-  applyLabelOutline(label, fontSize);
+  applyBattleLabelStyle(label, text, fontSize, color, options);
 
   return { node, label };
 }
@@ -307,6 +347,7 @@ export function bindOrCreateLabel(
   color: Color,
   width: number,
   height: number,
+  options: BattleLabelStyleOptions = {},
 ): TextNodeView {
   const node = parent.getChildByName(name) ?? new Node(name);
   setUiLayer(node);
@@ -316,19 +357,119 @@ export function bindOrCreateLabel(
   node.setPosition(x, y, 0);
 
   const label = node.getComponent(Label) ?? node.addComponent(Label);
-  label.string = text;
-  label.fontSize = fontSize;
-  label.lineHeight = fontSize + 5;
-  label.color = color;
-  label.horizontalAlign = Label.HorizontalAlign.CENTER;
-  label.verticalAlign = Label.VerticalAlign.CENTER;
-  applyLabelOutline(label, fontSize);
+  applyBattleLabelStyle(label, text, fontSize, color, options);
 
   if (!node.parent) {
     parent.addChild(node);
   }
 
   return { node, label };
+}
+
+export function applyBattleLabelStyle(
+  label: Label,
+  text: string,
+  fontSize: number,
+  color: Color,
+  options: BattleLabelStyleOptions = {},
+): void {
+  label.string = text;
+  label.fontSize = fontSize;
+  label.lineHeight = Math.ceil(
+    fontSize * (options.lineHeightMultiplier ?? BattleUiTokens.lineHeight.normal),
+  );
+  label.color = color;
+  label.horizontalAlign = getHorizontalLabelAlign(options.horizontalAlign);
+  label.verticalAlign = getVerticalLabelAlign(options.verticalAlign);
+  label.fontFamily = options.fontFamily ?? BattleUiTokens.fontFamily.ui;
+  label.useSystemFont = true;
+  applyBattleFontRole(label, options.fontRole ?? 'uiHud');
+  label.enableWrapText = Boolean(options.wrap);
+
+  const overflow = options.overflow ?? 'shrink';
+  if (overflow === 'resizeHeight') {
+    label.overflow = Label.Overflow.RESIZE_HEIGHT;
+  } else if (overflow === 'clamp') {
+    label.overflow = Label.Overflow.CLAMP;
+  } else {
+    label.overflow = Label.Overflow.SHRINK;
+  }
+
+  if (options.outline !== false) {
+    applyLabelOutline(label, fontSize);
+  } else {
+    label.outlineWidth = 0;
+  }
+}
+
+function getHorizontalLabelAlign(
+  align: BattleLabelStyleOptions['horizontalAlign'] = 'center',
+): Label.HorizontalAlign {
+  if (align === 'left') {
+    return Label.HorizontalAlign.LEFT;
+  }
+
+  if (align === 'right') {
+    return Label.HorizontalAlign.RIGHT;
+  }
+
+  return Label.HorizontalAlign.CENTER;
+}
+
+function getVerticalLabelAlign(
+  align: BattleLabelStyleOptions['verticalAlign'] = 'center',
+): Label.VerticalAlign {
+  if (align === 'top') {
+    return Label.VerticalAlign.TOP;
+  }
+
+  if (align === 'bottom') {
+    return Label.VerticalAlign.BOTTOM;
+  }
+
+  return Label.VerticalAlign.CENTER;
+}
+
+export function applyWidgetAlignment(
+  node: Node,
+  alignment?: WidgetAlignmentOptions,
+): Widget | undefined {
+  if (!alignment) {
+    return undefined;
+  }
+
+  const widget = node.getComponent(Widget) ?? node.addComponent(Widget);
+  widget.isAlignLeft = typeof alignment.left === 'number';
+  widget.isAlignRight = typeof alignment.right === 'number';
+  widget.isAlignTop = typeof alignment.top === 'number';
+  widget.isAlignBottom = typeof alignment.bottom === 'number';
+
+  if (widget.isAlignLeft) {
+    widget.left = alignment.left;
+  }
+
+  if (widget.isAlignRight) {
+    widget.right = alignment.right;
+  }
+
+  if (widget.isAlignTop) {
+    widget.top = alignment.top;
+  }
+
+  if (widget.isAlignBottom) {
+    widget.bottom = alignment.bottom;
+  }
+
+  if (alignment.alignMode === 'always') {
+    widget.alignMode = Widget.AlignMode.ALWAYS;
+  } else if (alignment.alignMode === 'once') {
+    widget.alignMode = Widget.AlignMode.ONCE;
+  } else {
+    widget.alignMode = Widget.AlignMode.ON_WINDOW_RESIZE;
+  }
+
+  widget.updateAlignment?.();
+  return widget;
 }
 
 export function ensureNamedUiChild(
@@ -419,8 +560,10 @@ export class UiButtonView {
       iconSize?: number;
       iconX?: number;
       labelOffsetX?: number;
+      fontRole?: BattleFontRole;
       hostNode?: Node | null;
       labelName?: string;
+      widgetAlignment?: WidgetAlignmentOptions;
     } = {},
   ) {
     this.node = this.options.hostNode ?? new Node(text || 'UiButton');
@@ -463,11 +606,16 @@ export class UiButtonView {
       BattleUiTokens.colors.textPrimary,
       this.options.iconFilename ? width * 0.72 : width,
       height,
+      {
+        fontRole: this.options.fontRole ?? 'uiButton',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
     this.label = labelView.label;
     if (!this.node.parent) {
       parent.addChild(this.node);
     }
+    applyWidgetAlignment(this.node, this.options.widgetAlignment);
   }
 
   public onClick(handler: () => void): void {
@@ -533,6 +681,7 @@ export class ResourceChipView {
     parent: Node,
     options: {
       hostNode?: Node | null;
+      widgetAlignment?: WidgetAlignmentOptions;
     } = {},
   ) {
     this.node = options.hostNode ?? new Node(`${title}Chip`);
@@ -557,13 +706,18 @@ export class ResourceChipView {
     const labelView = bindOrCreateLabel(
       this.node,
       'ResourceChipLabel',
-      `${title} 0`,
-      15,
+      '0',
+      18,
       -1,
       BattleUiTokens.font.caption,
       BattleUiTokens.colors.textPrimary,
-      width - 36,
+      width - 40,
       height,
+      {
+        fontRole: 'uiHud',
+        fontFamily: BattleUiTokens.fontFamily.number,
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
     this.label = labelView.label;
     if (!this.node.parent) {
@@ -573,7 +727,7 @@ export class ResourceChipView {
   }
 
   public refresh(value: number): void {
-    this.label.string = `${this.title} ${value}`;
+    this.label.string = `${value}`;
   }
 
   private draw(): void {
@@ -617,12 +771,13 @@ export class BossHealthBarView {
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, 58);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    createUiArtSkinNode(this.node, 'hud_boss_hp_bg.png', width, 40, 'BossHpSkin');
+    const skin = createUiArtSkinNode(this.node, 'hud_boss_hp_bg.png', width, 40, 'BossHpSkin');
+    skin.active = false;
 
     const nameView = bindOrCreateLabel(
       this.node,
       'BossNameLabel',
-      'Boss 未出现',
+      '',
       0,
       13,
       BattleUiTokens.font.caption,
@@ -652,7 +807,7 @@ export class BossHealthBarView {
       parent.addChild(this.node);
     }
 
-    this.refresh('Boss 未出现', 0, 1, false);
+    this.refresh('', 0, 1, false);
   }
 
   public refresh(name: string, hp: number, maxHp: number, focused: boolean): void {
@@ -670,10 +825,19 @@ export class BossHealthBarView {
     const left = -barWidth / 2;
     const top = -barHeight / 2 - 12;
 
-    this.nameLabel.string = active ? name : 'Boss 未出现';
+    this.node.active = active;
+    this.nameLabel.string = active ? name : '';
     this.valueLabel.string = active ? `${Math.ceil(visibleHp)}/${Math.ceil(visibleMax)}` : '';
 
     this.graphics.clear();
+    const skin = this.node.getChildByName('BossHpSkin');
+    if (skin) {
+      skin.active = active;
+    }
+    if (!active) {
+      return;
+    }
+
     this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, active ? 220 : 130);
     this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, focused ? 230 : 130);
     this.graphics.lineWidth = focused ? BattleUiTokens.stroke.strong : BattleUiTokens.stroke.normal;
@@ -744,7 +908,7 @@ export class CityHealthBarView {
     const labelView = bindOrCreateLabel(
       this.node,
       'CityHpLabel',
-      '城池 100/100',
+      t('hud.cityHp', { current: 100, max: 100 }),
       0,
       -1,
       BattleUiTokens.font.body,
@@ -769,7 +933,7 @@ export class CityHealthBarView {
     }
 
     this.lastHealth = current;
-    this.label.string = `城池 ${Math.ceil(current)}/${max}`;
+    this.label.string = t('hud.cityHp', { current: Math.ceil(current), max });
 
     const ratio = Math.max(0, Math.min(1, current / max));
     const active = focused || this.flashTimeLeft > 0;
@@ -841,13 +1005,13 @@ export class ComboView {
     this.node.setPosition(x, y, 0);
 
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    transform.setContentSize(260, 58);
+    transform.setContentSize(216, 48);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
     const comboSkin = bindOrCreateUiArtSkinNode(
       this.node,
       'hud_combo_plate.png',
-      260,
-      58,
+      216,
+      48,
       'ComboSkin',
     );
     comboSkin.active = false;
@@ -857,10 +1021,14 @@ export class ComboView {
       '',
       0,
       -1,
-      BattleUiTokens.font.hero,
+      BattleUiTokens.font.combo,
       BattleUiTokens.colors.highlight,
-      260,
-      56,
+      216,
+      46,
+      {
+        fontRole: 'comboCallout',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
     this.label = labelView.label;
     if (!this.node.parent) {
@@ -877,18 +1045,24 @@ export class ComboView {
 
     const skin = this.node.getChildByName('ComboSkin');
     if (skin) {
-      skin.active = true;
+      skin.active = false;
     }
 
-    this.label.string = `连杀 x${comboCount}`;
-    this.label.fontSize = comboCount >= 10 ? 44 : comboCount >= 5 ? 38 : 32;
+    this.label.string = t('battleFeedback.combo', { count: comboCount });
+    this.label.fontSize =
+      comboCount >= 10
+        ? BattleUiTokens.font.combo + 4
+        : comboCount >= 5
+          ? BattleUiTokens.font.combo
+          : BattleUiTokens.font.title;
+    this.label.lineHeight = Math.ceil(this.label.fontSize * BattleUiTokens.lineHeight.tight);
     this.label.color =
       comboCount >= 10 ? BattleUiTokens.colors.danger : BattleUiTokens.colors.highlight;
     this.graphics.clear();
-    this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, 170);
-    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 190);
-    this.graphics.lineWidth = BattleUiTokens.stroke.normal;
-    this.graphics.roundRect(-130, -27, 260, 54, BattleUiTokens.radius.pill);
+    this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, 112);
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 225);
+    this.graphics.lineWidth = BattleUiTokens.stroke.thin;
+    this.graphics.roundRect(-102, -20, 204, 40, BattleUiTokens.radius.pill);
     this.graphics.fill();
     this.graphics.stroke();
   }
@@ -914,11 +1088,22 @@ export class UltimateButtonView {
       hostNode?: Node | null;
     } = {},
   ) {
-    this.button = new UiButtonView('绝', x, y, 123, 123, BattleUiTokens.colors.primaryRed, parent, {
-      skinFilename: 'hud_ultimate_button_final.png',
-      hostNode: options.hostNode,
-      labelName: 'UltimateLabel',
-    });
+    this.button = new UiButtonView(
+      t('hud.ultimate'),
+      x,
+      y,
+      123,
+      123,
+      BattleUiTokens.colors.primaryRed,
+      parent,
+      {
+        skinFilename: 'hud_ultimate_button_final.png',
+        hostNode: options.hostNode,
+        labelName: 'UltimateLabel',
+        fontRole: 'ultimateCallout',
+        widgetAlignment: options.widgetAlignment,
+      },
+    );
     this.button.label.fontSize = 36;
     this.button.label.lineHeight = 40;
     this.button.setHighlighted(true);
@@ -952,7 +1137,7 @@ export class HeroAvatarSlotView {
     const labelView = bindOrCreateLabel(
       this.node,
       'AvatarLabel',
-      '空',
+      t('hud.empty'),
       0,
       -4,
       BattleUiTokens.font.tiny,
@@ -970,7 +1155,7 @@ export class HeroAvatarSlotView {
   public refresh(heroName: string, level: number, highlighted: boolean): void {
     const occupied = Boolean(heroName);
     this.refreshPortrait(heroName);
-    this.label.string = occupied ? `${heroName}\nLv${level}` : '空';
+    this.label.string = occupied ? `${heroName}\nLv${level}` : t('hud.empty');
     this.label.color = occupied
       ? BattleUiTokens.colors.textPrimary
       : BattleUiTokens.colors.textSecondary;
@@ -1056,8 +1241,8 @@ export interface UpgradeCardViewOptions {
 
 export class UpgradeCardView {
   public readonly node: Node;
-  private readonly graphics: Graphics;
   private readonly iconGraphics: Graphics;
+  private readonly selectedGlowNode: Node;
   private readonly ownsNode: boolean;
   private selected = false;
 
@@ -1077,18 +1262,34 @@ export class UpgradeCardView {
     this.node.active = true;
 
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    transform.setContentSize(178, 178);
-    this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
+    transform.setContentSize(UpgradeCardVisualMetrics.width, UpgradeCardVisualMetrics.height);
+    this.node.getComponent(Graphics)?.clear();
     this.node.getComponent(Button) ?? this.node.addComponent(Button);
-    bindOrCreateUiArtSkinNode(this.node, this.getCardSkin(), 178, 178, 'CardSkin');
+    const cardSkin = bindOrCreateUiArtSkinNode(
+      this.node,
+      this.getCardSkin(),
+      UpgradeCardVisualMetrics.width,
+      UpgradeCardVisualMetrics.height,
+      'CardSkin',
+    );
+    cardSkin.setSiblingIndex(1);
+    this.selectedGlowNode = bindOrCreateUiArtSkinNode(
+      this.node,
+      'card_selected_glow_final.png',
+      UpgradeCardVisualMetrics.selectedGlowWidth,
+      UpgradeCardVisualMetrics.selectedGlowHeight,
+      'CardSelectedGlow',
+    );
+    this.selectedGlowNode.active = false;
+    this.selectedGlowNode.setSiblingIndex(0);
     const frame = bindOrCreateUiArtSkinNode(
       this.node,
-      'card_frame_legendary_final.png',
-      186,
-      186,
+      this.getFrameSkin(),
+      UpgradeCardVisualMetrics.frameWidth,
+      UpgradeCardVisualMetrics.frameHeight,
       'CardFrame',
     );
-    frame.setSiblingIndex(1);
+    frame.setSiblingIndex(2);
     this.node.off(Button.EventType.CLICK);
     this.node.on(Button.EventType.CLICK, () => {
       this.setSelected(true);
@@ -1100,24 +1301,49 @@ export class UpgradeCardView {
       'CardTitleLabel',
       options.title,
       0,
-      58,
-      18,
+      UpgradeCardVisualMetrics.titleY,
+      BattleUiTokens.font.cardTitle,
       BattleUiTokens.colors.textPrimary,
-      160,
-      24,
+      UpgradeCardVisualMetrics.titleWidth,
+      UpgradeCardVisualMetrics.titleHeight,
+      {
+        fontRole: 'uiCardTitle',
+        fontFamily: BattleUiTokens.fontFamily.title,
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+        horizontalAlign: 'center',
+        verticalAlign: 'center',
+      },
     );
 
-    const icon = ensureNamedUiChild(this.node, 'IconPlaceholder', 0, 16, 58, 58);
+    const icon = ensureNamedUiChild(
+      this.node,
+      'IconPlaceholder',
+      0,
+      UpgradeCardVisualMetrics.iconY,
+      UpgradeCardVisualMetrics.iconSlotSize,
+      UpgradeCardVisualMetrics.iconSlotSize,
+    );
     setUiLayer(icon);
     const iconTransform = icon.getComponent(UITransform) ?? icon.addComponent(UITransform);
-    iconTransform.setContentSize(58, 58);
-    icon.setPosition(0, 16, 0);
+    iconTransform.setContentSize(
+      UpgradeCardVisualMetrics.iconSlotSize,
+      UpgradeCardVisualMetrics.iconSlotSize,
+    );
+    icon.setPosition(0, UpgradeCardVisualMetrics.iconY, 0);
     this.iconGraphics = icon.getComponent(Graphics) ?? icon.addComponent(Graphics);
+    const iconSlotSkin = bindOrCreateUiArtSkinNode(
+      icon,
+      'card_icon_slot.png',
+      UpgradeCardVisualMetrics.iconSlotSize,
+      UpgradeCardVisualMetrics.iconSlotSize,
+      'IconSlotSkin',
+    );
+    iconSlotSkin.setSiblingIndex(0);
     const schoolIcon = bindOrCreateUiArtSkinNode(
       icon,
       getSchoolIconFilename(options.school),
-      50,
-      50,
+      UpgradeCardVisualMetrics.iconSize,
+      UpgradeCardVisualMetrics.iconSize,
       'SchoolIcon',
     );
     schoolIcon.setSiblingIndex(1);
@@ -1127,35 +1353,70 @@ export class UpgradeCardView {
       'CardDescriptionLabel',
       options.description,
       0,
-      -34,
-      15,
+      UpgradeCardVisualMetrics.descY,
+      BattleUiTokens.font.cardBody,
       BattleUiTokens.colors.textSecondary,
-      150,
-      38,
+      UpgradeCardVisualMetrics.descWidth,
+      UpgradeCardVisualMetrics.descHeight,
+      {
+        fontRole: 'uiHud',
+        wrap: true,
+        overflow: 'shrink',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+        horizontalAlign: 'center',
+        verticalAlign: 'center',
+      },
     );
 
     const stars = bindOrCreateLabel(
       this.node,
       'CardStarLabel',
-      '★★★★★',
+      t('upgrade.rarityStars'),
       0,
-      -66,
-      15,
+      UpgradeCardVisualMetrics.starsY,
+      BattleUiTokens.font.cardTag,
       BattleUiTokens.colors.highlight,
-      140,
-      20,
+      UpgradeCardVisualMetrics.starsWidth,
+      UpgradeCardVisualMetrics.starsHeight,
+      {
+        fontRole: 'ultimateCallout',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+        horizontalAlign: 'center',
+        verticalAlign: 'center',
+      },
     );
 
-    const tag = bindOrCreateLabel(
+    const tagNode = ensureNamedUiChild(
       this.node,
+      'CardSchoolTag',
+      0,
+      UpgradeCardVisualMetrics.tagY,
+      UpgradeCardVisualMetrics.tagWidth,
+      UpgradeCardVisualMetrics.tagHeight,
+    );
+    bindOrCreateUiArtSkinNode(
+      tagNode,
+      this.getTagSkin(options.school),
+      UpgradeCardVisualMetrics.tagWidth,
+      UpgradeCardVisualMetrics.tagHeight,
+      'CardSchoolTagSkin',
+    );
+    const tag = bindOrCreateLabel(
+      tagNode,
       'CardSchoolTagLabel',
       this.getSchoolLabel(options.school),
       0,
-      -84,
-      14,
+      0,
+      BattleUiTokens.font.cardTag,
       getSchoolAccentColor(options.school),
-      108,
-      20,
+      UpgradeCardVisualMetrics.tagWidth,
+      UpgradeCardVisualMetrics.tagHeight,
+      {
+        fontRole: 'schoolCallout',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+        horizontalAlign: 'center',
+        verticalAlign: 'center',
+      },
     );
     this.redraw();
   }
@@ -1180,35 +1441,22 @@ export class UpgradeCardView {
   private redraw(): void {
     const schoolColor = getSchoolColor(this.options.school);
     const accent = getSchoolAccentColor(this.options.school);
-    const rarity = getRarityColor(this.options.rarity);
+    const metrics = UpgradeCardVisualMetrics;
 
-    this.graphics.clear();
-
-    if (this.selected) {
-      this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 140);
-      this.graphics.lineWidth = 10;
-      this.graphics.roundRect(-98, -98, 196, 196, BattleUiTokens.radius.lg);
-      this.graphics.stroke();
-    }
-
-    this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, 130);
-    this.graphics.strokeColor = this.selected ? BattleUiTokens.colors.highlight : rarity;
-    this.graphics.lineWidth = this.selected
-      ? BattleUiTokens.stroke.strong
-      : BattleUiTokens.stroke.normal;
-    this.graphics.roundRect(-89, -89, 178, 178, BattleUiTokens.radius.lg);
-    this.graphics.fill();
-    this.graphics.stroke();
-
-    this.graphics.fillColor = uiColor(schoolColor, 175);
-    this.graphics.roundRect(-74, 46, 148, 28, BattleUiTokens.radius.md);
-    this.graphics.fill();
+    this.node.getComponent(Graphics)?.clear();
+    this.selectedGlowNode.active = this.selected;
 
     this.iconGraphics.clear();
     this.iconGraphics.fillColor = uiColor(schoolColor, 210);
     this.iconGraphics.strokeColor = accent;
     this.iconGraphics.lineWidth = BattleUiTokens.stroke.normal;
-    this.iconGraphics.roundRect(-29, -29, 58, 58, BattleUiTokens.radius.md);
+    this.iconGraphics.roundRect(
+      -metrics.iconSlotSize / 2,
+      -metrics.iconSlotSize / 2,
+      metrics.iconSlotSize,
+      metrics.iconSlotSize,
+      BattleUiTokens.radius.md,
+    );
     this.iconGraphics.fill();
     this.iconGraphics.stroke();
     this.iconGraphics.strokeColor = uiColor(Color.WHITE, 120);
@@ -1232,16 +1480,36 @@ export class UpgradeCardView {
     return 'card_bg_fire_final.png';
   }
 
-  private getSchoolLabel(school: BattleUiSchool): string {
+  private getFrameSkin(): string {
+    if (this.options.rarity === 'legendary') {
+      return 'card_frame_legendary_final.png';
+    }
+
+    return `card_frame_${this.options.rarity ?? 'normal'}.png`;
+  }
+
+  private getTagSkin(school: BattleUiSchool): string {
     if (school === 'thunder') {
-      return '雷系';
+      return 'card_tag_thunder.png';
     }
 
     if (school === 'summon') {
-      return '召唤';
+      return 'card_tag_summon.png';
     }
 
-    return '火系';
+    return 'card_tag_fire.png';
+  }
+
+  private getSchoolLabel(school: BattleUiSchool): string {
+    if (school === 'thunder') {
+      return t('upgrade.schoolThunder');
+    }
+
+    if (school === 'summon') {
+      return t('upgrade.schoolSummon');
+    }
+
+    return t('upgrade.schoolFire');
   }
 
   private addTextOutline(node: Node, width: number): void {

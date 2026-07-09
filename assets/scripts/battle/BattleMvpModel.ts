@@ -140,7 +140,7 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   enemyWallHoldSeconds: 3,
   waveInterval: 3,
   upgradeInterval: 10,
-  mainAttackDamage: 16,
+  mainAttackDamage: 11,
   mainAttackInterval: 0.7,
   heroBaseDps: 5,
   playerPosition: { x: 0, y: -405 },

@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "language": "zh-CN",
+    "designResolution": "720x1280",
+    "usage": "Cocos TextAsset fallback for battle UI copy"
+  },
+  "hud": {
+    "waveZero": "当前波次：0",
+    "remaining": "剩余 {count}",
+    "start": "开始战斗",
+    "restart": "重新开始",
+    "statusIdle": "待开始",
+    "statusFighting": "战斗中",
+    "statusGameOver": "游戏失败",
+    "buildUnknown": "流派：未成型",
+    "buildFire": "流派：火焰压制",
+    "buildThunder": "流派：雷霆连锁",
+    "buildSummon": "流派：召唤成型",
+    "cityHp": "城池 {current}/{max}",
+    "tower": "箭塔\n3/3",
+    "oil": "火油\n5/5",
+    "auto": "自动",
+    "bond": "羁绊",
+    "ultimate": "绝",
+    "empty": "空",
+    "speed": "x{speed}"
+  },
+  "battleFeedback": {
+    "critical": "暴击",
+    "hero": "英雄",
+    "kill": "击杀!",
+    "combo": "连杀 x{count}",
+    "chain": "连锁 ×{count}"
+  },
+  "notices": {
+    "bossIncoming": "Boss 来袭！守住城门",
+    "eliteIncoming": "精英怪出现"
+  },
+  "upgrade": {
+    "title": "选择强化效果",
+    "schoolFire": "火系",
+    "schoolThunder": "雷系",
+    "schoolSummon": "召唤",
+    "rarityStars": "★★★★★"
+  },
+  "grid": {
+    "title": "布阵：{heroes}/{maxHeroes}  DPS {dps}",
+    "pendingHero": "待放置：{heroName}",
+    "pendingNone": "待放置：无",
+    "mergeOnly": "同名英雄才能合成",
+    "boardFull": "上阵已满，选召唤+1",
+    "slotEmpty": "{slotLabel}\n空",
+    "slotHero": "{slotLabel}\n{focus}{heroName} Lv{level}"
+  },
+  "cards": {
+    "fire_burn_damage_30": {
+      "title": "烈焰火墙+",
+      "description": "灼烧伤害+30%\n火势更猛"
+    },
+    "fire_spread_plus_1": {
+      "title": "火焰扩散+",
+      "description": "额外点燃+1\n压制怪潮"
+    },
+    "thunder_chain_plus_1": {
+      "title": "连锁闪电+",
+      "description": "弹射次数+1\n清场更快"
+    },
+    "thunder_crit_plus_10": {
+      "title": "雷霆暴击+",
+      "description": "暴击率+10%\n爆发提高"
+    },
+    "summon_slots_plus_1": {
+      "title": "召唤灵兽+",
+      "description": "上阵英雄+1\n阵容变厚"
+    },
+    "summon_hero_damage_20": {
+      "title": "灵兽攻击+",
+      "description": "英雄攻击+20%\n输出成长"
+    }
+  }
+}

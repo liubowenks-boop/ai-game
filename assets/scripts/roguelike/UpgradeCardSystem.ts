@@ -2,6 +2,7 @@
 import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
 
 import { BattleMvpModel, UpgradeCardState } from '../battle/BattleMvpModel';
+import { t } from '../ui/BattleTextResources';
 import { BattleUiTokens } from '../ui/BattleUiTokens';
 import { BattleUiV4Layout } from '../ui/BattleUiLayout';
 import {
@@ -15,7 +16,11 @@ interface CardView {
   card: UpgradeCardView;
 }
 
+const UPGRADE_PANEL_TITLE_Y = 148;
+const UPGRADE_CARD_Y = -38;
+
 export class UpgradeCardSystem {
+  private readonly dimmerNode: Node;
   private readonly root: Node;
   private readonly cards: CardView[] = [];
   private readonly recruitHintLabel?: Label;
@@ -26,29 +31,43 @@ export class UpgradeCardSystem {
     private readonly onPicked: () => void,
     private readonly onRecruit?: () => void,
   ) {
+    this.dimmerNode = parent.getChildByName('UpgradeDimmer') ?? new Node('UpgradeDimmer');
+    this.setUiLayer(this.dimmerNode);
+    const dimmerTransform =
+      this.dimmerNode.getComponent(UITransform) ?? this.dimmerNode.addComponent(UITransform);
+    dimmerTransform.setContentSize(
+      BattleUiV4Layout.upgradeScrim.width,
+      BattleUiV4Layout.upgradeScrim.height,
+    );
+    this.dimmerNode.setPosition(
+      BattleUiV4Layout.upgradeScrim.x,
+      BattleUiV4Layout.upgradeScrim.y,
+      0,
+    );
+    this.dimmerNode.getComponent(Button) ?? this.dimmerNode.addComponent(Button);
+    const dimmer = this.dimmerNode.getComponent(Graphics) ?? this.dimmerNode.addComponent(Graphics);
+    this.drawDimmer(dimmer);
+    if (!this.dimmerNode.parent) {
+      parent.addChild(this.dimmerNode);
+    }
+    this.dimmerNode.setSiblingIndex(0);
+    this.dimmerNode.active = false;
+
     this.root = parent.getChildByName('UpgradeCardSystem') ?? new Node('UpgradeCardSystem');
     this.setUiLayer(this.root);
 
     const transform = this.root.getComponent(UITransform) ?? this.root.addComponent(UITransform);
-    transform.setContentSize(BattleUiV4Layout.upgradePanel.width, BattleUiV4Layout.upgradePanel.height);
+    transform.setContentSize(
+      BattleUiV4Layout.upgradePanel.width,
+      BattleUiV4Layout.upgradePanel.height,
+    );
     this.root.setPosition(BattleUiV4Layout.upgradePanel.x, BattleUiV4Layout.upgradePanel.y, 0);
     if (!this.root.parent) {
       parent.addChild(this.root);
     }
+    this.root.setSiblingIndex(1);
 
-    const panel = this.root.getComponent(Graphics) ?? this.root.addComponent(Graphics);
-    panel.fillColor = BattleUiTokens.colors.panelBase;
-    panel.strokeColor = BattleUiTokens.colors.strokeGold;
-    panel.lineWidth = 3;
-    panel.roundRect(
-      -BattleUiV4Layout.upgradePanel.width / 2,
-      -BattleUiV4Layout.upgradePanel.height / 2,
-      BattleUiV4Layout.upgradePanel.width,
-      BattleUiV4Layout.upgradePanel.height,
-      8,
-    );
-    panel.fill();
-    panel.stroke();
+    this.root.getComponent(Graphics)?.clear();
     bindOrCreateUiArtSkinNode(
       this.root,
       'card_panel_bg_final.png',
@@ -56,25 +75,25 @@ export class UpgradeCardSystem {
       BattleUiV4Layout.upgradePanel.height,
       'UpgradePanelSkin',
     );
-    const titleSkin = bindOrCreateUiArtSkinNode(
-      this.root,
-      'card_panel_title_final.png',
-      290,
-      42,
-      'UpgradeTitleSkin',
-    );
-    titleSkin.setPosition(0, 92, 0);
+    const oldTitleSkin = this.root.getChildByName('UpgradeTitleSkin');
+    if (oldTitleSkin) {
+      oldTitleSkin.active = false;
+    }
 
     bindOrCreateLabel(
       this.root,
       'UpgradeTitleLabel',
-      '选择强化效果',
+      t('upgrade.title'),
       0,
-      91,
-      24,
+      UPGRADE_PANEL_TITLE_Y,
+      26,
       BattleUiTokens.colors.textPrimary,
-      300,
-      34,
+      330,
+      38,
+      {
+        fontRole: 'uiTitle',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
 
     this.root.active = false;
@@ -82,18 +101,22 @@ export class UpgradeCardSystem {
 
   public show(): void {
     this.clearCards();
+    this.dimmerNode.active = true;
     this.root.active = true;
+    this.root.setSiblingIndex(1);
 
     const cards = this.model.pendingUpgradeCards;
-    const positions = [-194, 0, 194];
+    const positions = [-210, 0, 210];
 
     cards.forEach((card, index) => {
-      const view = this.createCard(card, positions[index], -8, index);
+      const view = this.createCard(card, positions[index], UPGRADE_CARD_Y, index);
+      view.card.node.setScale(1, 1, 1);
       this.cards.push(view);
     });
   }
 
   public hide(): void {
+    this.dimmerNode.active = false;
     this.root.active = false;
     this.clearCards();
   }
@@ -132,8 +155,21 @@ export class UpgradeCardSystem {
     };
   }
 
+  private drawDimmer(graphics: Graphics): void {
+    graphics.clear();
+    graphics.fillColor = new Color(0, 0, 0, 172);
+    graphics.rect(
+      -BattleUiV4Layout.upgradeScrim.width / 2,
+      -BattleUiV4Layout.upgradeScrim.height / 2,
+      BattleUiV4Layout.upgradeScrim.width,
+      BattleUiV4Layout.upgradeScrim.height,
+    );
+    graphics.fill();
+  }
+
   private clearCards(): void {
     for (const card of this.cards) {
+      card.card.node.setScale(1, 1, 1);
       card.card.destroy();
     }
 

@@ -14,6 +14,7 @@ import {
 
 import { UpgradeCardSystem } from '../roguelike/UpgradeCardSystem';
 import {
+  applyBattleLabelStyle,
   bindOrCreateLabel,
   bindOrCreateUiArtSkinNode,
   BossHealthBarView,
@@ -27,14 +28,25 @@ import {
   UiButtonView,
   UltimateButtonView,
 } from '../ui/BattleUiComponents';
+import { preloadBattleFontResources } from '../ui/BattleFontResources';
 import { BattleUiV4Layout } from '../ui/BattleUiLayout';
 import { ensureSceneCanvas, ensureSceneLayer } from '../ui/BattleUiSceneBindings';
+import { preloadBattleTextResources, t } from '../ui/BattleTextResources';
 import { BattleUiTokens } from '../ui/BattleUiTokens';
+import { PLAYER_ANIMATION_PROFILE } from '../data/AnimationConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
 import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
+import {
+  UnitAnimationRuntime,
+  computeProceduralAnimationPose,
+  createUnitAnimationRuntime,
+  isUnitAnimationComplete,
+  requestUnitAnimation,
+  tickUnitAnimation,
+} from './UnitAnimationSystem';
 import { WaveSystem } from './WaveSystem';
 
 const { ccclass } = _decorator;
@@ -97,6 +109,7 @@ export class BattleController extends Component {
   private noticeLabel!: Label;
   private readonly floatingTexts: FloatingTextView[] = [];
   private readonly floatingTextSlots: Node[] = [];
+  private playerAnimation: UnitAnimationRuntime = createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
   private comboCount = 0;
   private comboTimeLeft = 0;
   private noticeTimeLeft = 0;
@@ -131,6 +144,7 @@ export class BattleController extends Component {
 
     const result = this.model.tick(deltaTime);
 
+    this.requestPlayerAnimationFromResult(result);
     this.processReadabilityResult(result);
     this.updateReadability(deltaTime);
     this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
@@ -150,6 +164,8 @@ export class BattleController extends Component {
     }
 
     this.initialized = true;
+    preloadBattleTextResources();
+    preloadBattleFontResources();
     view.setDesignResolutionSize(this.stageWidth, this.stageHeight, ResolutionPolicy.FIXED_WIDTH);
 
     const canvas = this.createCanvas();
@@ -189,10 +205,11 @@ export class BattleController extends Component {
 
   private startBattle(): void {
     this.model.startBattle();
+    this.playerAnimation = createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
     this.enemySystem.clear();
     this.upgradeCardSystem.hide();
     this.clearReadabilityFeedback();
-    this.startButtonLabel.string = '重新开始';
+    this.startButtonLabel.string = t('hud.restart');
     this.refreshUi();
   }
 
@@ -200,31 +217,35 @@ export class BattleController extends Component {
     const activeFocus = this.getActiveVisualFocus();
     this.cityHealthSystem.refresh(this.model, activeFocus === 'city');
     this.waveSystem.refresh(this.model);
-    this.remainingEnemiesLabel.string = `剩余 ${this.model.enemies.length}`;
+    this.remainingEnemiesLabel.string = t('hud.remaining', { count: this.model.enemies.length });
     this.goldChipView.refresh(0);
     this.stoneChipView.refresh(0);
-    this.pauseButtonView.setText('暂停');
-    this.speedButtonView.setText('x1');
+    this.pauseButtonView.setText('');
+    this.speedButtonView.setText(t('hud.speed', { speed: 1 }));
     this.buildHintLabel.string = this.getBuildHintText();
     this.refreshHeroAvatarBar();
     this.gridPlacementSystem.refresh();
   }
 
   private createTopHudLayer(): { waveLabel: Label } {
-    createPanelNode(
+    const topFrame = createPanelNode(
       'TopHudFrame',
       BattleUiV4Layout.topHud.x,
       BattleUiV4Layout.topHud.y,
       BattleUiV4Layout.topHud.width,
       BattleUiV4Layout.topHud.height,
       this.topHudLayer,
-      218,
+      92,
     );
+    const topFrameSkin = topFrame.node.getChildByName('UiArtSkin');
+    if (topFrameSkin) {
+      topFrameSkin.active = false;
+    }
 
     const waveView = bindOrCreateLabel(
       this.topHudLayer,
       'WaveLabel',
-      '当前波次：0',
+      t('hud.waveZero'),
       -270,
       606,
       BattleUiTokens.font.body,
@@ -236,7 +257,7 @@ export class BattleController extends Component {
     const remainView = bindOrCreateLabel(
       this.topHudLayer,
       'RemainingEnemiesLabel',
-      '剩余 0',
+      t('hud.remaining', { count: 0 }),
       -270,
       574,
       BattleUiTokens.font.caption,
@@ -249,35 +270,36 @@ export class BattleController extends Component {
     this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer, {
       hostNode: this.topHudLayer.getChildByName('BossHealthBarPrefab'),
     });
-    this.goldChipView = new ResourceChipView('金币', 224, 606, 100, 32, this.topHudLayer, {
+    this.goldChipView = new ResourceChipView('金币', 230, 606, 86, 32, this.topHudLayer, {
       hostNode: this.topHudLayer.getChildByName('GoldChipPrefab'),
     });
-    this.stoneChipView = new ResourceChipView('灵石', 224, 574, 100, 32, this.topHudLayer, {
+    this.stoneChipView = new ResourceChipView('灵石', 230, 574, 86, 32, this.topHudLayer, {
       hostNode: this.topHudLayer.getChildByName('StoneChipPrefab'),
     });
 
     this.pauseButtonView = new UiButtonView(
-      '暂停',
+      '',
       310,
       606,
-      54,
+      48,
       42,
       BattleUiTokens.colors.panelBrown,
       this.topHudLayer,
       {
         iconFilename: 'icon_pause.png',
         iconSize: 26,
-        iconX: -13,
-        labelOffsetX: 10,
+        iconX: 0,
+        labelOffsetX: 0,
         hostNode: this.topHudLayer.getChildByName('PauseButtonPrefab'),
         labelName: 'PauseLabel',
+        widgetAlignment: { right: 26, top: 13 },
       },
     );
     this.speedButtonView = new UiButtonView(
-      'x1',
+      t('hud.speed', { speed: 1 }),
       310,
       558,
-      54,
+      56,
       42,
       BattleUiTokens.colors.panelBrown,
       this.topHudLayer,
@@ -288,11 +310,12 @@ export class BattleController extends Component {
         labelOffsetX: 10,
         hostNode: this.topHudLayer.getChildByName('SpeedButtonPrefab'),
         labelName: 'SpeedLabel',
+        widgetAlignment: { right: 22, top: 61 },
       },
     );
 
     const startButton = new UiButtonView(
-      '开始战斗',
+      t('hud.start'),
       0,
       506,
       160,
@@ -336,7 +359,7 @@ export class BattleController extends Component {
     const statusView = bindOrCreateLabel(
       this.midStatusLayer,
       'StatusLabel',
-      '待开始',
+      t('hud.statusIdle'),
       BattleUiV4Layout.statusLabel.x,
       BattleUiV4Layout.statusLabel.y,
       BattleUiTokens.font.caption,
@@ -348,7 +371,7 @@ export class BattleController extends Component {
     const buildHintView = bindOrCreateLabel(
       this.midStatusLayer,
       'BuildHintLabel',
-      '流派：未成型',
+      t('hud.buildUnknown'),
       BattleUiV4Layout.buildHintLabel.x,
       BattleUiV4Layout.buildHintLabel.y,
       BattleUiTokens.font.caption,
@@ -359,7 +382,7 @@ export class BattleController extends Component {
     this.buildHintLabel = buildHintView.label;
 
     new UiButtonView(
-      '箭塔\n3/3',
+      t('hud.tower'),
       BattleUiV4Layout.towerButton.x,
       BattleUiV4Layout.towerButton.y,
       BattleUiV4Layout.towerButton.width,
@@ -370,10 +393,11 @@ export class BattleController extends Component {
         skinFilename: 'hud_tower_button_final.png',
         hostNode: this.midStatusLayer.getChildByName('TowerButtonPrefab'),
         labelName: 'TowerLabel',
+        widgetAlignment: { left: 22, bottom: 380 },
       },
     );
     new UiButtonView(
-      '火油\n5/5',
+      t('hud.oil'),
       BattleUiV4Layout.oilButton.x,
       BattleUiV4Layout.oilButton.y,
       BattleUiV4Layout.oilButton.width,
@@ -384,6 +408,7 @@ export class BattleController extends Component {
         skinFilename: 'hud_oil_button_final.png',
         hostNode: this.midStatusLayer.getChildByName('OilButtonPrefab'),
         labelName: 'OilLabel',
+        widgetAlignment: { right: 22, bottom: 380 },
       },
     );
 
@@ -420,10 +445,11 @@ export class BattleController extends Component {
       this.bottomHudLayer,
       {
         hostNode: this.bottomHudLayer.getChildByName('UltimateButtonPrefab'),
+        widgetAlignment: { right: 21, bottom: 23 },
       },
     );
     this.autoButtonView = new UiButtonView(
-      '自动',
+      t('hud.auto'),
       BattleUiV4Layout.autoButton.x,
       BattleUiV4Layout.autoButton.y,
       BattleUiV4Layout.autoButton.width,
@@ -434,10 +460,11 @@ export class BattleController extends Component {
         skinFilename: 'hud_right_action_button_final.png',
         hostNode: this.bottomHudLayer.getChildByName('AutoButtonPrefab'),
         labelName: 'AutoLabel',
+        widgetAlignment: { right: 18, bottom: 225 },
       },
     );
     this.bondButtonView = new UiButtonView(
-      '羁绊',
+      t('hud.bond'),
       -278,
       BattleUiV4Layout.ultimateButton.y,
       76,
@@ -448,6 +475,7 @@ export class BattleController extends Component {
         skinFilename: 'hud_right_action_button_final.png',
         hostNode: this.bottomHudLayer.getChildByName('BondButtonPrefab'),
         labelName: 'BondLabel',
+        widgetAlignment: { left: 44, bottom: 23 },
       },
     );
   }
@@ -579,6 +607,10 @@ export class BattleController extends Component {
       BattleUiTokens.colors.highlight,
       520,
       50,
+      {
+        fontRole: 'bossWarning',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
     this.noticeLabel = notice.label;
     this.floatingTextSlots.length = 0;
@@ -604,7 +636,12 @@ export class BattleController extends Component {
         BattleUiTokens.colors.textPrimary,
         180,
         52,
+        {
+          fontRole: 'damageNumber',
+          lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+        },
       );
+      this.applyDamageNumberStyle(slot.getChildByName('FloatingTextLabel')?.getComponent(Label), BattleUiTokens.font.body);
       this.floatingTextSlots.push(slot);
     }
   }
@@ -629,7 +666,7 @@ export class BattleController extends Component {
 
     if (chainEvents.length >= 1 && mainEvent) {
       this.spawnFloatingText(
-        `连锁 ×${chainEvents.length}`,
+        t('battleFeedback.chain', { count: chainEvents.length }),
         mainEvent.enemyPosition.x + 36,
         mainEvent.enemyPosition.y + 60,
         26,
@@ -641,9 +678,13 @@ export class BattleController extends Component {
     }
 
     for (const event of visibleEvents) {
-      const fontSize = event.critical ? 30 : event.source === 'thunder_chain' ? 22 : 20;
+      const fontSize = event.critical ? 34 : event.source === 'thunder_chain' ? 25 : 24;
       const color = this.getDamageTextColor(event);
-      const prefix = event.critical ? '暴击 ' : event.source === 'hero_dps' ? '英雄 ' : '';
+      const prefix = event.critical
+        ? `${t('battleFeedback.critical')} `
+        : event.source === 'hero_dps'
+          ? `${t('battleFeedback.hero')} `
+          : '';
       this.spawnFloatingText(
         `${prefix}${Math.ceil(event.damage)}`,
         event.enemyPosition.x,
@@ -652,7 +693,7 @@ export class BattleController extends Component {
         color,
         event.critical ? 0.85 : 0.58,
         event.critical ? 92 : 64,
-        event.critical ? 180 : 130,
+        event.critical ? 210 : 154,
       );
     }
   }
@@ -672,7 +713,7 @@ export class BattleController extends Component {
 
       const position = this.getEventPosition(enemyId, result.attackEvents) ?? { x: 0, y: 0 };
       this.spawnFloatingText(
-        '击杀!',
+        t('battleFeedback.kill'),
         position.x,
         position.y + 58,
         34,
@@ -686,7 +727,7 @@ export class BattleController extends Component {
     if (this.comboCount >= 5) {
       this.setVisualFocus('combo', 0.58);
       this.spawnFloatingText(
-        `连杀 x${this.comboCount}`,
+        t('battleFeedback.combo', { count: this.comboCount }),
         0,
         348,
         this.comboCount >= 10 ? 44 : 38,
@@ -704,13 +745,13 @@ export class BattleController extends Component {
       .filter(Boolean) as EnemyState[];
 
     if (spawnedEnemies.some((enemy) => enemy.kind === 'boss')) {
-      this.showNotice('Boss 来袭！守住城门', new Color(255, 84, 84, 255), 42, 2.2);
+      this.showNotice(t('notices.bossIncoming'), new Color(255, 84, 84, 255), 42, 2.2);
       this.setVisualFocus('boss', 1.05);
       return;
     }
 
     if (spawnedEnemies.some((enemy) => enemy.kind === 'tank' || enemy.kind === 'ranged')) {
-      this.showNotice('精英怪出现', new Color(255, 220, 92, 255), 32, 1.5);
+      this.showNotice(t('notices.eliteIncoming'), new Color(255, 220, 92, 255), 32, 1.5);
     }
   }
 
@@ -728,13 +769,29 @@ export class BattleController extends Component {
       this.visualFocusTimeLeft = Math.max(0, this.visualFocusTimeLeft - deltaTime);
     }
 
+    this.updatePlayerAnimation(deltaTime);
     const outputFocus = this.getOutputFocus();
     const activeFocus = this.getActiveVisualFocus();
     this.gridPlacementSystem.setMainOutputHero(
       outputFocus.kind === 'hero' ? (outputFocus.heroId ?? 0) : 0,
     );
+    this.gridPlacementSystem.updateAnimations(deltaTime);
     this.drawPlayerVisual(outputFocus.kind === 'player', activeFocus);
     this.redrawCityLine(activeFocus === 'city');
+  }
+
+  private requestPlayerAnimationFromResult(result: BattleTickResult): void {
+    if (result.attackEvents.some((event) => event.source === 'main')) {
+      requestUnitAnimation(this.playerAnimation, 'attack');
+    }
+  }
+
+  private updatePlayerAnimation(deltaTime: number): void {
+    tickUnitAnimation(this.playerAnimation, deltaTime);
+
+    if (isUnitAnimationComplete(this.playerAnimation)) {
+      requestUnitAnimation(this.playerAnimation, 'idle');
+    }
   }
 
   private getEnemyVisualContext(): { focus: VisualFocusTarget } {
@@ -837,18 +894,18 @@ export class BattleController extends Component {
       (this.model.build.summon.maxBoardHeroes > 3 ? 1 : 0);
 
     if (fireScore >= thunderScore && fireScore >= summonScore && fireScore > 0) {
-      return '流派：火焰压制';
+      return t('hud.buildFire');
     }
 
     if (thunderScore >= fireScore && thunderScore >= summonScore && thunderScore > 0) {
-      return '流派：雷霆连锁';
+      return t('hud.buildThunder');
     }
 
     if (summonScore > 0) {
-      return '流派：召唤成型';
+      return t('hud.buildSummon');
     }
 
-    return '流派：未成型';
+    return t('hud.buildUnknown');
   }
 
   private refreshHeroAvatarBar(): void {
@@ -869,8 +926,19 @@ export class BattleController extends Component {
     const majorFocusActive = activeFocus === 'boss' || activeFocus === 'city';
     const highlightStrength = isMainOutput ? (majorFocusActive ? 0.55 : 1) : 0;
     const scale = highlightStrength > 0 ? 1 + highlightStrength * 0.065 : 1;
+    const pose = computeProceduralAnimationPose(
+      this.playerAnimation.currentState,
+      this.playerAnimation.elapsed,
+      'hero',
+    );
 
-    this.playerNode.setScale(scale, scale, 1);
+    this.playerNode.setPosition(
+      this.model.playerPosition.x + pose.offsetX,
+      this.model.playerPosition.y + pose.offsetY,
+      0,
+    );
+    this.playerNode.setScale(scale * pose.scaleX, scale * pose.scaleY, 1);
+    this.playerNode.angle = pose.rotation;
     this.playerAuraGraphics.clear();
 
     if (highlightStrength > 0) {
@@ -1021,7 +1089,7 @@ export class BattleController extends Component {
     if (!boss) {
       this.lastBossHp = Number.NaN;
       this.bossHitFlashTimeLeft = 0;
-      this.bossHealthBarView.refresh('Boss 未出现', 0, 1, false);
+      this.bossHealthBarView.refresh('', 0, 1, false);
       return;
     }
 
@@ -1115,8 +1183,24 @@ export class BattleController extends Component {
       color,
       width,
       52,
+      {
+        fontRole: 'damageNumber',
+        lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+      },
     );
+    this.applyDamageNumberStyle(labelView.label, fontSize);
     return { node, label: labelView.label };
+  }
+
+  private applyDamageNumberStyle(label?: Label | null, fontSize = BattleUiTokens.font.body): void {
+    if (!label) {
+      return;
+    }
+
+    label.fontSize = fontSize + 2;
+    label.lineHeight = Math.ceil((fontSize + 2) * BattleUiTokens.lineHeight.tight);
+    label.outlineWidth = Math.max(4, Math.round(fontSize * 0.22));
+    label.outlineColor = new Color(24, 10, 4, 240);
   }
 
   private getDamageTextColor(event: AttackEvent): Color {
@@ -1162,6 +1246,7 @@ export class BattleController extends Component {
     }
 
     this.floatingTexts.length = 0;
+    this.autoAttackSystem?.clear();
     this.comboCount = 0;
     this.comboTimeLeft = 0;
     this.noticeTimeLeft = 0;
@@ -1172,7 +1257,7 @@ export class BattleController extends Component {
     this.lastBossHp = Number.NaN;
     this.noticeLabel.string = '';
     this.comboView.clear();
-    this.bossHealthBarView.refresh('Boss 未出现', 0, 1, false);
+    this.bossHealthBarView.refresh('', 0, 1, false);
     this.gridPlacementSystem.setMainOutputHero(0);
     this.battleLayer.setScale(1, 1, 1);
   }
@@ -1212,7 +1297,10 @@ export class BattleController extends Component {
     portrait.setSiblingIndex(Math.max(0, player.children.length - 2));
     this.drawPlayerVisual(true, 'none');
 
-    bindOrCreateLabel(player, 'MainHeroLabel', '主角', 0, -8, 24, Color.WHITE, 80, 32);
+    bindOrCreateLabel(player, 'MainHeroLabel', '主角', 0, -8, 24, Color.WHITE, 80, 32, {
+      fontRole: 'uiTitle',
+      lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+    });
 
     if (!player.parent) {
       parent.addChild(player);
@@ -1238,10 +1326,11 @@ export class BattleController extends Component {
     node.setPosition(x, y, 0);
 
     const label = node.addComponent(Label);
-    label.string = text;
-    label.fontSize = fontSize;
-    label.lineHeight = fontSize + 4;
-    label.color = color;
+    applyBattleLabelStyle(label, text, fontSize, color, {
+      fontRole: 'damageNumber',
+      lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
+    });
+    this.applyDamageNumberStyle(label, fontSize);
 
     return { node, label };
   }

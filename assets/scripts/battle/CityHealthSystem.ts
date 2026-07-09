@@ -2,6 +2,7 @@
 import { Label } from 'cc';
 
 import { CityHealthBarView } from '../ui/BattleUiComponents';
+import { t } from '../ui/BattleTextResources';
 import { BattleMvpModel } from './BattleMvpModel';
 
 export class CityHealthSystem {
@@ -14,10 +15,10 @@ export class CityHealthSystem {
     this.healthBarView.refresh(model.cityHealth, model.options.cityMaxHealth, focused);
 
     if (model.gameOver) {
-      this.statusLabel.string = '游戏失败';
+      this.statusLabel.string = t('hud.statusGameOver');
       return;
     }
 
-    this.statusLabel.string = model.running ? '战斗中' : '待开始';
+    this.statusLabel.string = model.running ? t('hud.statusFighting') : t('hud.statusIdle');
   }
 }

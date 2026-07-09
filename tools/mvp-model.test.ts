@@ -87,10 +87,32 @@ runTest('default enemy tuning is slower and less punishing for readable mobile c
   assert.equal(model.options.enemyBaseSpeed, 34);
   assert.equal(model.options.enemyDamage, 0.5);
   assert.equal(model.options.enemyBaseHp, 20);
-  assert.equal(model.options.mainAttackDamage, 16);
+  assert.equal(model.options.mainAttackDamage, 11);
   assert.equal(model.options.waveInterval, 3);
   assert.ok((fast?.speedMultiplier ?? 99) <= 1.12);
   assert.ok((boss?.damageMultiplier ?? 99) <= 4.5);
+});
+
+runTest('default main attack softens the opening wave without making it toothless', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    heroBaseDps: 0,
+    random: () => 1,
+  });
+
+  model.startBattle();
+  const wave = model.spawnWave();
+
+  assert.equal(wave.length, 3);
+
+  const firstHit = model.tick(model.options.mainAttackInterval);
+
+  assert.equal(firstHit.killedEnemyIds.length, 0);
+  assert.ok(wave.some((enemy) => enemy.alive && enemy.hp < enemy.maxHp));
+
+  const secondPulse = model.tick(model.options.mainAttackInterval);
+
+  assert.ok(secondPulse.killedEnemyIds.length >= 1);
 });
 
 runTest('upgrade cards are always tied to fire, thunder, or summon builds', () => {
