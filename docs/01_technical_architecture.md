@@ -11,13 +11,17 @@
 - `assets/scripts/battle/BattleController.ts`：Cocos 入口组件。优先复用场景中已有的 Canvas 和 Layer；缺失时自动创建兜底节点。
 - `assets/scripts/battle/BattleMvpModel.ts`：纯 TypeScript 规则模型，不依赖 Cocos。负责核心战斗状态、三流派构筑、波次节奏、英雄 DPS 和敌人状态，便于用 Node 直接测试。
 - `assets/scripts/data/BattleConfig.ts`：英雄、敌人、强化卡静态配置。后续调数值优先修改该文件。
+- `assets/scripts/data/AnimationConfig.ts`：人物、怪物、Boss 动画状态、clip 名、优先级和 Spine 资源命名约定。
 - `assets/scripts/battle/EnemySystem.ts`：根据模型中的敌人状态创建、移动和销毁原型敌人节点。
+- `assets/scripts/battle/UnitAnimationSystem.ts`：共享单位动画驱动。当前使用程序动画模拟待机、移动、攻击、受击、死亡和 Boss 出场；后续可切换为 Spine 播放层。
 - `assets/scripts/battle/PlayerAutoAttackSystem.ts`：根据主角攻击、暴击和雷链事件绘制简单直线反馈。
 - `assets/scripts/battle/WaveSystem.ts`：刷新当前波次显示。
 - `assets/scripts/battle/CityHealthSystem.ts`：刷新城池血量和失败状态。
 - `assets/scripts/battle/GridPlacementSystem.ts`：招募按钮、前排 3 格、后排 2 格、放置和合成后的显示刷新。
 - `assets/scripts/roguelike/UpgradeCardSystem.ts`：三选一强化卡片显示和点击生效。
-- `assets/scripts/ui/BattleUiComponents.ts`：Boss 血条、城池血条、Combo、按钮、头像槽、资源条、通用美术加载等 UI 承载组件。
+- `assets/scripts/ui/BattleUiComponents.ts`：Boss 血条、城池血条、Combo、按钮、头像槽、资源条、通用美术加载和统一 Label 排版等 UI 承载组件。
+- `assets/scripts/ui/BattleTextResources.ts`：加载 `assets/resources/ui_text_zh.json` 文本资源，提供 UI 文案兜底和参数化格式化。
+- `assets/scripts/ui/BattleFontResources.ts`：按 UI 角色懒加载 `assets/resources/fonts` 下的 TTF 字体，加载完成后自动应用到已绑定 Label。
 - `assets/scripts/ui/BattleUiLayout.ts`：`720x1280` 竖屏布局常量和安全区测试入口。
 - `assets/scripts/ui/BattleUiTokens.ts`：红金、雷系、召唤系、字号、描边、圆角等视觉 token。
 - `assets/scripts/ui/BattleUiSceneBindings.ts`：场景节点绑定辅助，连接 `BattleMain.scene` 与运行时自动兜底。
@@ -36,13 +40,17 @@
 
 当前 MVP 的主要实现目录。包含 `BattleController`、`BattleMvpModel`、敌人、波次、主角自动攻击、城血和布阵系统。
 
+动画表现不写进 `BattleMvpModel`。战斗模型只产出攻击、受击、死亡、波次、Boss 等结果；`EnemySystem`、`BattleController`、`GridPlacementSystem` 通过 `UnitAnimationSystem` 消费这些结果并播放程序动画。后续接入 Spine 时应继续保持这个边界。
+
 ### roguelike
 
 当前包含 `UpgradeCardSystem`，实现三选一强化 UI 和点击应用逻辑。强化卡必须属于火系、雷系或召唤系，实际规则由 `BattleMvpModel` 执行。
 
 ### ui
 
-当前已有 UI token、布局常量、通用组件和场景绑定辅助。第一轮仍由 TypeScript 生成大部分具体节点，但节点会优先挂在 `BattleMain.scene` 中的固定 Layer 下。`BossHealthBarView`、`CityHealthBarView`、`UpgradeCardView`、`UltimateButtonView`、`HeroAvatarSlotView`、自动按钮、羁绊按钮、暂停、倍速、箭塔、火油、波次、剩余敌人、资源 chip、流派状态、Combo、开始战斗按钮、战斗反馈文字、玩家主角、城墙线和敌人视觉模板已完成场景内占位绑定；后续可继续把战斗背景、技能轨迹和英雄棋盘节点迁移为 Prefab。
+当前已有 UI token、布局常量、通用组件、文本资源加载器和场景绑定辅助。第一轮仍由 TypeScript 生成大部分具体节点，但节点会优先挂在 `BattleMain.scene` 中的固定 Layer 下。`BossHealthBarView`、`CityHealthBarView`、`UpgradeCardView`、`UltimateButtonView`、`HeroAvatarSlotView`、自动按钮、羁绊按钮、暂停、倍速、箭塔、火油、波次、剩余敌人、资源 chip、流派状态、Combo、开始战斗按钮、战斗反馈文字、玩家主角、城墙线和敌人视觉模板已完成场景内占位绑定；后续可继续把战斗背景、技能轨迹和英雄棋盘节点迁移为 Prefab。
+
+UI 文案放在 `assets/resources/ui_text_zh.json`，字体规划放在 `assets/resources/ui_font_profile.json`。当前已下载 SIL OFL 字体并接入运行时角色加载；后续正式 BMFont 数字字接入时优先替换字体资源和 profile，不改战斗逻辑。
 
 ### platform
 
@@ -51,6 +59,8 @@
 ### data
 
 当前英雄、敌人和强化卡配置放在 `assets/scripts/data/BattleConfig.ts`。战斗运行参数仍在 `BattleMvpModel` 的默认选项中，后续可以继续迁移到可导表数据。
+
+动画状态和 Spine 资源约定放在 `assets/scripts/data/AnimationConfig.ts`。英雄统一使用 `idle/attack/cast/hit/death/victory`，敌人统一使用 `idle/spawn/walk/attack_city/hit/death`，Boss 额外使用 `boss_intro/boss_attack`。
 
 ### utils
 
@@ -65,9 +75,10 @@
 5. 玩家点击“开始战斗”后调用 `BattleMvpModel.startBattle()`。
 6. 每帧由 `BattleMvpModel.tick(deltaTime)` 推进规则。
 7. `EnemySystem` 将敌人状态同步为原型节点。
-8. `PlayerAutoAttackSystem` 展示主角攻击连线。
-9. `UpgradeCardSystem` 在模型触发强化时显示 3 张流派卡片。
-10. `GridPlacementSystem` 处理招募、放置、同格/相邻合成、上阵数量和英雄 DPS 显示。
+8. `UnitAnimationSystem` 根据战斗结果驱动敌人、主角和棋盘英雄的程序动画。
+9. `PlayerAutoAttackSystem` 展示主角攻击连线。
+10. `UpgradeCardSystem` 在模型触发强化时显示 3 张流派卡片。
+11. `GridPlacementSystem` 处理招募、放置、同格/相邻合成、上阵数量和英雄 DPS 显示。
 
 ## v0.2 规则边界
 
@@ -102,6 +113,12 @@ npm run typecheck
 
 ```bash
 npm run test:scene
+```
+
+运行动画系统测试：
+
+```bash
+npm run test:animation
 ```
 
 在 Cocos Creator 中运行：

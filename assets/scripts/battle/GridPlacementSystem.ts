@@ -1,9 +1,23 @@
 // @ts-nocheck
 import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
 
-import { createUiArtSkinNode, getHeroPortraitFilename } from '../ui/BattleUiComponents';
+import {
+  applyBattleLabelStyle,
+  createUiArtSkinNode,
+  getHeroPortraitFilename,
+} from '../ui/BattleUiComponents';
 import { BattleUiV4Layout, RectSpec } from '../ui/BattleUiLayout';
+import { t } from '../ui/BattleTextResources';
 import { BattleMvpModel, GridSlotState } from './BattleMvpModel';
+import { getHeroAnimationProfile } from '../data/AnimationConfig';
+import {
+  UnitAnimationRuntime,
+  computeProceduralAnimationPose,
+  createUnitAnimationRuntime,
+  isUnitAnimationComplete,
+  requestUnitAnimation,
+  tickUnitAnimation,
+} from './UnitAnimationSystem';
 
 interface ButtonView {
   node: Node;
@@ -14,6 +28,10 @@ interface ButtonView {
   baseColor: Color;
   portraitNode?: Node;
   portraitFilename?: string;
+  animation?: UnitAnimationRuntime;
+  animationHeroName?: string;
+  baseX?: number;
+  baseY?: number;
 }
 
 export class GridPlacementSystem {
@@ -34,7 +52,7 @@ export class GridPlacementSystem {
     parent.addChild(this.root);
 
     const title = this.createLabel(
-      '布阵：前排3格 / 后排2格',
+      t('grid.title', { heroes: 0, maxHeroes: this.model.build.summon.maxBoardHeroes, dps: 0 }),
       BattleUiV4Layout.placementTitle.x,
       BattleUiV4Layout.placementTitle.y,
       20,
@@ -67,12 +85,14 @@ export class GridPlacementSystem {
   }
 
   public refresh(): void {
-    this.titleLabel.string = `布阵：${this.model.getHeroes().length}/${this.model.build.summon.maxBoardHeroes}  DPS ${Math.ceil(
-      this.model.getTotalHeroDps(),
-    )}`;
+    this.titleLabel.string = t('grid.title', {
+      heroes: this.model.getHeroes().length,
+      maxHeroes: this.model.build.summon.maxBoardHeroes,
+      dps: Math.ceil(this.model.getTotalHeroDps()),
+    });
     this.pendingLabel.string = this.pendingHeroName
-      ? `待放置：${this.pendingHeroName}`
-      : this.pendingMessage || '待放置：无';
+      ? t('grid.pendingHero', { heroName: this.pendingHeroName })
+      : this.pendingMessage || t('grid.pendingNone');
 
     for (const slot of this.model.slots) {
       const view = this.slotButtons[slot.index];
@@ -91,6 +111,49 @@ export class GridPlacementSystem {
 
   public setMainOutputHero(heroId: number): void {
     this.highlightedHeroId = heroId;
+  }
+
+  public updateAnimations(deltaSeconds: number): void {
+    for (const slot of this.model.slots) {
+      const view = this.slotButtons[slot.index];
+      if (!view) {
+        continue;
+      }
+
+      if (!slot.hero) {
+        view.node.setPosition(view.baseX ?? view.node.position.x, view.baseY ?? view.node.position.y, 0);
+        view.node.setScale(1, 1, 1);
+        view.node.angle = 0;
+        continue;
+      }
+
+      if (!view.animation || view.animationHeroName !== slot.hero.name) {
+        view.animation = createUnitAnimationRuntime(getHeroAnimationProfile(slot.hero.name));
+        view.animationHeroName = slot.hero.name;
+        requestUnitAnimation(view.animation, 'cast');
+      }
+
+      const highlighted = slot.hero.id === this.highlightedHeroId;
+      requestUnitAnimation(view.animation, highlighted ? 'cast' : 'idle');
+      tickUnitAnimation(view.animation, deltaSeconds);
+      if (isUnitAnimationComplete(view.animation)) {
+        requestUnitAnimation(view.animation, 'idle');
+      }
+
+      const pose = computeProceduralAnimationPose(
+        view.animation.currentState,
+        view.animation.elapsed,
+        'hero',
+      );
+      const focusScale = highlighted ? 1.04 : 1;
+      view.node.setPosition(
+        (view.baseX ?? view.node.position.x) + pose.offsetX,
+        (view.baseY ?? view.node.position.y) + pose.offsetY,
+        0,
+      );
+      view.node.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
+      view.node.angle = pose.rotation;
+    }
   }
 
   public recruitFromUpgrade(): void {
@@ -120,9 +183,9 @@ export class GridPlacementSystem {
         this.pendingHeroName = '';
         this.pendingMessage = '';
       } else if (slot.hero && slot.hero.name !== this.pendingHeroName) {
-        this.pendingMessage = '同名英雄才能合成';
+        this.pendingMessage = t('grid.mergeOnly');
       } else {
-        this.pendingMessage = '上阵已满，选召唤+1';
+        this.pendingMessage = t('grid.boardFull');
       }
 
       this.refresh();
@@ -133,11 +196,16 @@ export class GridPlacementSystem {
 
   private getSlotText(slot: GridSlotState, highlightedHeroId = 0): string {
     if (!slot.hero) {
-      return `${slot.label}\n空`;
+      return t('grid.slotEmpty', { slotLabel: slot.label });
     }
 
     const mark = slot.hero.id === highlightedHeroId ? '★' : '';
-    return `${slot.label}\n${mark}${slot.hero.name} Lv${slot.hero.level}`;
+    return t('grid.slotHero', {
+      slotLabel: slot.label,
+      focus: mark,
+      heroName: slot.hero.name,
+      level: slot.hero.level,
+    });
   }
 
   private getSlotColor(slot: GridSlotState): Color {
@@ -248,14 +316,14 @@ export class GridPlacementSystem {
     const labelTransform = labelNode.addComponent(UITransform);
     labelTransform.setContentSize(width, height);
     const label = labelNode.addComponent(Label);
-    label.string = text;
-    label.fontSize = 18;
-    label.lineHeight = 22;
-    label.color = Color.WHITE;
+    applyBattleLabelStyle(label, text, 18, Color.WHITE, {
+      lineHeightMultiplier: 1.18,
+      overflow: 'shrink',
+    });
     labelNode.setPosition(16, -9, 0);
     node.addChild(labelNode);
 
-    const view = { node, graphics, label, width, height, baseColor: color };
+    const view = { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
     this.drawPlainButton(view);
 
     return view;
@@ -287,10 +355,10 @@ export class GridPlacementSystem {
     node.setPosition(x, y, 0);
 
     const label = node.addComponent(Label);
-    label.string = text;
-    label.fontSize = fontSize;
-    label.lineHeight = fontSize + 4;
-    label.color = color;
+    applyBattleLabelStyle(label, text, fontSize, color, {
+      lineHeightMultiplier: 1.18,
+      overflow: 'shrink',
+    });
 
     return { node, label };
   }

@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "designResolution": "720x1280",
+    "usage": "Font and typography resource profile for battle UI"
+  },
+  "runtime": {
+    "current": "runtime-loaded-ttf-with-system-fallback",
+    "reason": "BattleFontResources loads downloaded TTF files by UI role. Labels render with system font first, then switch to Font assets after resources.load succeeds."
+  },
+  "downloadedAssets": [
+    {
+      "file": "fonts/SmileySans-Oblique.ttf",
+      "name": "Smiley Sans / 得意黑",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "Logo、副标题、Boss 名牌、商业感强的斜体艺术字"
+    },
+    {
+      "file": "fonts/ZCOOLKuaiLe-Regular.ttf",
+      "name": "ZCOOL KuaiLe / 站酷快乐体",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "开始战斗、强化标题、强化卡标题、按钮主字"
+    },
+    {
+      "file": "fonts/ZCOOLQingKeHuangYou-Regular.ttf",
+      "name": "ZCOOL QingKe HuangYou / 站酷庆科黄油体",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "资源数字、HUD 标签、轻传奇硬朗标题"
+    },
+    {
+      "file": "fonts/ZCOOLXiaoWei-Regular.ttf",
+      "name": "ZCOOL XiaoWei / 站酷小薇体",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "古风说明字、剧情章名、备用卡牌标题"
+    },
+    {
+      "file": "fonts/MaShanZheng-Regular.ttf",
+      "name": "Ma Shan Zheng / 马善政毛笔楷书",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "Boss 来袭、关卡掉落、强反馈喊字"
+    },
+    {
+      "file": "fonts/LongCang-Regular.ttf",
+      "name": "Long Cang / 龙藏体",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "古风标题、剧情章名、沙城氛围字"
+    },
+    {
+      "file": "fonts/LiuJianMaoCao-Regular.ttf",
+      "name": "Liu Jian Mao Cao / 刘建毛草",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "暴击、绝技、连杀等夸张艺术字"
+    },
+    {
+      "file": "fonts/ZhiMangXing-Regular.ttf",
+      "name": "Zhi Mang Xing / 志莽行书",
+      "license": "SIL Open Font License 1.1",
+      "recommendedUse": "技能名、火系/雷系强化表现、活动标题"
+    }
+  ],
+  "marketReference": {
+    "checkedGames": ["永远的蔚蓝星球", "向僵尸开炮"],
+    "finding": "Public store/community pages expose screenshots and marketing text, but no official font-family disclosure was found. Use legally bundled OFL display fonts that match the popular mobile tower-defense card/button feel instead of copying proprietary game assets."
+  },
+  "recommendedAssignments": {
+    "uiTitle": "fonts/ZCOOLKuaiLe-Regular.ttf",
+    "uiButton": "fonts/ZCOOLKuaiLe-Regular.ttf",
+    "uiHud": "fonts/ZCOOLQingKeHuangYou-Regular.ttf",
+    "uiCardTitle": "fonts/ZCOOLKuaiLe-Regular.ttf",
+    "bossWarning": "fonts/MaShanZheng-Regular.ttf",
+    "ultimateCallout": "fonts/LiuJianMaoCao-Regular.ttf",
+    "comboCallout": "fonts/LiuJianMaoCao-Regular.ttf",
+    "schoolCallout": "fonts/ZhiMangXing-Regular.ttf",
+    "damageNumber": "fonts/SmileySans-Oblique.ttf"
+  },
+  "recommendedFonts": {
+    "uiTitle": "ZCOOLKuaiLe-Regular.ttf for hot mobile-game card/button titles; SmileySans-Oblique.ttf for logo-like splash text",
+    "uiBody": "ZCOOLQingKeHuangYou-Regular.ttf for compact HUD; keep system font for long body text if readability drops",
+    "damageNumber": "Use SmileySans-Oblique.ttf for clearer, heavier battle numbers; generate BMFont later for production damage numbers"
+  },
+  "futureAssets": [
+    "font_number_damage.fnt",
+    "font_number_damage.png",
+    "font_number_combo.fnt",
+    "font_number_combo.png",
+    "font_number_resource.fnt",
+    "font_number_resource.png"
+  ],
+  "styles": {
+    "tiny": { "fontSize": 16, "lineHeight": 20, "overflow": "shrink" },
+    "caption": { "fontSize": 18, "lineHeight": 23, "overflow": "shrink" },
+    "body": { "fontSize": 22, "lineHeight": 28, "overflow": "shrink" },
+    "title": { "fontSize": 28, "lineHeight": 34, "overflow": "shrink" },
+    "hero": { "fontSize": 36, "lineHeight": 42, "overflow": "shrink" },
+    "cardDescription": { "fontSize": 16, "lineHeight": 18, "overflow": "shrink", "wrap": true }
+  }
+}

@@ -38,8 +38,22 @@ export const BattleUiTokens = {
     tiny: 16,
     caption: 18,
     body: 22,
+    cardTag: 16,
+    cardBody: 16,
+    cardTitle: 22,
     title: 28,
     hero: 36,
+    combo: 38,
+  },
+  fontFamily: {
+    ui: 'Arial',
+    title: 'ZCOOL KuaiLe',
+    number: 'Arial',
+  },
+  lineHeight: {
+    tight: 1.12,
+    normal: 1.22,
+    loose: 1.32,
   },
   spacing: {
     xs: 6,

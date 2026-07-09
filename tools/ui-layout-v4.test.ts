@@ -48,11 +48,6 @@ function main(): void {
     'ultimate button overlaps upgrade panel',
   );
   assert(!rectsOverlap(layout.heroBar, layout.ultimateButton), 'ultimate button overlaps hero bar');
-  assert(
-    !rectsOverlap(layout.upgradePanel, layout.towerButton),
-    'tower button overlaps upgrade panel',
-  );
-  assert(!rectsOverlap(layout.upgradePanel, layout.oilButton), 'oil button overlaps upgrade panel');
   assertNear(
     layout.towerButton.y,
     layout.cityHp.y,
@@ -66,6 +61,7 @@ function main(): void {
   const buildHintLabel = assertRect(layoutMap, 'buildHintLabel');
   const placementTitle = assertRect(layoutMap, 'placementTitle');
   const placementPending = assertRect(layoutMap, 'placementPending');
+  const upgradeScrim = assertRect(layoutMap, 'upgradeScrim');
   const gridSlotFront1 = assertRect(layoutMap, 'gridSlotFront1');
   const gridSlotFront2 = assertRect(layoutMap, 'gridSlotFront2');
   const gridSlotFront3 = assertRect(layoutMap, 'gridSlotFront3');
@@ -96,6 +92,36 @@ function main(): void {
   assert(
     !rectsOverlap(placementPending, layout.heroBar),
     'pending placement label overlaps hero bar',
+  );
+  assertNear(layout.upgradePanel.x, 0, 'upgrade panel should be horizontally centered');
+  assertNear(layout.upgradePanel.y, 0, 'upgrade panel should be vertically centered');
+  assert(
+    layout.upgradePanel.width >= 660,
+    'upgrade panel should leave enough horizontal room for three choice cards',
+  );
+  assert(
+    layout.upgradePanel.width <= BattleUiDesign.width - 32,
+    'upgrade panel should keep portrait screen side margins',
+  );
+  assertNear(upgradeScrim.x, 0, 'upgrade dimmer should be horizontally centered');
+  assertNear(upgradeScrim.y, 0, 'upgrade dimmer should be vertically centered');
+  assertNear(
+    upgradeScrim.width,
+    BattleUiDesign.width,
+    'upgrade dimmer should cover portrait width',
+  );
+  assertNear(
+    upgradeScrim.height,
+    BattleUiDesign.height,
+    'upgrade dimmer should cover portrait height',
+  );
+  assert(
+    !rectsOverlap(layout.upgradePanel, layout.topHud),
+    'centered upgrade panel should not overlap top hud',
+  );
+  assert(
+    !rectsOverlap(layout.upgradePanel, layout.heroBar),
+    'centered upgrade panel should not overlap bottom hero bar',
   );
 
   for (const gridRect of [

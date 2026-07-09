@@ -8,6 +8,17 @@ import {
   getEnemyPortraitFilename,
 } from '../ui/BattleUiComponents';
 import { EnemyState } from './BattleMvpModel';
+import {
+  UnitAnimationPose,
+  UnitAnimationRuntime,
+  computeProceduralAnimationPose,
+  createUnitAnimationRuntime,
+  isUnitAnimationComplete,
+  requestUnitAnimation,
+  resolveEnemyAnimationState,
+  tickUnitAnimation,
+} from './UnitAnimationSystem';
+import { getEnemyAnimationProfile } from '../data/AnimationConfig';
 
 interface EnemyNodeView {
   node: Node;
@@ -19,6 +30,11 @@ interface EnemyNodeView {
   statusIcons: Map<string, Node>;
   bobPhase: number;
   bobOffset: number;
+  baseX: number;
+  baseY: number;
+  dying: boolean;
+  animation: UnitAnimationRuntime;
+  animationPose: UnitAnimationPose;
 }
 
 export type VisualFocusTarget = 'none' | 'boss' | 'city' | 'combo' | 'output';
@@ -55,16 +71,42 @@ export class EnemySystem {
 
     for (const [enemyId, view] of this.enemyViews.entries()) {
       if (!aliveIds.has(enemyId)) {
-        view.node.destroy();
-        this.enemyViews.delete(enemyId);
+        this.updateDyingEnemyView(enemyId, view);
       }
     }
 
     for (const enemy of enemies) {
-      const view = this.enemyViews.get(enemy.id) ?? this.createEnemyView(enemy);
+      const existingView = this.enemyViews.get(enemy.id);
+      const newlyCreated = !existingView;
+      const view = existingView ?? this.createEnemyView(enemy);
+      view.dying = false;
+      const nextState = resolveEnemyAnimationState(enemy, {
+        previousHp: newlyCreated ? undefined : view.lastHp,
+        newlySpawned: newlyCreated,
+      });
+      requestUnitAnimation(view.animation, nextState);
+      tickUnitAnimation(view.animation, 1 / 60);
+      if (isUnitAnimationComplete(view.animation)) {
+        requestUnitAnimation(
+          view.animation,
+          resolveEnemyAnimationState(enemy, { previousHp: enemy.hp }),
+        );
+      }
+      view.animationPose = computeProceduralAnimationPose(
+        view.animation.currentState,
+        view.animation.elapsed,
+        enemy.kind === 'boss' ? 'boss' : 'enemy',
+      );
       const bob = this.computeBobOffset(enemy, view.bobPhase);
       view.bobOffset = bob;
-      view.node.setPosition(enemy.position.x, enemy.position.y + bob, 0);
+      view.baseX = enemy.position.x;
+      view.baseY = enemy.position.y + bob;
+      view.node.setPosition(
+        view.baseX + view.animationPose.offsetX,
+        view.baseY + view.animationPose.offsetY,
+        0,
+      );
+      view.node.angle = view.animationPose.rotation;
       view.label.string = this.getEnemyLabel(enemy);
       view.label.color = this.getLabelColor(enemy, crowded, visualContext);
 
@@ -137,6 +179,8 @@ export class EnemySystem {
     const label = labelView.label;
 
     this.parent.addChild(node);
+    const animation = createUnitAnimationRuntime(getEnemyAnimationProfile(enemy.kind));
+    requestUnitAnimation(animation, enemy.kind === 'boss' ? 'boss_intro' : 'spawn');
 
     const view = {
       node,
@@ -148,11 +192,42 @@ export class EnemySystem {
       statusIcons: new Map<string, Node>(),
       bobPhase: Math.random() * Math.PI * 2,
       bobOffset: 0,
+      baseX: enemy.position.x,
+      baseY: enemy.position.y,
+      dying: false,
+      animation,
+      animationPose: computeProceduralAnimationPose('spawn', 0, enemy.kind === 'boss' ? 'boss' : 'enemy'),
     };
     this.drawEnemy(enemy, view, false, { focus: 'none' });
     this.enemyViews.set(enemy.id, view);
 
     return view;
+  }
+
+  private updateDyingEnemyView(enemyId: number, view: EnemyNodeView): void {
+    if (!view.dying) {
+      view.dying = true;
+      requestUnitAnimation(view.animation, 'death');
+    }
+
+    tickUnitAnimation(view.animation, 1 / 60);
+    view.animationPose = computeProceduralAnimationPose(
+      'death',
+      view.animation.elapsed,
+      view.animation.profile.subject === 'boss' ? 'boss' : 'enemy',
+    );
+    view.node.setPosition(
+      view.baseX + view.animationPose.offsetX,
+      view.baseY + view.animationPose.offsetY,
+      0,
+    );
+    view.node.setScale(view.animationPose.scaleX, view.animationPose.scaleY, 1);
+    view.node.angle = view.animationPose.rotation;
+
+    if (isUnitAnimationComplete(view.animation)) {
+      view.node.destroy();
+      this.enemyViews.delete(enemyId);
+    }
   }
 
   private drawEnemy(
@@ -171,8 +246,9 @@ export class EnemySystem {
     const flash = view.flashTimeLeft > 0;
     const bossFocused = enemy.kind === 'boss' && visualContext.focus === 'boss';
     const scale = this.getEnemyScale(enemy, flash, bossFocused, muted);
+    const pose = view.animationPose ?? computeProceduralAnimationPose('idle', 0);
 
-    view.node.setScale(scale, scale, 1);
+    view.node.setScale(scale * pose.scaleX, scale * pose.scaleY, 1);
     view.graphics.clear();
 
     // Ground shadow (stays on ground, doesn't bob with body)
