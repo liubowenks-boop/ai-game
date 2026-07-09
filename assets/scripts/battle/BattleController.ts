@@ -316,40 +316,45 @@ export class BattleController extends Component {
 
   private createMidStatusLayer(): { statusLabel: Label } {
     this.cityHealthBarView = new CityHealthBarView(
-      BattleUiV4Layout.cityHp.x - 92,
-      BattleUiV4Layout.cityHp.y,
-      292,
+      BattleUiV4Layout.cityHealthBar.x,
+      BattleUiV4Layout.cityHealthBar.y,
+      BattleUiV4Layout.cityHealthBar.width,
       this.midStatusLayer,
       {
         hostNode: this.midStatusLayer.getChildByName('CityHealthBarPrefab'),
       },
     );
-    this.comboView = new ComboView(98, BattleUiV4Layout.cityHp.y, this.midStatusLayer, {
-      hostNode: this.midStatusLayer.getChildByName('ComboView'),
-    });
+    this.comboView = new ComboView(
+      BattleUiV4Layout.comboBadge.x,
+      BattleUiV4Layout.comboBadge.y,
+      this.midStatusLayer,
+      {
+        hostNode: this.midStatusLayer.getChildByName('ComboView'),
+      },
+    );
 
     const statusView = bindOrCreateLabel(
       this.midStatusLayer,
       'StatusLabel',
       '待开始',
-      250,
-      BattleUiV4Layout.cityHp.y + 14,
+      BattleUiV4Layout.statusLabel.x,
+      BattleUiV4Layout.statusLabel.y,
       BattleUiTokens.font.caption,
       BattleUiTokens.colors.textPrimary,
-      126,
-      28,
+      BattleUiV4Layout.statusLabel.width,
+      BattleUiV4Layout.statusLabel.height,
     );
 
     const buildHintView = bindOrCreateLabel(
       this.midStatusLayer,
       'BuildHintLabel',
       '流派：未成型',
-      250,
-      BattleUiV4Layout.cityHp.y - 14,
+      BattleUiV4Layout.buildHintLabel.x,
+      BattleUiV4Layout.buildHintLabel.y,
       BattleUiTokens.font.caption,
       BattleUiTokens.colors.highlight,
-      142,
-      28,
+      BattleUiV4Layout.buildHintLabel.width,
+      BattleUiV4Layout.buildHintLabel.height,
     );
     this.buildHintLabel = buildHintView.label;
 
@@ -504,7 +509,14 @@ export class BattleController extends Component {
 
     this.cityLineGraphics = line.getComponent(Graphics) ?? line.addComponent(Graphics);
     ensureNamedUiChild(line, 'CityLineFill', 0, 0, this.stageWidth - 80, this.stageHeight);
-    ensureNamedUiChild(line, 'CityLineStroke', 0, this.model.options.cityLineY, this.stageWidth - 80, 12);
+    ensureNamedUiChild(
+      line,
+      'CityLineStroke',
+      0,
+      this.model.options.cityLineY,
+      this.stageWidth - 80,
+      12,
+    );
     this.redrawCityLine(false);
 
     if (!line.parent) {
@@ -548,7 +560,8 @@ export class BattleController extends Component {
   }
 
   private createReadabilityUi(parent: Node): void {
-    const feedbackPool = parent.getChildByName('BattleFeedbackPool') ?? new Node('BattleFeedbackPool');
+    const feedbackPool =
+      parent.getChildByName('BattleFeedbackPool') ?? new Node('BattleFeedbackPool');
     this.setUiLayer(feedbackPool);
     feedbackPool.setPosition(0, 0, 0);
 
@@ -630,11 +643,7 @@ export class BattleController extends Component {
     for (const event of visibleEvents) {
       const fontSize = event.critical ? 30 : event.source === 'thunder_chain' ? 22 : 20;
       const color = this.getDamageTextColor(event);
-      const prefix = event.critical
-        ? '暴击 '
-        : event.source === 'hero_dps'
-          ? '英雄 '
-          : '';
+      const prefix = event.critical ? '暴击 ' : event.source === 'hero_dps' ? '英雄 ' : '';
       this.spawnFloatingText(
         `${prefix}${Math.ceil(event.damage)}`,
         event.enemyPosition.x,
@@ -1193,7 +1202,13 @@ export class BattleController extends Component {
       player.addChild(bodyNode);
     }
     this.playerGraphics = bodyNode.getComponent(Graphics) ?? bodyNode.addComponent(Graphics);
-    const portrait = bindOrCreateUiArtSkinNode(player, 'portrait_hero_archer.png', 66, 66, 'MainHeroPortrait');
+    const portrait = bindOrCreateUiArtSkinNode(
+      player,
+      'portrait_hero_archer.png',
+      66,
+      66,
+      'MainHeroPortrait',
+    );
     portrait.setSiblingIndex(Math.max(0, player.children.length - 2));
     this.drawPlayerVisual(true, 'none');
 

@@ -6,7 +6,6 @@ import {
   Graphics,
   ImageAsset,
   Label,
-  LabelOutline,
   Layers,
   Node,
   Sprite,
@@ -355,10 +354,9 @@ export function ensureNamedUiChild(
 }
 
 export function applyLabelOutline(label: Label, fontSize: number): void {
-  const outline = label.node.getComponent(LabelOutline) ?? label.node.addComponent(LabelOutline);
   const width = Math.max(2, Math.round(fontSize * 0.14));
-  outline.width = width;
-  outline.color = uiColor(Color.BLACK, 205);
+  label.outlineWidth = width;
+  label.outlineColor = uiColor(Color.BLACK, 205);
 }
 
 export function createPanelNode(
@@ -544,7 +542,13 @@ export class ResourceChipView {
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, height);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    bindOrCreateUiArtSkinNode(this.node, 'hud_resource_chip.png', width, height, 'ResourceChipSkin');
+    bindOrCreateUiArtSkinNode(
+      this.node,
+      'hud_resource_chip.png',
+      width,
+      height,
+      'ResourceChipSkin',
+    );
     const iconFilename = title === '金币' ? 'icon_gold.png' : 'icon_spirit_stone.png';
     const icon = bindOrCreateUiArtSkinNode(this.node, iconFilename, 26, 26, 'ResourceChipIcon');
     icon.setPosition(-width / 2 + 22, 0, 0);
@@ -839,7 +843,13 @@ export class ComboView {
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(260, 58);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    const comboSkin = bindOrCreateUiArtSkinNode(this.node, 'hud_combo_plate.png', 260, 58, 'ComboSkin');
+    const comboSkin = bindOrCreateUiArtSkinNode(
+      this.node,
+      'hud_combo_plate.png',
+      260,
+      58,
+      'ComboSkin',
+    );
     comboSkin.active = false;
     const labelView = bindOrCreateLabel(
       this.node,
@@ -1008,7 +1018,8 @@ export class HeroAvatarSlotView {
 
   private refreshPortrait(heroName: string): void {
     const filename = getHeroPortraitFilename(heroName) ?? '';
-    this.portraitNode = this.portraitNode ?? this.node.getChildByName('AvatarPortrait') ?? undefined;
+    this.portraitNode =
+      this.portraitNode ?? this.node.getChildByName('AvatarPortrait') ?? undefined;
 
     if (!filename) {
       if (this.portraitNode) {
@@ -1234,8 +1245,12 @@ export class UpgradeCardView {
   }
 
   private addTextOutline(node: Node, width: number): void {
-    const outline = node.addComponent(LabelOutline);
-    outline.color = uiColor(Color.BLACK, 210);
-    outline.width = width;
+    const label = node.getComponent(Label);
+    if (!label) {
+      return;
+    }
+
+    label.outlineColor = uiColor(Color.BLACK, 210);
+    label.outlineWidth = width;
   }
 }

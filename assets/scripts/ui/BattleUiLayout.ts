@@ -21,10 +21,26 @@ function fromTopLeft(x: number, y: number, width: number, height: number): RectS
   };
 }
 
+function fromCenter(x: number, y: number, width: number, height: number): RectSpec {
+  return { x, y, width, height };
+}
+
 export const BattleUiV4Layout = {
   topHud: fromTopLeft(16, 16, 688, 87),
   battleArea: fromTopLeft(0, 102, 720, 768),
   cityHp: fromTopLeft(180, 835, 360, 40),
+  cityHealthBar: fromTopLeft(210, 832, 300, 46),
+  comboBadge: fromTopLeft(230, 765, 260, 58),
+  statusLabel: fromCenter(-235, -154, 160, 28),
+  buildHintLabel: fromCenter(235, -154, 190, 28),
+  placementTitle: fromCenter(0, -462, 360, 28),
+  placementPending: fromCenter(0, -492, 360, 24),
+  gridSlotFront1: fromCenter(-220, -285, 108, 66),
+  gridSlotFront2: fromCenter(0, -285, 108, 66),
+  gridSlotFront3: fromCenter(220, -285, 108, 66),
+  gridSlotBack1: fromCenter(-150, -405, 108, 66),
+  gridSlotBack2: fromCenter(150, -405, 108, 66),
+  mainHeroUnit: fromCenter(0, -405, 72, 72),
   towerButton: fromTopLeft(22, 810, 76, 90),
   oilButton: fromTopLeft(622, 810, 76, 90),
   upgradePanel: fromTopLeft(29, 922, 576, 198),

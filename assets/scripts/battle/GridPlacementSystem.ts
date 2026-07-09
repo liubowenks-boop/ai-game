@@ -2,6 +2,7 @@
 import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
 
 import { createUiArtSkinNode, getHeroPortraitFilename } from '../ui/BattleUiComponents';
+import { BattleUiV4Layout, RectSpec } from '../ui/BattleUiLayout';
 import { BattleMvpModel, GridSlotState } from './BattleMvpModel';
 
 interface ButtonView {
@@ -34,15 +35,25 @@ export class GridPlacementSystem {
 
     const title = this.createLabel(
       '布阵：前排3格 / 后排2格',
-      0,
-      -220,
-      24,
+      BattleUiV4Layout.placementTitle.x,
+      BattleUiV4Layout.placementTitle.y,
+      20,
       new Color(255, 255, 255, 255),
+      BattleUiV4Layout.placementTitle.width,
+      BattleUiV4Layout.placementTitle.height,
     );
     this.titleLabel = title.label;
     this.root.addChild(title.node);
 
-    const pending = this.createLabel('', 0, -248, 22, new Color(255, 232, 122, 255));
+    const pending = this.createLabel(
+      '',
+      BattleUiV4Layout.placementPending.x,
+      BattleUiV4Layout.placementPending.y,
+      18,
+      new Color(255, 232, 122, 255),
+      BattleUiV4Layout.placementPending.width,
+      BattleUiV4Layout.placementPending.height,
+    );
     this.pendingLabel = pending.label;
     this.root.addChild(pending.node);
 
@@ -89,8 +100,15 @@ export class GridPlacementSystem {
   }
 
   private createSlotButton(slot: GridSlotState): ButtonView {
-    const position = this.getVisualSlotPosition(slot);
-    const view = this.createButton('', position.x, position.y, 108, 66, this.getSlotColor(slot));
+    const rect = this.getVisualSlotRect(slot);
+    const view = this.createButton(
+      '',
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      this.getSlotColor(slot),
+    );
     view.node.on(Button.EventType.CLICK, () => {
       if (!this.pendingHeroName) {
         return;
@@ -126,16 +144,18 @@ export class GridPlacementSystem {
     return slot.row === 'front' ? new Color(84, 98, 128, 255) : new Color(76, 82, 104, 255);
   }
 
-  private getVisualSlotPosition(slot: GridSlotState): { x: number; y: number } {
-    const positions: Record<number, { x: number; y: number }> = {
-      0: { x: -220, y: -285 },
-      1: { x: 0, y: -285 },
-      2: { x: 220, y: -285 },
-      3: { x: -150, y: -405 },
-      4: { x: 150, y: -405 },
+  private getVisualSlotRect(slot: GridSlotState): RectSpec {
+    const positions: Record<number, RectSpec> = {
+      0: BattleUiV4Layout.gridSlotFront1,
+      1: BattleUiV4Layout.gridSlotFront2,
+      2: BattleUiV4Layout.gridSlotFront3,
+      3: BattleUiV4Layout.gridSlotBack1,
+      4: BattleUiV4Layout.gridSlotBack2,
     };
 
-    return positions[slot.index] ?? slot.position;
+    return (
+      positions[slot.index] ?? { x: slot.position.x, y: slot.position.y, width: 108, height: 66 }
+    );
   }
 
   private drawSlotButton(view: ButtonView, slot: GridSlotState, highlighted: boolean): void {
@@ -256,12 +276,14 @@ export class GridPlacementSystem {
     y: number,
     fontSize: number,
     color: Color,
+    width: number,
+    height: number,
   ): ButtonView {
     const node = new Node(text);
     this.setUiLayer(node);
 
     const transform = node.addComponent(UITransform);
-    transform.setContentSize(280, 40);
+    transform.setContentSize(width, height);
     node.setPosition(x, y, 0);
 
     const label = node.addComponent(Label);
