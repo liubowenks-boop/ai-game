@@ -41,6 +41,21 @@
 - `tools/mvp-model.test.ts`：MVP/v0.2 纯逻辑测试。
 - `tools/scene-structure.test.ts`：检查 `BattleMain.scene` 的基础层级和 `BattleController` 挂载。
 
+## 环境安装
+
+本项目建议使用 **Cocos Creator 3.8.8 / 3.8 LTS**。`package.json` 中已标记当前工程对应的 Creator 版本为 `3.8.8`，优先使用同版本打开项目，避免场景和组件序列化差异。
+
+1. 进入 [Cocos Creator 官方下载页](https://www.cocos.com/en/creator-download)，下载并安装 **Cocos Dashboard**。
+2. 启动 Cocos Dashboard。Mac 版通常是将 `CocosDashboard.app` 拖到“应用程序”后双击启动；Windows 版按安装包向导安装后启动。
+3. 使用 Cocos 开发者账号登录 Dashboard。
+4. 在 Dashboard 的编辑器/版本管理入口中安装 **Cocos Creator 3.8.8**。如果只看到 3.8 LTS 的其他补丁版本，也建议先安装 3.8.x，再尽量切到 3.8.8。
+5. 可选但推荐安装 **Node.js LTS**，用于执行本仓库的 `npm install`、类型检查和原型测试脚本。
+
+官方参考：
+
+- [Cocos Creator 3.8 安装和启动](https://docs.cocos.com/creator/3.8/manual/zh/getting-started/install/)
+- [Cocos Creator 3.8 使用 Dashboard](https://docs.cocos.com/creator/3.8/manual/zh/getting-started/dashboard/)
+
 ## 本地验证
 
 安装依赖：
@@ -67,6 +82,13 @@ npm run typecheck
 npm run test:scene
 ```
 
+运行 UI 布局和动画配置检查：
+
+```bash
+npm run test:ui-layout
+npm run test:animation
+```
+
 设置 Cocos 预览默认竖屏：
 
 ```bash
@@ -79,11 +101,14 @@ npm run preview:portrait
 
 ## 用 Cocos Creator 运行
 
-1. 使用 **Cocos Creator 3.8 LTS** 打开本仓库根目录。
-2. 在资源管理器中打开 `assets/scenes/BattleMain.scene`。
-3. 确认层级中存在 `BattleRoot`，并挂载了 `BattleController`。
-4. 点击预览运行。
-5. 在画面中点击“开始战斗”，即可看到局内战斗闭环。
+1. 打开 **Cocos Dashboard**，从已安装的编辑器中启动 **Cocos Creator 3.8.8**。
+2. 在 Dashboard 项目页选择“添加/打开已有项目”，指向本仓库根目录。
+3. 首次打开后等待资源导入和脚本编译完成。
+4. 在资源管理器中打开 `assets/scenes/BattleMain.scene`。
+5. 确认层级中存在 `BattleRoot`，并挂载了 `BattleController`。
+6. 如需默认按移动端竖屏预览，先在终端运行 `npm run preview:portrait`，再回到 Creator 重新点击预览。
+7. 点击 Creator 顶部预览按钮运行项目；浏览器预览通常会打开 `http://127.0.0.1:7456/`。
+8. 在画面中点击“开始战斗”，即可看到局内战斗闭环。
 
 ## 竖屏预览切换
 
