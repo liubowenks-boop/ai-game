@@ -15,12 +15,14 @@ import {
 import { UpgradeCardSystem } from '../roguelike/UpgradeCardSystem';
 import {
   bindOrCreateLabel,
+  bindOrCreateUiArtSkinNode,
   BossHealthBarView,
   CityHealthBarView,
   ComboView,
   createUiArtSkinNode,
   createPanelNode,
   HeroAvatarSlotView,
+  ensureNamedUiChild,
   ResourceChipView,
   UiButtonView,
   UltimateButtonView,
@@ -167,7 +169,10 @@ export class BattleController extends Component {
     this.createBottomHudLayer();
     this.createReadabilityUi(this.feedbackLayer);
 
-    this.enemySystem = new EnemySystem(this.battleLayer);
+    this.enemySystem = new EnemySystem(
+      this.battleLayer,
+      this.battleLayer.getChildByName('EnemyVisualTemplate'),
+    );
     this.cityHealthSystem = new CityHealthSystem(this.cityHealthBarView, midViews.statusLabel);
     this.waveSystem = new WaveSystem(hudViews.waveLabel);
     this.autoAttackSystem = new PlayerAutoAttackSystem(this.battleLayer, this.playerNode);
@@ -483,6 +488,7 @@ export class BattleController extends Component {
     graphics.fill();
 
     parent.addChild(background);
+    background.setSiblingIndex(0);
     createUiArtSkinNode(
       background,
       'battle_bg_sandgate_720x1280.png',
@@ -493,12 +499,17 @@ export class BattleController extends Component {
   }
 
   private drawCityLine(parent: Node): void {
-    const line = new Node('CityBottomLine');
+    const line = parent.getChildByName('CityBottomLine') ?? new Node('CityBottomLine');
     this.setUiLayer(line);
 
-    this.cityLineGraphics = line.addComponent(Graphics);
+    this.cityLineGraphics = line.getComponent(Graphics) ?? line.addComponent(Graphics);
+    ensureNamedUiChild(line, 'CityLineFill', 0, 0, this.stageWidth - 80, this.stageHeight);
+    ensureNamedUiChild(line, 'CityLineStroke', 0, this.model.options.cityLineY, this.stageWidth - 80, 12);
     this.redrawCityLine(false);
-    parent.addChild(line);
+
+    if (!line.parent) {
+      parent.addChild(line);
+    }
   }
 
   private redrawCityLine(focused: boolean): void {
@@ -1158,31 +1169,39 @@ export class BattleController extends Component {
   }
 
   private createPlayerNode(parent: Node): Node {
-    const player = new Node('MainHero');
+    const player = parent.getChildByName('MainHeroPrefab') ?? new Node('MainHeroPrefab');
     this.setUiLayer(player);
 
-    const transform = player.addComponent(UITransform);
+    const transform = player.getComponent(UITransform) ?? player.addComponent(UITransform);
     transform.setContentSize(72, 72);
     player.setPosition(this.model.playerPosition.x, this.model.playerPosition.y, 0);
+    player.active = true;
     this.playerNode = player;
 
-    const auraNode = new Node('MainHeroAura');
+    const auraNode = player.getChildByName('MainHeroAura') ?? new Node('MainHeroAura');
     this.setUiLayer(auraNode);
-    player.addChild(auraNode);
-    this.playerAuraGraphics = auraNode.addComponent(Graphics);
+    if (!auraNode.parent) {
+      player.addChild(auraNode);
+    }
+    this.playerAuraGraphics = auraNode.getComponent(Graphics) ?? auraNode.addComponent(Graphics);
 
-    const bodyNode = new Node('MainHeroBody');
+    const bodyNode = player.getChildByName('MainHeroBody') ?? new Node('MainHeroBody');
     this.setUiLayer(bodyNode);
-    const bodyTransform = bodyNode.addComponent(UITransform);
+    const bodyTransform = bodyNode.getComponent(UITransform) ?? bodyNode.addComponent(UITransform);
     bodyTransform.setContentSize(72, 72);
-    player.addChild(bodyNode);
-    this.playerGraphics = bodyNode.addComponent(Graphics);
-    createUiArtSkinNode(bodyNode, 'portrait_hero_archer.png', 66, 66, 'MainHeroPortrait');
+    if (!bodyNode.parent) {
+      player.addChild(bodyNode);
+    }
+    this.playerGraphics = bodyNode.getComponent(Graphics) ?? bodyNode.addComponent(Graphics);
+    const portrait = bindOrCreateUiArtSkinNode(player, 'portrait_hero_archer.png', 66, 66, 'MainHeroPortrait');
+    portrait.setSiblingIndex(Math.max(0, player.children.length - 2));
     this.drawPlayerVisual(true, 'none');
 
-    const label = this.createLabel('主角', 0, -8, 24, Color.WHITE, 80, 32);
-    player.addChild(label.node);
-    parent.addChild(player);
+    bindOrCreateLabel(player, 'MainHeroLabel', '主角', 0, -8, 24, Color.WHITE, 80, 32);
+
+    if (!player.parent) {
+      parent.addChild(player);
+    }
 
     return player;
   }

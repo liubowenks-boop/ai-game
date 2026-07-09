@@ -1,7 +1,12 @@
 // @ts-nocheck
-import { Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
+import { Color, Graphics, instantiate, Label, Layers, Node, UITransform } from 'cc';
 
-import { createUiArtSkinNode, getEnemyPortraitFilename } from '../ui/BattleUiComponents';
+import {
+  bindOrCreateLabel,
+  bindOrCreateUiArtSkinNode,
+  createUiArtSkinNode,
+  getEnemyPortraitFilename,
+} from '../ui/BattleUiComponents';
 import { EnemyState } from './BattleMvpModel';
 
 interface EnemyNodeView {
@@ -34,7 +39,14 @@ export class EnemySystem {
   private static readonly STATUS_ICON_GAP = 4;
   private timeAccumulator = 0;
 
-  public constructor(private readonly parent: Node) {}
+  public constructor(
+    private readonly parent: Node,
+    private readonly enemyTemplate?: Node | null,
+  ) {
+    if (this.enemyTemplate) {
+      this.enemyTemplate.active = false;
+    }
+  }
 
   public sync(enemies: EnemyState[], visualContext: EnemyVisualContext = { focus: 'none' }): void {
     this.timeAccumulator += 1 / 60;
@@ -78,15 +90,17 @@ export class EnemySystem {
   }
 
   private createEnemyView(enemy: EnemyState): EnemyNodeView {
-    const node = new Node(`Enemy_${enemy.id}`);
+    const node = this.enemyTemplate ? instantiate(this.enemyTemplate) : new Node(`Enemy_${enemy.id}`);
+    node.name = `Enemy_${enemy.id}`;
+    node.active = true;
     this.setUiLayer(node);
 
-    const transform = node.addComponent(UITransform);
+    const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
     const size = enemy.kind === 'boss' ? 88 : enemy.radius * 2;
     transform.setContentSize(size, size);
 
-    const graphics = node.addComponent(Graphics);
-    const portrait = createUiArtSkinNode(
+    const graphics = node.getComponent(Graphics) ?? node.addComponent(Graphics);
+    const portrait = bindOrCreateUiArtSkinNode(
       node,
       getEnemyPortraitFilename(enemy.kind),
       enemy.kind === 'boss' ? 96 : size + 10,
@@ -95,32 +109,32 @@ export class EnemySystem {
     );
     portrait.setSiblingIndex(1);
 
-    const healthBarNode = new Node('EnemyHealthBar');
+    const healthBarNode = node.getChildByName('EnemyHealthBar') ?? new Node('EnemyHealthBar');
     this.setUiLayer(healthBarNode);
-    const healthBarTransform = healthBarNode.addComponent(UITransform);
+    const healthBarTransform = healthBarNode.getComponent(UITransform) ?? healthBarNode.addComponent(UITransform);
     healthBarTransform.setContentSize(
       enemy.kind === 'boss' ? 118 : 86,
       enemy.kind === 'boss' ? 16 : 12,
     );
-    const healthBar = healthBarNode.addComponent(Graphics);
+    const healthBar = healthBarNode.getComponent(Graphics) ?? healthBarNode.addComponent(Graphics);
     healthBarNode.setPosition(0, size / 2 + (enemy.kind === 'boss' ? 16 : 12), 0);
-    node.addChild(healthBarNode);
+    if (!healthBarNode.parent) {
+      node.addChild(healthBarNode);
+    }
 
-    const labelNode = new Node('HpLabel');
-    this.setUiLayer(labelNode);
-
-    const labelTransform = labelNode.addComponent(UITransform);
-    labelTransform.setContentSize(
+    const labelView = bindOrCreateLabel(
+      node,
+      'HpLabel',
+      this.getEnemyLabel(enemy),
+      0,
+      -4,
+      enemy.kind === 'boss' ? 18 : 16,
+      Color.WHITE,
       enemy.kind === 'boss' ? 130 : 90,
       enemy.kind === 'boss' ? 52 : 38,
     );
-    const label = labelNode.addComponent(Label);
-    label.fontSize = enemy.kind === 'boss' ? 18 : 16;
-    label.lineHeight = enemy.kind === 'boss' ? 22 : 19;
-    label.color = Color.WHITE;
-    label.string = this.getEnemyLabel(enemy);
-    labelNode.setPosition(0, -4, 0);
-    node.addChild(labelNode);
+    labelView.label.lineHeight = enemy.kind === 'boss' ? 22 : 19;
+    const label = labelView.label;
 
     this.parent.addChild(node);
 

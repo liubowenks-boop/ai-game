@@ -42,7 +42,7 @@
 
 ### ui
 
-当前已有 UI token、布局常量、通用组件和场景绑定辅助。第一轮仍由 TypeScript 生成大部分具体节点，但节点会优先挂在 `BattleMain.scene` 中的固定 Layer 下。`BossHealthBarView`、`CityHealthBarView`、`UpgradeCardView`、`UltimateButtonView`、`HeroAvatarSlotView`、自动按钮、羁绊按钮、暂停、倍速、箭塔、火油、波次、剩余敌人、资源 chip、流派状态、Combo、开始战斗按钮和战斗反馈文字已完成场景内占位绑定；后续可继续把玩家主角、城墙线、敌人血条等战斗表现节点迁移为 Prefab。
+当前已有 UI token、布局常量、通用组件和场景绑定辅助。第一轮仍由 TypeScript 生成大部分具体节点，但节点会优先挂在 `BattleMain.scene` 中的固定 Layer 下。`BossHealthBarView`、`CityHealthBarView`、`UpgradeCardView`、`UltimateButtonView`、`HeroAvatarSlotView`、自动按钮、羁绊按钮、暂停、倍速、箭塔、火油、波次、剩余敌人、资源 chip、流派状态、Combo、开始战斗按钮、战斗反馈文字、玩家主角、城墙线和敌人视觉模板已完成场景内占位绑定；后续可继续把战斗背景、技能轨迹和英雄棋盘节点迁移为 Prefab。
 
 ### platform
 

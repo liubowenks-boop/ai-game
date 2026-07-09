@@ -50,6 +50,18 @@ assert.ok(hasComponent(battleRootId, '25a13umWiFJNJAyrT8aD6Ph'), 'BattleRoot mis
 const canvasId = childByName(battleRootId, 'BattleMainCanvas');
 const battleLayerId = childByName(canvasId, 'BattleLayer');
 const feedbackLayerId = childByName(battleLayerId, 'BattleFeedbackLayer');
+const mainHeroPrefabId = childByName(battleLayerId, 'MainHeroPrefab');
+childByName(mainHeroPrefabId, 'MainHeroAura');
+childByName(mainHeroPrefabId, 'MainHeroBody');
+childByName(mainHeroPrefabId, 'MainHeroPortrait');
+childByName(mainHeroPrefabId, 'MainHeroLabel');
+const cityLinePrefabId = childByName(battleLayerId, 'CityBottomLine');
+childByName(cityLinePrefabId, 'CityLineFill');
+childByName(cityLinePrefabId, 'CityLineStroke');
+const enemyVisualTemplateId = childByName(battleLayerId, 'EnemyVisualTemplate');
+childByName(enemyVisualTemplateId, 'EnemyPortrait');
+childByName(enemyVisualTemplateId, 'EnemyHealthBar');
+childByName(enemyVisualTemplateId, 'HpLabel');
 const topHudLayerId = childByName(canvasId, 'TopHudLayer');
 const midStatusLayerId = childByName(canvasId, 'MidStatusLayer');
 const upgradePanelLayerId = childByName(canvasId, 'UpgradePanelLayer');
