@@ -178,6 +178,15 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.equal(heroAvatarSlotViewSource.includes('待招募'), false);
   assert.match(heroAvatarSlotViewSource, /graphics\.roundRect\(/);
   assert.equal(/graphics\.circle\(/.test(heroAvatarSlotViewSource), false);
+  assert.match(
+    heroAvatarSlotViewSource,
+    /if \(filename !== this\.portraitFilename && this\.portraitNode\) \{\s*this\.portraitNode\.active = false;\s*this\.portraitNode\.destroy\(\);\s*this\.portraitNode = undefined;\s*\}/s,
+  );
+  assert.match(
+    heroAvatarSlotViewSource,
+    /this\.portraitNode = createUiArtSkinNode\(\s*this\.node,\s*filename,\s*this\.width - 6,\s*this\.height - 6,\s*'AvatarPortrait',\s*\);/s,
+  );
+  assert.equal(/bindOrCreateUiArtSkinNode/.test(heroAvatarSlotViewSource), false);
   assert.match(createBottomHudLayerSource, /rect\.x/);
   assert.match(createBottomHudLayerSource, /rect\.y/);
   assert.match(createBottomHudLayerSource, /rect\.width/);

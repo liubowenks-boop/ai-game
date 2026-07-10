@@ -1195,8 +1195,14 @@ export class HeroAvatarSlotView {
       return;
     }
 
+    if (filename !== this.portraitFilename && this.portraitNode) {
+      this.portraitNode.active = false;
+      this.portraitNode.destroy();
+      this.portraitNode = undefined;
+    }
+
     this.portraitFilename = filename;
-    this.portraitNode = bindOrCreateUiArtSkinNode(
+    this.portraitNode = createUiArtSkinNode(
       this.node,
       filename,
       this.width - 6,
