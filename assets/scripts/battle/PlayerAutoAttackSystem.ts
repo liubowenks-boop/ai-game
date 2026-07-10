@@ -1,17 +1,20 @@
 // @ts-nocheck
 import {
-  builtinResMgr,
+  assetManager,
   Color,
   Graphics,
+  ImageAsset,
   Layers,
   Node,
   ParticleSystem2D,
   SpriteFrame,
+  Texture2D,
   UITransform,
   Vec2,
   Vec3,
 } from 'cc';
 
+import { getUiArtAsset } from '../ui/UiArtManifest';
 import { BattleMvpModel, BattleTickResult } from './BattleMvpModel';
 
 type AutoAttackSource = 'main' | 'thunder_chain';
@@ -44,6 +47,10 @@ interface HitBurst {
 }
 
 const fxSpriteFrameCache = new Map<string, SpriteFrame>();
+const FX_SPRITE_FILENAMES: Record<'gold' | 'fire', string> = {
+  gold: 'fx_glow_gold_soft.png',
+  fire: 'fx_fire_small.png',
+};
 
 export class PlayerAutoAttackSystem {
   private readonly effectNode: Node;
@@ -62,6 +69,8 @@ export class PlayerAutoAttackSystem {
     transform.setContentSize(720, 1280);
     this.graphics = this.effectNode.addComponent(Graphics);
     effectLayer.addChild(this.effectNode);
+    loadFxSpriteFrame('gold', () => undefined);
+    loadFxSpriteFrame('fire', () => undefined);
   }
 
   public refresh(result: BattleTickResult, model: BattleMvpModel): void {
@@ -391,11 +400,19 @@ export class PlayerAutoAttackSystem {
 
     const particle = node.addComponent(ParticleSystem2D);
     this.configureHitParticleSystem(particle, critical);
-    const frame = getFxSpriteFrame(critical ? 'fire' : 'gold');
-    if (frame) {
+    loadFxSpriteFrame(critical ? 'fire' : 'gold', (frame) => {
+      if (!node.isValid) {
+        return;
+      }
+
+      if (!frame) {
+        node.destroy();
+        return;
+      }
+
       particle.spriteFrame = frame;
-    }
-    particle.resetSystem();
+      particle.resetSystem();
+    });
   }
 
   private configureHitParticleSystem(particle: ParticleSystem2D, critical: boolean): void {
@@ -480,18 +497,42 @@ export class PlayerAutoAttackSystem {
   }
 }
 
-function getFxSpriteFrame(variant: 'gold' | 'fire'): SpriteFrame | null {
-  const cached = fxSpriteFrameCache.get(variant);
+function loadFxSpriteFrame(variant: 'gold' | 'fire', done: (frame: SpriteFrame | null) => void): void {
+  const filename = FX_SPRITE_FILENAMES[variant];
+  const cached = fxSpriteFrameCache.get(filename);
   if (cached) {
-    return cached;
+    done(cached);
+    return;
   }
 
-  const image = builtinResMgr.get('white-texture');
-  if (!image) {
-    return null;
+  const spec = getUiArtAsset(filename);
+  if (!spec) {
+    done(null);
+    return;
   }
 
-  const frame = SpriteFrame.createWithImage(image);
-  fxSpriteFrameCache.set(variant, frame);
-  return frame;
+  assetManager.loadAny(spec.uuid, (error, asset) => {
+    if (error || !asset) {
+      done(null);
+      return;
+    }
+
+    let frame: SpriteFrame | null = null;
+    if (asset instanceof SpriteFrame) {
+      frame = asset;
+    } else if (asset instanceof ImageAsset) {
+      frame = SpriteFrame.createWithImage(asset);
+    } else if (asset instanceof Texture2D) {
+      frame = new SpriteFrame();
+      frame.texture = asset;
+    }
+
+    if (!frame) {
+      done(null);
+      return;
+    }
+
+    fxSpriteFrameCache.set(filename, frame);
+    done(frame);
+  });
 }

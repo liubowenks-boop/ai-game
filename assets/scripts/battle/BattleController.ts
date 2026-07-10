@@ -8,6 +8,8 @@ import {
   Layers,
   Node,
   ResolutionPolicy,
+  resources,
+  sp,
   UITransform,
   view,
 } from 'cc';
@@ -16,7 +18,6 @@ import { UpgradeCardSystem } from '../roguelike/UpgradeCardSystem';
 import {
   applyBattleLabelStyle,
   bindOrCreateLabel,
-  bindOrCreateUiArtSkinNode,
   BossHealthBarView,
   CityHealthBarView,
   ComboView,
@@ -33,7 +34,13 @@ import { BattleUiV4Layout } from '../ui/BattleUiLayout';
 import { ensureSceneCanvas, ensureSceneLayer } from '../ui/BattleUiSceneBindings';
 import { preloadBattleTextResources, t } from '../ui/BattleTextResources';
 import { BattleUiTokens } from '../ui/BattleUiTokens';
-import { PLAYER_ANIMATION_PROFILE } from '../data/AnimationConfig';
+import {
+  PLAYER_ANIMATION_PROFILE,
+  PLAYER_ATTACK_SPINE_SPEED,
+  PLAYER_ATTACK_SPINE_SOURCE_DURATION,
+  getAnimationClipSpec,
+  resolvePlayerAttackAnimationTiming,
+} from '../data/AnimationConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
@@ -83,8 +90,14 @@ export class BattleController extends Component {
   private upgradeCardSystem!: UpgradeCardSystem;
   private gridPlacementSystem!: GridPlacementSystem;
   private playerNode!: Node;
-  private playerGraphics!: Graphics;
+  private playerAttackSpineNode!: Node;
+  private playerAttackSpine!: sp.Skeleton;
+  private playerAttackSpineLoading = false;
+  private playerAttackSpineLoaded = false;
+  private pendingPlayerAttackSpine = false;
+  private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
   private playerAuraGraphics!: Graphics;
+  private playerAttackEffectsGraphics!: Graphics;
   private startButtonLabel!: Label;
   private battleLayer!: Node;
   private feedbackLayer!: Node;
@@ -781,17 +794,34 @@ export class BattleController extends Component {
   }
 
   private requestPlayerAnimationFromResult(result: BattleTickResult): void {
-    if (result.attackEvents.some((event) => event.source === 'main')) {
-      requestUnitAnimation(this.playerAnimation, 'attack');
+    const hasMainAttack = result.attackEvents.some((event) => event.source === 'main');
+
+    if (hasMainAttack && !this.isPlayerAttackInProgress()) {
+      if (requestUnitAnimation(this.playerAnimation, 'attack')) {
+        const timing = resolvePlayerAttackAnimationTiming(
+          this.model.options.mainAttackInterval,
+          this.model.mainAttackInterval,
+        );
+        this.playerAnimation.duration = timing.animationDuration;
+        this.playerAttackSpinePlaybackSpeed = timing.spinePlaybackSpeed;
+        this.playPlayerAttackSpine();
+      }
     }
   }
 
   private updatePlayerAnimation(deltaTime: number): void {
-    tickUnitAnimation(this.playerAnimation, deltaTime);
+    const presentationDelta = Math.min(deltaTime, 1 / 30);
+    tickUnitAnimation(this.playerAnimation, presentationDelta);
+
+    if (this.playerAttackSpineLoaded && this.isPlayerAttackInProgress()) {
+      this.applyPlayerAttackSpineFrame();
+    }
 
     if (isUnitAnimationComplete(this.playerAnimation)) {
       requestUnitAnimation(this.playerAnimation, 'idle');
     }
+
+    this.syncPlayerAttackSpineVisibility();
   }
 
   private getEnemyVisualContext(): { focus: VisualFocusTarget } {
@@ -926,11 +956,14 @@ export class BattleController extends Component {
     const majorFocusActive = activeFocus === 'boss' || activeFocus === 'city';
     const highlightStrength = isMainOutput ? (majorFocusActive ? 0.55 : 1) : 0;
     const scale = highlightStrength > 0 ? 1 + highlightStrength * 0.065 : 1;
-    const pose = computeProceduralAnimationPose(
-      this.playerAnimation.currentState,
-      this.playerAnimation.elapsed,
-      'hero',
-    );
+    const useSpineAttack = this.isPlayerAttackSpineActive();
+    const pose = useSpineAttack
+      ? { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, rotation: 0 }
+      : computeProceduralAnimationPose(
+          this.playerAnimation.currentState,
+          this.playerAnimation.elapsed,
+          'hero',
+        );
 
     this.playerNode.setPosition(
       this.model.playerPosition.x + pose.offsetX,
@@ -940,6 +973,11 @@ export class BattleController extends Component {
     this.playerNode.setScale(scale * pose.scaleX, scale * pose.scaleY, 1);
     this.playerNode.angle = pose.rotation;
     this.playerAuraGraphics.clear();
+    this.playerAttackEffectsGraphics.clear();
+
+    this.playerAuraGraphics.fillColor = new Color(0, 0, 0, 88);
+    this.playerAuraGraphics.ellipse(0, -40, 31, 9);
+    this.playerAuraGraphics.fill();
 
     if (highlightStrength > 0) {
       this.playerAuraGraphics.strokeColor = new Color(
@@ -962,61 +1000,130 @@ export class BattleController extends Component {
       this.playerAuraGraphics.stroke();
     }
 
-    this.playerGraphics.clear();
+    if (useSpineAttack) {
+      this.drawPlayerAttackAccent();
+    }
+  }
 
-    // Ground shadow (ellipse below feet)
-    this.playerGraphics.fillColor = new Color(0, 0, 0, 90);
-    this.playerGraphics.ellipse(0, -40, 34, 10);
-    this.playerGraphics.fill();
+  private drawPlayerAttackAccent(): void {
+    const progress = Math.min(1, this.playerAnimation.elapsed / this.playerAnimation.duration);
+    const windup = Math.max(0, Math.min(1, progress / 0.3));
 
-    // Base body color
-    const baseColor =
-      highlightStrength > 0
-        ? new Color(78, 164, 255, 255)
-        : majorFocusActive
-          ? new Color(58, 116, 186, 215)
-          : new Color(70, 148, 242, 255);
+    this.playerAttackEffectsGraphics.fillColor = new Color(255, 154, 54, Math.floor(48 * windup));
+    this.playerAttackEffectsGraphics.circle(8, 20, 18 + windup * 14);
+    this.playerAttackEffectsGraphics.fill();
+  }
 
-    // Bottom darker layer (depth shadow)
-    this.playerGraphics.fillColor = new Color(
-      Math.max(0, baseColor.r - 45),
-      Math.max(0, baseColor.g - 45),
-      Math.max(0, baseColor.b - 35),
-      baseColor.a,
+  private createPlayerAttackSpineNode(player: Node): void {
+    const spineNode = player.getChildByName('MainHeroAttackSpine') ?? new Node('MainHeroAttackSpine');
+    this.setUiLayer(spineNode);
+    spineNode.setPosition(0, 8, 0);
+    spineNode.setScale(0.28, 0.28, 1);
+    spineNode.active = false;
+
+    if (!spineNode.parent) {
+      player.addChild(spineNode);
+    }
+
+    this.playerAttackSpineNode = spineNode;
+    this.playerAttackSpine = spineNode.getComponent(sp.Skeleton) ?? spineNode.addComponent(sp.Skeleton);
+    this.playerAttackSpine.premultipliedAlpha = false;
+    spineNode.setSiblingIndex(Math.max(0, player.children.length - 1));
+  }
+
+  private preloadPlayerAttackSpine(): void {
+    const attackClip = getAnimationClipSpec(this.playerAnimation.profile, 'attack');
+    if (attackClip.renderer !== 'spine' || !attackClip.spineAssetBase || this.playerAttackSpineLoading) {
+      return;
+    }
+
+    this.playerAttackSpineLoading = true;
+    resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
+      this.playerAttackSpineLoading = false;
+
+      if (error || !skeletonData) {
+        console.warn(`Failed to load player attack Spine asset: ${attackClip.spineAssetBase}`, error);
+        return;
+      }
+
+      this.playerAttackSpine.skeletonData = skeletonData;
+      this.playerAttackSpineLoaded = true;
+      this.showPlayerIdleSpine();
+
+      if (this.pendingPlayerAttackSpine && this.playerAnimation.currentState === 'attack') {
+        this.playPlayerAttackSpine();
+      }
+    });
+  }
+
+  private playPlayerAttackSpine(): void {
+    const attackClip = getAnimationClipSpec(this.playerAnimation.profile, 'attack');
+    if (attackClip.renderer !== 'spine' || !attackClip.spineAssetBase) {
+      return;
+    }
+
+    this.preloadPlayerAttackSpine();
+    if (!this.playerAttackSpineLoaded) {
+      this.pendingPlayerAttackSpine = true;
+      return;
+    }
+
+    this.pendingPlayerAttackSpine = false;
+    this.playerAttackSpineNode.active = true;
+    this.playerAttackSpine.clearTracks();
+    this.playerAttackSpine.setToSetupPose();
+    this.playerAttackSpine.setAnimation(0, attackClip.clipName, attackClip.loop);
+    this.playerAttackSpine.paused = true;
+    this.applyPlayerAttackSpineFrame();
+  }
+
+  private applyPlayerAttackSpineFrame(): void {
+    const progress = Math.min(
+      1,
+      (this.playerAnimation.elapsed * this.playerAttackSpinePlaybackSpeed) /
+        PLAYER_ATTACK_SPINE_SOURCE_DURATION,
     );
-    this.playerGraphics.roundRect(-36, -36, 72, 40, 10);
-    this.playerGraphics.fill();
+    const frameIndex = Math.min(7, Math.floor(progress * 8));
+    this.playerAttackSpine.setAttachment('frame', `frame_${frameIndex}`);
+  }
 
-    // Main body
-    this.playerGraphics.fillColor = baseColor;
-    this.playerGraphics.roundRect(-36, -18, 72, 54, 10);
-    this.playerGraphics.fill();
+  private showPlayerIdleSpine(): void {
+    if (!this.playerAttackSpineLoaded) {
+      return;
+    }
 
-    // Top highlight layer (lighter, gives gradient feel)
-    this.playerGraphics.fillColor = new Color(
-      Math.min(255, baseColor.r + 55),
-      Math.min(255, baseColor.g + 55),
-      Math.min(255, baseColor.b + 40),
-      Math.floor(baseColor.a * 0.55),
+    this.playerAttackSpine.paused = true;
+    this.playerAttackSpine.clearTracks();
+    this.playerAttackSpine.setToSetupPose();
+    this.playerAttackSpineNode.active = true;
+  }
+
+  private syncPlayerAttackSpineVisibility(): void {
+    if (!this.playerAttackSpineNode) {
+      return;
+    }
+
+    if (this.isPlayerAttackSpineActive()) {
+      this.playerAttackSpineNode.active = true;
+      return;
+    }
+
+    this.pendingPlayerAttackSpine = false;
+    this.showPlayerIdleSpine();
+  }
+
+  private isPlayerAttackSpineActive(): boolean {
+    return (
+      this.playerAttackSpineLoaded &&
+      this.isPlayerAttackInProgress()
     );
-    this.playerGraphics.roundRect(-34, -14, 68, 22, 8);
-    this.playerGraphics.fill();
+  }
 
-    // Outline
-    this.playerGraphics.strokeColor =
-      highlightStrength > 0
-        ? new Color(255, 248, 168, 255)
-        : new Color(255, 255, 255, majorFocusActive ? 150 : 230);
-    this.playerGraphics.lineWidth = highlightStrength > 0 ? 6 : 4;
-    this.playerGraphics.roundRect(-36, -36, 72, 72, 10);
-    this.playerGraphics.stroke();
-
-    // Top edge highlight (specular)
-    this.playerGraphics.strokeColor = new Color(255, 255, 255, 110);
-    this.playerGraphics.lineWidth = 2;
-    this.playerGraphics.moveTo(-28, 30);
-    this.playerGraphics.lineTo(28, 30);
-    this.playerGraphics.stroke();
+  private isPlayerAttackInProgress(): boolean {
+    return (
+      this.playerAnimation.currentState === 'attack' &&
+      !isUnitAnimationComplete(this.playerAnimation)
+    );
   }
 
   private updateFloatingTexts(deltaTime: number): void {
@@ -1062,25 +1169,11 @@ export class BattleController extends Component {
   }
 
   private updateFocusZoom(deltaTime: number): void {
-    const activeFocus = this.getActiveVisualFocus();
-    const baseScale =
-      activeFocus === 'boss'
-        ? 1.026
-        : activeFocus === 'city'
-          ? 1.02
-          : activeFocus === 'combo'
-            ? 1.018
-            : 1;
-    let pulseScale = 0;
-
     if (this.focusTimeLeft > 0) {
       this.focusTimeLeft = Math.max(0, this.focusTimeLeft - deltaTime);
-      const progress = Math.max(0, Math.min(1, this.focusTimeLeft / this.focusPulseDuration));
-      pulseScale = Math.sin(progress * Math.PI) * 0.035;
     }
 
-    const scale = baseScale + pulseScale;
-    this.battleLayer.setScale(scale, scale, 1);
+    this.battleLayer.setScale(1, 1, 1);
   }
 
   private refreshBossBar(deltaTime = 1 / 60): void {
@@ -1272,6 +1365,14 @@ export class BattleController extends Component {
     player.active = true;
     this.playerNode = player;
 
+    for (const nodeName of ['MainHeroBody', 'MainHeroPortrait', 'MainHeroLabel']) {
+      const legacyNode = player.getChildByName(nodeName);
+      if (legacyNode) {
+        legacyNode.active = false;
+        legacyNode.destroy();
+      }
+    }
+
     const auraNode = player.getChildByName('MainHeroAura') ?? new Node('MainHeroAura');
     this.setUiLayer(auraNode);
     if (!auraNode.parent) {
@@ -1279,28 +1380,19 @@ export class BattleController extends Component {
     }
     this.playerAuraGraphics = auraNode.getComponent(Graphics) ?? auraNode.addComponent(Graphics);
 
-    const bodyNode = player.getChildByName('MainHeroBody') ?? new Node('MainHeroBody');
-    this.setUiLayer(bodyNode);
-    const bodyTransform = bodyNode.getComponent(UITransform) ?? bodyNode.addComponent(UITransform);
-    bodyTransform.setContentSize(72, 72);
-    if (!bodyNode.parent) {
-      player.addChild(bodyNode);
+    const attackEffectsNode =
+      player.getChildByName('MainHeroAttackEffects') ?? new Node('MainHeroAttackEffects');
+    this.setUiLayer(attackEffectsNode);
+    if (!attackEffectsNode.parent) {
+      player.addChild(attackEffectsNode);
     }
-    this.playerGraphics = bodyNode.getComponent(Graphics) ?? bodyNode.addComponent(Graphics);
-    const portrait = bindOrCreateUiArtSkinNode(
-      player,
-      'portrait_hero_archer.png',
-      66,
-      66,
-      'MainHeroPortrait',
-    );
-    portrait.setSiblingIndex(Math.max(0, player.children.length - 2));
-    this.drawPlayerVisual(true, 'none');
+    this.playerAttackEffectsGraphics =
+      attackEffectsNode.getComponent(Graphics) ?? attackEffectsNode.addComponent(Graphics);
+    attackEffectsNode.setSiblingIndex(Math.max(0, player.children.length - 1));
 
-    bindOrCreateLabel(player, 'MainHeroLabel', '主角', 0, -8, 24, Color.WHITE, 80, 32, {
-      fontRole: 'uiTitle',
-      lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
-    });
+    this.createPlayerAttackSpineNode(player);
+    this.preloadPlayerAttackSpine();
+    this.drawPlayerVisual(true, 'none');
 
     if (!player.parent) {
       parent.addChild(player);
