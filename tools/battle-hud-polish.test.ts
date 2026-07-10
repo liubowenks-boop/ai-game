@@ -313,7 +313,29 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
   assert.match(cityHealthBarViewSource, /private readonly valueLabel: Label;/);
   assert.match(
     cityHealthBarViewSource,
-    /this\.valueLabel\.string = `\$\{Math\.ceil\(current\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
+    /bindOrCreateUiArtSkinNode\(\s*this\.node,\s*'hud_city_hp_bg\.png',\s*width,\s*44,\s*'CityHpSkin',?\s*\)/,
+  );
+  assert.match(
+    cityHealthBarViewSource,
+    /const visibleCurrent = Math\.max\(0,\s*Math\.min\(safeMax,\s*current\)\);/,
+  );
+  assert.match(cityHealthBarViewSource, /const ratio = Math\.max\(0,\s*Math\.min\(1,\s*visibleCurrent \/ safeMax\)\);/);
+  assert.match(
+    cityHealthBarViewSource,
+    /this\.valueLabel\.string = `\$\{Math\.ceil\(visibleCurrent\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
+  );
+  assert.match(cityHealthBarViewSource, /const fillWidth = trackWidth \* ratio;/);
+  assert.match(
+    cityHealthBarViewSource,
+    /const fillRadius = Math\.min\(BattleUiTokens\.radius\.md,\s*fillWidth \/ 2,\s*trackHeight \/ 2\);/,
+  );
+  assert.match(
+    cityHealthBarViewSource,
+    /const sheenWidth = Math\.max\(0,\s*fillWidth - 4\);/,
+  );
+  assert.match(
+    cityHealthBarViewSource,
+    /if \(sheenWidth > 0\) \{\s*this\.graphics\.fillColor = uiColor\(Color\.WHITE,\s*42\);\s*this\.graphics\.roundRect\([\s\S]*Math\.min\(2,\s*sheenWidth \/ 2\)/s,
   );
   assert.match(
     cityHealthBarViewSource,

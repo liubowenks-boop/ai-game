@@ -903,9 +903,13 @@ export class CityHealthBarView {
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, 48);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    const cityHpSkin =
-      this.node.getChildByName('CityHpSkin') ??
-      createUiArtSkinNode(this.node, 'hud_city_hp_bg.png', width, 44, 'CityHpSkin');
+    const cityHpSkin = bindOrCreateUiArtSkinNode(
+      this.node,
+      'hud_city_hp_bg.png',
+      width,
+      44,
+      'CityHpSkin',
+    );
     cityHpSkin.active = false;
 
     bindOrCreateLabel(
@@ -958,8 +962,9 @@ export class CityHealthBarView {
 
     this.lastHealth = current;
     const safeMax = Math.max(1, max);
-    const ratio = Math.max(0, Math.min(1, current / safeMax));
-    this.valueLabel.string = `${Math.ceil(current)}/${Math.ceil(safeMax)}`;
+    const visibleCurrent = Math.max(0, Math.min(safeMax, current));
+    const ratio = Math.max(0, Math.min(1, visibleCurrent / safeMax));
+    this.valueLabel.string = `${Math.ceil(visibleCurrent)}/${Math.ceil(safeMax)}`;
 
     const frameLeft = -this.width / 2;
     const frameBottom = -24;
@@ -969,7 +974,7 @@ export class CityHealthBarView {
     const trackWidth = this.width - 52 - valueWidth - 10;
     const trackBottom = -10;
     const trackHeight = 20;
-    const fillWidth = Math.max(0, trackWidth * ratio);
+    const fillWidth = trackWidth * ratio;
     const fillColor =
       ratio > 0.55
         ? BattleUiTokens.colors.summonGreen
@@ -1033,13 +1038,23 @@ export class CityHealthBarView {
     this.graphics.stroke();
 
     if (fillWidth > 0) {
+      const fillRadius = Math.min(BattleUiTokens.radius.md, fillWidth / 2, trackHeight / 2);
       this.graphics.fillColor = fillColor;
-      this.graphics.roundRect(trackLeft, trackBottom, fillWidth, trackHeight, BattleUiTokens.radius.md);
+      this.graphics.roundRect(trackLeft, trackBottom, fillWidth, trackHeight, fillRadius);
       this.graphics.fill();
 
-      this.graphics.fillColor = uiColor(Color.WHITE, 42);
-      this.graphics.roundRect(trackLeft + 2, trackBottom + trackHeight - 6, Math.max(0, fillWidth - 4), 4, 2);
-      this.graphics.fill();
+      const sheenWidth = Math.max(0, fillWidth - 4);
+      if (sheenWidth > 0) {
+        this.graphics.fillColor = uiColor(Color.WHITE, 42);
+        this.graphics.roundRect(
+          trackLeft + 2,
+          trackBottom + trackHeight - 6,
+          sheenWidth,
+          4,
+          Math.min(2, sheenWidth / 2),
+        );
+        this.graphics.fill();
+      }
     }
 
     if (this.flashTimeLeft > 0) {
