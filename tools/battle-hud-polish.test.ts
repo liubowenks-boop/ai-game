@@ -8,6 +8,14 @@ const gridPlacementSource = readFileSync(
   'assets/scripts/battle/GridPlacementSystem.ts',
   'utf8',
 );
+const battleUiComponentsSource = readFileSync(
+  'assets/scripts/ui/BattleUiComponents.ts',
+  'utf8',
+);
+const battleControllerSource = readFileSync(
+  'assets/scripts/battle/BattleController.ts',
+  'utf8',
+);
 
 function sourceSection(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -133,6 +141,51 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(cityHealthBar, gridSlotFront2), false);
+});
+
+runTest('bottom rail creates six text-free rectangular portrait slots', () => {
+  const heroAvatarSlotViewSource = sourceSection(
+    battleUiComponentsSource,
+    'export class HeroAvatarSlotView {',
+    'export interface UpgradeCardViewOptions {',
+  );
+  const createBottomHudLayerSource = sourceSection(
+    battleControllerSource,
+    'private createBottomHudLayer(): void {',
+    'private createCanvas(): Node {',
+  );
+  const refreshHeroAvatarBarSource = sourceSection(
+    battleControllerSource,
+    'private refreshHeroAvatarBar(): void {',
+    'private drawPlayerVisual(',
+  );
+
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot1/);
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot2/);
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot3/);
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot4/);
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot5/);
+  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
+  assert.match(heroAvatarSlotViewSource, /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s);
+  assert.match(heroAvatarSlotViewSource, /this\.node\.getChildByName\('AvatarSkin'\)\?\.active = false;/);
+  assert.match(heroAvatarSlotViewSource, /this\.node\.getChildByName\('AvatarLabel'\)\?\.active = false;/);
+  assert.equal(heroAvatarSlotViewSource.includes("t('hud.empty')"), false);
+  assert.equal(/Lv\$\{level\}/.test(heroAvatarSlotViewSource), false);
+  assert.equal(/heroName\\n/.test(heroAvatarSlotViewSource), false);
+  assert.equal(/private readonly label: Label;/.test(heroAvatarSlotViewSource), false);
+  assert.equal(/role/i.test(heroAvatarSlotViewSource), false);
+  assert.equal(heroAvatarSlotViewSource.includes('空位'), false);
+  assert.equal(heroAvatarSlotViewSource.includes('待招募'), false);
+  assert.match(heroAvatarSlotViewSource, /graphics\.roundRect\(/);
+  assert.equal(/graphics\.circle\(/.test(heroAvatarSlotViewSource), false);
+  assert.match(createBottomHudLayerSource, /rect\.x/);
+  assert.match(createBottomHudLayerSource, /rect\.y/);
+  assert.match(createBottomHudLayerSource, /rect\.width/);
+  assert.match(createBottomHudLayerSource, /rect\.height/);
+  assert.match(createBottomHudLayerSource, /nodeName: `HeroAvatarSlot\$\{index \+ 1\}`/);
+  assert.match(refreshHeroAvatarBarSource, /\.refresh\(\s*hero\?\.name \?\? '',\s*Boolean\(/s);
+  assert.equal(/hero\?\.level/.test(refreshHeroAvatarBarSource), false);
+  assert.equal(/Lv/.test(refreshHeroAvatarBarSource), false);
 });
 
 runTest('deployable positions draw circles instead of rounded rectangles', () => {
