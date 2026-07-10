@@ -1,20 +1,16 @@
 import assert from 'node:assert/strict';
 
 import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
-import {
-  BattleUiV4Layout,
-  RectSpec,
-  rectsOverlap,
-} from '../assets/scripts/ui/BattleUiLayout';
+import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
   console.log(`pass: ${name}`);
 }
 
-function requireRect(name: string): RectSpec {
-  const rect = (BattleUiV4Layout as Record<string, RectSpec | undefined>)[name];
-  assert.ok(rect, `${name} rect should be defined`);
+function requireRect(key: keyof typeof BattleUiV4Layout): RectSpec {
+  const rect = BattleUiV4Layout[key];
+  assert.ok(rect, `${String(key)} should exist`);
   return rect;
 }
 
@@ -38,6 +34,8 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
     frontRects.map((rect) => rect.y),
     [-300, -300, -300],
   );
+  assert.equal(frontRects[1].x - frontRects[0].x, frontRects[2].x - frontRects[1].x);
+  assert.equal(new Set(frontRects.map((rect) => rect.y)).size, 1);
   assert.ok(frontRects.every((rect) => rect.width === 82 && rect.height === 82));
 
   assert.deepEqual(
@@ -48,6 +46,8 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
     backRects.map((rect) => rect.y),
     [-410, -410, -410],
   );
+  assert.equal(backRects[1].x - backRects[0].x, backRects[2].x - backRects[1].x);
+  assert.equal(new Set(backRects.map((rect) => rect.y)).size, 1);
   assert.ok(backRects.every((rect) => rect.width === 82 && rect.height === 82));
 
   const model = new BattleMvpModel();
@@ -63,9 +63,15 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
 });
 
 runTest('six fixed portrait slots fit the hero rail without overlap', () => {
-  const portraitRects = Array.from({ length: 6 }, (_, index) =>
-    requireRect(`heroAvatarSlot${index + 1}`),
-  );
+  const portraitSlotKeys = [
+    'heroAvatarSlot1',
+    'heroAvatarSlot2',
+    'heroAvatarSlot3',
+    'heroAvatarSlot4',
+    'heroAvatarSlot5',
+    'heroAvatarSlot6',
+  ] as const;
+  const portraitRects = portraitSlotKeys.map((key) => requireRect(key));
 
   assert.deepEqual(
     portraitRects.map((rect) => rect.x),
@@ -74,7 +80,27 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
   assert.ok(portraitRects.every((rect) => rect.y === BattleUiV4Layout.heroBar.y));
   assert.ok(portraitRects.every((rect) => rect.width === 56 && rect.height === 72));
 
+  const heroBar = BattleUiV4Layout.heroBar;
+  const heroBarLeft = heroBar.x - heroBar.width / 2;
+  const heroBarRight = heroBar.x + heroBar.width / 2;
+  const heroBarBottom = heroBar.y - heroBar.height / 2;
+  const heroBarTop = heroBar.y + heroBar.height / 2;
+
+  portraitRects.forEach((rect, index) => {
+    const isInsideHeroBar =
+      rect.x - rect.width / 2 >= heroBarLeft &&
+      rect.x + rect.width / 2 <= heroBarRight &&
+      rect.y - rect.height / 2 >= heroBarBottom &&
+      rect.y + rect.height / 2 <= heroBarTop;
+    assert.ok(isInsideHeroBar, `${portraitSlotKeys[index]} should fit inside heroBar`);
+  });
+
   for (let index = 1; index < portraitRects.length; index += 1) {
+    const previousRect = portraitRects[index - 1];
+    const currentRect = portraitRects[index];
+    const gap = currentRect.x - currentRect.width / 2 - (previousRect.x + previousRect.width / 2);
+
+    assert.equal(gap, 8);
     assert.equal(rectsOverlap(portraitRects[index - 1], portraitRects[index]), false);
   }
 
