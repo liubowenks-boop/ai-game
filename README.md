@@ -41,6 +41,13 @@
 - `tools/mvp-model.test.ts`：MVP/v0.2 纯逻辑测试。
 - `tools/scene-structure.test.ts`：检查 `BattleMain.scene` 的基础层级和 `BattleController` 挂载。
 
+## 主角 Spine 攻击动画
+
+- 主角攻击资源位于 `assets/resources/spine/animation/`，运行时由 `BattleController` 加载并以透明背景叠加在主角位置。
+- 普通攻速下，攻击动画播放时长为 `0.7` 秒；金色飞弹和命中特效继续由 `PlayerAutoAttackSystem` 独立负责。
+- 动画时长会随实际攻击间隔自动同步：`攻速倍率 = 基础攻击间隔 / 当前攻击间隔`，`动画时长 = clamp(0.7 / 攻速倍率, 0.22, 1.4)` 秒。攻速提高时，主角攻击动画相应加快。
+- `AnimationConfig.ts` 中的 `PLAYER_ATTACK_ANIMATION_BASE_DURATION`、`PLAYER_ATTACK_ANIMATION_MIN_DURATION` 与 `PLAYER_ATTACK_ANIMATION_MAX_DURATION` 是统一调参入口。
+
 ## 环境安装
 
 本项目建议使用 **Cocos Creator 3.8.8 / 3.8 LTS**。`package.json` 中已标记当前工程对应的 Creator 版本为 `3.8.8`，优先使用同版本打开项目，避免场景和组件序列化差异。
@@ -87,6 +94,12 @@ npm run test:scene
 ```bash
 npm run test:ui-layout
 npm run test:animation
+```
+
+运行 Spine 资源导入检查：
+
+```bash
+npm run test:spine-import
 ```
 
 设置 Cocos 预览默认竖屏：

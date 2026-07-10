@@ -4,12 +4,16 @@ import { readFileSync } from 'node:fs';
 import {
   ENEMY_ANIMATION_PROFILES,
   HERO_ANIMATION_PROFILES,
+  PLAYER_ATTACK_ANIMATION_BASE_DURATION,
+  PLAYER_ATTACK_ANIMATION_MAX_DURATION,
+  PLAYER_ATTACK_ANIMATION_MIN_DURATION,
   PLAYER_ANIMATION_PROFILE,
   REQUIRED_ENEMY_ANIMATION_STATES,
   REQUIRED_HERO_ANIMATION_STATES,
   SPINE_ASSET_REQUIREMENTS,
   getEnemyAnimationProfile,
   getHeroAnimationProfile,
+  resolvePlayerAttackAnimationTiming,
 } from '../assets/scripts/data/AnimationConfig';
 import {
   computeProceduralAnimationPose,
@@ -44,6 +48,130 @@ runTest('animation profiles cover required hero and enemy states', () => {
   assert.equal(getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_attack'), true);
   assert.equal(getHeroAnimationProfile('弓手').id, 'hero_archer');
   assert.equal(PLAYER_ANIMATION_PROFILE.clips.some((clip) => clip.state === 'attack'), true);
+});
+
+runTest('main hero attack uses imported Spine animation asset', () => {
+  const attackClip = PLAYER_ANIMATION_PROFILE.clips.find((clip) => clip.state === 'attack');
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.ok(attackClip, 'main hero profile should define an attack clip');
+  assert.equal(attackClip.renderer, 'spine');
+  assert.equal(attackClip.spineAssetBase, 'spine/animation/animation');
+  assert.equal(attackClip.clipName, 'attack');
+  assert.equal(attackClip.duration, 0.7);
+  assert.equal(controllerSource.includes('resources.load('), true);
+  assert.equal(controllerSource.includes('sp.SkeletonData'), true);
+  assert.equal(controllerSource.includes('playPlayerAttackSpine'), true);
+  assert.equal(controllerSource.includes('MainHeroAttackSpine'), true);
+});
+
+runTest('main hero attack duration follows the gameplay attack-speed multiplier', () => {
+  assert.equal(PLAYER_ATTACK_ANIMATION_BASE_DURATION, 0.7);
+  assert.equal(PLAYER_ATTACK_ANIMATION_MIN_DURATION, 0.22);
+  assert.equal(PLAYER_ATTACK_ANIMATION_MAX_DURATION, 1.4);
+
+  const halfSpeed = resolvePlayerAttackAnimationTiming(0.7, 1.4);
+  const baseSpeed = resolvePlayerAttackAnimationTiming(0.7, 0.7);
+  const oneAndHalfSpeed = resolvePlayerAttackAnimationTiming(0.7, 0.7 / 1.5);
+  const doubleSpeed = resolvePlayerAttackAnimationTiming(0.7, 0.35);
+  const tripleSpeed = resolvePlayerAttackAnimationTiming(0.7, 0.7 / 3);
+
+  assert.equal(halfSpeed.attackSpeedMultiplier, 0.5);
+  assert.equal(halfSpeed.animationDuration, 1.4);
+  assert.equal(baseSpeed.attackSpeedMultiplier, 1);
+  assert.equal(baseSpeed.animationDuration, 0.7);
+  assert.ok(Math.abs(oneAndHalfSpeed.animationDuration - 0.7 / 1.5) < 0.00001);
+  assert.equal(doubleSpeed.attackSpeedMultiplier, 2);
+  assert.equal(doubleSpeed.animationDuration, 0.35);
+  assert.ok(Math.abs(tripleSpeed.animationDuration - 0.7 / 3) < 0.00001);
+});
+
+runTest('main hero attack timing clamps extremes and rejects invalid intervals', () => {
+  assert.equal(resolvePlayerAttackAnimationTiming(0.7, 10).animationDuration, 1.4);
+  assert.equal(resolvePlayerAttackAnimationTiming(0.7, 0.01).animationDuration, 0.22);
+  assert.equal(resolvePlayerAttackAnimationTiming(0.7, 0).animationDuration, 0.7);
+  assert.equal(resolvePlayerAttackAnimationTiming(0.7, Number.NaN).animationDuration, 0.7);
+  assert.equal(resolvePlayerAttackAnimationTiming(-1, 0.7).animationDuration, 0.7);
+});
+
+runTest('main hero applies current gameplay attack speed to each Spine cycle', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('resolvePlayerAttackAnimationTiming'), true);
+  assert.equal(controllerSource.includes('this.model.options.mainAttackInterval'), true);
+  assert.equal(controllerSource.includes('this.model.mainAttackInterval'), true);
+  assert.equal(controllerSource.includes('this.playerAnimation.duration = timing.animationDuration'), true);
+  assert.equal(
+    controllerSource.includes('this.playerAttackSpinePlaybackSpeed = timing.spinePlaybackSpeed'),
+    true,
+  );
+  assert.equal(
+    controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'),
+    true,
+  );
+});
+
+runTest('main hero does not restart Spine playback before the current attack completes', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('!this.isPlayerAttackInProgress()'), true);
+  assert.equal(controllerSource.includes('private isPlayerAttackInProgress(): boolean'), true);
+});
+
+runTest('main hero attack presentation survives long simulation frames', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('const presentationDelta = Math.min(deltaTime, 1 / 30);'), true);
+  assert.equal(controllerSource.includes('private applyPlayerAttackSpineFrame(): void'), true);
+  assert.equal(controllerSource.includes('this.applyPlayerAttackSpineFrame();'), true);
+});
+
+runTest('main hero resumes a cleared Spine track for each attack', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('this.playerAttackSpine.paused = true'), true);
+  assert.equal(controllerSource.includes('this.playerAttackSpine.clearTracks()'), true);
+});
+
+runTest('main hero maps the Spine attack slot across all source frames', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes("this.playerAttackSpine.setAttachment('frame', `frame_${frameIndex}`);"), true);
+  assert.equal(controllerSource.includes('const frameIndex = Math.min(7, Math.floor(progress * 8));'), true);
+});
+
+runTest('main hero renders a persistent Spine setup pose without placeholder UI', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes("?? new Node('MainHeroBody')"), false);
+  assert.equal(controllerSource.includes("'portrait_hero_archer.png'"), false);
+  assert.equal(controllerSource.includes("bindOrCreateLabel(player, 'MainHeroLabel'"), false);
+  assert.equal(controllerSource.includes('showPlayerIdleSpine'), true);
+  assert.equal(controllerSource.includes('setToSetupPose()'), true);
+  assert.equal(controllerSource.includes('this.playerAttackSpine.setAttachment'), true);
+});
+
+runTest('main hero attack keeps its local glow without rectangular head strokes', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('MainHeroAttackEffects'), true);
+  assert.equal(controllerSource.includes('drawPlayerAttackAccent'), true);
+  assert.equal(controllerSource.includes('playerAttackEffectsGraphics'), true);
+  assert.equal(controllerSource.includes('PLAYER_ATTACK_SPINE_DURATION'), false);
+  assert.equal(controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'), true);
+  assert.equal(controllerSource.includes('255, 154, 54'), true);
+  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.circle('), true);
+  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineTo('), false);
+  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineWidth = 12'), false);
+  assert.equal(controllerSource.includes('new Color(255, 106, 38'), false);
+});
+
+runTest('battle layer remains scale-stable during focus readability events', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('pulseScale'), false);
+  assert.equal(controllerSource.includes('Math.sin(progress * Math.PI) * 0.035'), false);
+  assert.equal(controllerSource.includes('this.battleLayer.setScale(scale, scale, 1);'), false);
 });
 
 runTest('animation priority allows hit over walk but protects death', () => {
@@ -107,7 +235,7 @@ runTest('finite animation runtime completes non-looping clips', () => {
   requestUnitAnimation(runtime, 'attack');
   tickUnitAnimation(runtime, 0.12);
   assert.equal(isUnitAnimationComplete(runtime), false);
-  tickUnitAnimation(runtime, 1);
+  tickUnitAnimation(runtime, runtime.duration);
   assert.equal(isUnitAnimationComplete(runtime), true);
 });
 
@@ -125,7 +253,7 @@ runTest('battle presentation systems call the shared animation driver', () => {
   assert.equal(gridSource.includes('computeProceduralAnimationPose'), true);
 });
 
-runTest('player attacks render golden projectiles with 2d particle hit bursts', () => {
+runTest('player attacks render golden projectiles with transparent 2d particle hit bursts', () => {
   const autoAttackSource = readFileSync('assets/scripts/battle/PlayerAutoAttackSystem.ts', 'utf8');
 
   assert.equal(autoAttackSource.includes('ParticleSystem2D'), true);
@@ -135,7 +263,13 @@ runTest('player attacks render golden projectiles with 2d particle hit bursts', 
   assert.equal(autoAttackSource.includes('drawGoldenArrowProjectile'), true);
   assert.equal(autoAttackSource.includes('spawnHitParticleBurst'), true);
   assert.equal(autoAttackSource.includes('configureHitParticleSystem'), true);
-  assert.equal(autoAttackSource.includes('builtinResMgr'), true);
+  assert.equal(autoAttackSource.includes('getUiArtAsset'), true);
+  assert.equal(autoAttackSource.includes('assetManager.loadAny(spec.uuid'), true);
+  assert.equal(autoAttackSource.includes("assetManager.loadBundle('ui'"), false);
+  assert.equal(autoAttackSource.includes('fx_glow_gold_soft.png'), true);
+  assert.equal(autoAttackSource.includes('fx_fire_small.png'), true);
+  assert.equal(autoAttackSource.includes('builtinResMgr'), false);
+  assert.equal(autoAttackSource.includes('white-texture'), false);
   assert.equal(autoAttackSource.includes('particle.custom = true'), true);
   assert.equal(autoAttackSource.includes('particle.autoRemoveOnFinish = true'), true);
   assert.equal(autoAttackSource.includes('particle.resetSystem()'), true);
@@ -146,5 +280,4 @@ runTest('player attacks render golden projectiles with 2d particle hit bursts', 
   assert.equal(autoAttackSource.includes('particle.emissionRate = critical ? 440 : 280'), true);
   assert.equal(autoAttackSource.includes('new Color(255, 96, 32'), true);
   assert.equal(autoAttackSource.includes('distance / 1000'), true);
-  assert.equal(autoAttackSource.includes("loadBundle('ui'"), false);
 });

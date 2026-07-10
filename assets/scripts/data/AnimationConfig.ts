@@ -24,6 +24,8 @@ export interface UnitAnimationClipSpec {
   priority: number;
   interruptible: boolean;
   speed?: number;
+  renderer?: UnitAnimationRenderer;
+  spineAssetBase?: string;
 }
 
 export interface UnitAnimationProfile {
@@ -37,6 +39,47 @@ export interface UnitAnimationProfile {
 
 export const SPINE_ASSET_REQUIREMENTS = ['.json/.skel', '.png', '.txt/.atlas'] as const;
 export const SUPPORTED_SPINE_VERSION = '3.8';
+export const PLAYER_ATTACK_SPINE_ASSET_BASE = 'spine/animation/animation';
+export const PLAYER_ATTACK_SPINE_CLIP_NAME = 'attack';
+export const PLAYER_ATTACK_SPINE_SOURCE_DURATION = 2 / 3;
+export const PLAYER_ATTACK_ANIMATION_BASE_DURATION = 0.7;
+export const PLAYER_ATTACK_ANIMATION_MIN_DURATION = 0.22;
+export const PLAYER_ATTACK_ANIMATION_MAX_DURATION = 1.4;
+export const PLAYER_ATTACK_SPINE_DURATION = PLAYER_ATTACK_ANIMATION_BASE_DURATION;
+export const PLAYER_ATTACK_SPINE_SPEED =
+  PLAYER_ATTACK_SPINE_SOURCE_DURATION / PLAYER_ATTACK_ANIMATION_BASE_DURATION;
+
+export interface PlayerAttackAnimationTiming {
+  attackSpeedMultiplier: number;
+  animationDuration: number;
+  spinePlaybackSpeed: number;
+}
+
+export function resolvePlayerAttackAnimationTiming(
+  baseAttackInterval: number,
+  currentAttackInterval: number,
+): PlayerAttackAnimationTiming {
+  const safeBaseInterval =
+    Number.isFinite(baseAttackInterval) && baseAttackInterval > 0
+      ? baseAttackInterval
+      : PLAYER_ATTACK_ANIMATION_BASE_DURATION;
+  const safeCurrentInterval =
+    Number.isFinite(currentAttackInterval) && currentAttackInterval > 0
+      ? currentAttackInterval
+      : safeBaseInterval;
+  const attackSpeedMultiplier = safeBaseInterval / safeCurrentInterval;
+  const unclampedDuration = PLAYER_ATTACK_ANIMATION_BASE_DURATION / attackSpeedMultiplier;
+  const animationDuration = Math.min(
+    PLAYER_ATTACK_ANIMATION_MAX_DURATION,
+    Math.max(PLAYER_ATTACK_ANIMATION_MIN_DURATION, unclampedDuration),
+  );
+
+  return {
+    attackSpeedMultiplier,
+    animationDuration,
+    spinePlaybackSpeed: PLAYER_ATTACK_SPINE_SOURCE_DURATION / animationDuration,
+  };
+}
 
 export const REQUIRED_ENEMY_ANIMATION_STATES: UnitAnimationState[] = [
   'idle',
@@ -75,6 +118,7 @@ function clip(
   duration: number,
   loop = false,
   clipName: string = state,
+  options: Partial<Pick<UnitAnimationClipSpec, 'renderer' | 'spineAssetBase' | 'speed'>> = {},
 ): UnitAnimationClipSpec {
   return {
     state,
@@ -83,6 +127,7 @@ function clip(
     duration,
     priority: UNIT_ANIMATION_PRIORITY[state],
     interruptible: state !== 'death',
+    ...options,
   };
 }
 
@@ -129,7 +174,25 @@ function heroProfile(id: string, displayName: string): UnitAnimationProfile {
   };
 }
 
-export const PLAYER_ANIMATION_PROFILE: UnitAnimationProfile = heroProfile('hero_main', '主角');
+function playerProfile(): UnitAnimationProfile {
+  return {
+    ...heroProfile('hero_main', '主角'),
+    clips: [
+      clip('idle', 0.9, true),
+      clip('attack', PLAYER_ATTACK_SPINE_DURATION, false, PLAYER_ATTACK_SPINE_CLIP_NAME, {
+        renderer: 'spine',
+        spineAssetBase: PLAYER_ATTACK_SPINE_ASSET_BASE,
+        speed: PLAYER_ATTACK_SPINE_SPEED,
+      }),
+      clip('cast', 0.52),
+      clip('hit', 0.18),
+      clip('death', 0.58),
+      clip('victory', 0.85, true),
+    ],
+  };
+}
+
+export const PLAYER_ANIMATION_PROFILE: UnitAnimationProfile = playerProfile();
 
 export const HERO_ANIMATION_PROFILES: Record<string, UnitAnimationProfile> = {
   弓手: heroProfile('hero_archer', '弓手'),
