@@ -883,7 +883,7 @@ export class BossHealthBarView {
 export class CityHealthBarView {
   public readonly node: Node;
   private readonly graphics: Graphics;
-  private readonly label: Label;
+  private readonly valueLabel: Label;
   private lastHealth = Number.NaN;
   private flashTimeLeft = 0;
 
@@ -901,26 +901,50 @@ export class CityHealthBarView {
     this.node.setPosition(x, y, 0);
 
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    transform.setContentSize(width, 46);
+    transform.setContentSize(width, 48);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    createUiArtSkinNode(this.node, 'hud_city_hp_bg.png', width, 44, 'CityHpSkin');
+    const cityHpSkin =
+      this.node.getChildByName('CityHpSkin') ??
+      createUiArtSkinNode(this.node, 'hud_city_hp_bg.png', width, 44, 'CityHpSkin');
+    cityHpSkin.active = false;
 
-    const labelView = bindOrCreateLabel(
+    bindOrCreateLabel(
+      this.node,
+      'CityHpEmblemLabel',
+      '城',
+      -width / 2 + 26,
+      0,
+      BattleUiTokens.font.tiny,
+      BattleUiTokens.colors.textPrimary,
+      34,
+      34,
+      {
+        fontRole: 'uiHud',
+      },
+    );
+
+    const valueLabelView = bindOrCreateLabel(
       this.node,
       'CityHpLabel',
-      t('hud.cityHp', { current: 100, max: 100 }),
+      '100/100',
+      width / 2 - 42,
       0,
-      -1,
-      BattleUiTokens.font.body,
+      BattleUiTokens.font.caption,
       BattleUiTokens.colors.textPrimary,
-      width,
-      44,
+      76,
+      28,
+      {
+        fontRole: 'damageNumber',
+      },
     );
-    this.label = labelView.label;
+    this.valueLabel = valueLabelView.label;
 
-    ensureNamedUiChild(this.node, 'CityHpBarBg', 0, 0, width, 30);
-    ensureNamedUiChild(this.node, 'CityHpBarFill', 0, 0, width, 30);
-    ensureNamedUiChild(this.node, 'CityHpHitFlash', 0, 0, width + 12, 42);
+    const cityHpBarBg = ensureNamedUiChild(this.node, 'CityHpBarBg', 0, 0, width, 30);
+    cityHpBarBg.active = false;
+    const cityHpBarFill = ensureNamedUiChild(this.node, 'CityHpBarFill', 0, 0, width, 30);
+    cityHpBarFill.active = false;
+    const cityHpHitFlash = ensureNamedUiChild(this.node, 'CityHpHitFlash', 0, 0, width + 12, 42);
+    cityHpHitFlash.active = false;
 
     if (!this.node.parent) {
       parent.addChild(this.node);
@@ -933,15 +957,19 @@ export class CityHealthBarView {
     }
 
     this.lastHealth = current;
-    this.label.string = t('hud.cityHp', { current: Math.ceil(current), max });
+    const safeMax = Math.max(1, max);
+    const ratio = Math.max(0, Math.min(1, current / safeMax));
+    this.valueLabel.string = `${Math.ceil(current)}/${Math.ceil(safeMax)}`;
 
-    const ratio = Math.max(0, Math.min(1, current / max));
-    const active = focused || this.flashTimeLeft > 0;
-    const scale = this.flashTimeLeft > 0 ? 1.06 : focused ? 1.025 : 1;
-    const barWidth = this.width * scale;
-    const barHeight = 30 * scale;
-    const left = -barWidth / 2;
-    const top = -barHeight / 2;
+    const frameLeft = -this.width / 2;
+    const frameBottom = -24;
+    const emblemX = frameLeft + 26;
+    const valueWidth = 76;
+    const trackLeft = frameLeft + 52;
+    const trackWidth = this.width - 52 - valueWidth - 10;
+    const trackBottom = -10;
+    const trackHeight = 20;
+    const fillWidth = Math.max(0, trackWidth * ratio);
     const fillColor =
       ratio > 0.55
         ? BattleUiTokens.colors.summonGreen
@@ -951,37 +979,70 @@ export class CityHealthBarView {
 
     this.graphics.clear();
 
-    if (active) {
-      this.graphics.strokeColor =
-        this.flashTimeLeft > 0
-          ? uiColor(Color.WHITE, 150)
-          : uiColor(BattleUiTokens.colors.highlight, 100);
-      this.graphics.lineWidth = this.flashTimeLeft > 0 ? 12 : 8;
+    if (focused) {
+      this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 120);
+      this.graphics.lineWidth = 4;
       this.graphics.roundRect(
-        left - 6,
-        top - 6,
-        barWidth + 12,
-        barHeight + 12,
-        BattleUiTokens.radius.lg,
+        frameLeft - 3,
+        frameBottom - 3,
+        this.width + 6,
+        54,
+        BattleUiTokens.radius.lg + 2,
+      );
+      this.graphics.stroke();
+    }
+
+    if (this.flashTimeLeft > 0) {
+      this.graphics.strokeColor = uiColor(Color.WHITE, 180);
+      this.graphics.lineWidth = 3;
+      this.graphics.roundRect(
+        frameLeft - 5,
+        frameBottom - 5,
+        this.width + 10,
+        58,
+        BattleUiTokens.radius.lg + 4,
       );
       this.graphics.stroke();
     }
 
     this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, 228);
-    this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(frameLeft, frameBottom, this.width, 48, BattleUiTokens.radius.lg);
     this.graphics.fill();
-    this.graphics.fillColor = fillColor;
-    this.graphics.roundRect(left, top, barWidth * ratio, barHeight, BattleUiTokens.radius.md);
-    this.graphics.fill();
+
     this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, 210);
     this.graphics.lineWidth = BattleUiTokens.stroke.normal;
-    this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(frameLeft, frameBottom, this.width, 48, BattleUiTokens.radius.lg);
     this.graphics.stroke();
 
-    if (this.flashTimeLeft > 0) {
-      this.graphics.fillColor = uiColor(Color.WHITE, 70);
-      this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelBrown, 224);
+    this.graphics.circle(emblemX, 0, 15);
+    this.graphics.fill();
+
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, 200);
+    this.graphics.lineWidth = 2;
+    this.graphics.circle(emblemX, 0, 15);
+    this.graphics.stroke();
+
+    this.graphics.fillColor = uiColor(Color.BLACK, 188);
+    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.fill();
+
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeDark, 220);
+    this.graphics.lineWidth = 2;
+    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.stroke();
+
+    if (fillWidth > 0) {
+      this.graphics.fillColor = fillColor;
+      this.graphics.roundRect(trackLeft, trackBottom, fillWidth, trackHeight, BattleUiTokens.radius.md);
       this.graphics.fill();
+
+      this.graphics.fillColor = uiColor(Color.WHITE, 42);
+      this.graphics.roundRect(trackLeft + 2, trackBottom + trackHeight - 6, Math.max(0, fillWidth - 4), 4, 2);
+      this.graphics.fill();
+    }
+
+    if (this.flashTimeLeft > 0) {
       this.flashTimeLeft = Math.max(0, this.flashTimeLeft - 1 / 60);
     }
   }

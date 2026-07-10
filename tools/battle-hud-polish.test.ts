@@ -297,3 +297,43 @@ runTest('formation animation keeps ring centers fixed', () => {
   assert.equal(/view\.node\.setScale\(focusScale \*/.test(updateAnimationsSource), false);
   assert.equal(/view\.node\.angle = pose\.rotation/.test(updateAnimationsSource), false);
 });
+
+runTest('city health bar is fixed, immediate, and independently readable', () => {
+  const cityHealthBarViewSource = sourceSection(
+    battleUiComponentsSource,
+    'export class CityHealthBarView {',
+    'export class ComboView {',
+  );
+
+  assert.match(cityHealthBarViewSource, /CityHpEmblemLabel/);
+  assert.match(cityHealthBarViewSource, /graphics\.circle\(emblemX,\s*0,\s*15\);/);
+  assert.match(cityHealthBarViewSource, /ratio > 0\.55/);
+  assert.match(cityHealthBarViewSource, /ratio > 0\.28/);
+  assert.match(cityHealthBarViewSource, /transform\.setContentSize\(width,\s*48\);/);
+  assert.match(cityHealthBarViewSource, /private readonly valueLabel: Label;/);
+  assert.match(
+    cityHealthBarViewSource,
+    /this\.valueLabel\.string = `\$\{Math\.ceil\(current\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
+  );
+  assert.match(
+    cityHealthBarViewSource,
+    /if \(focused\) \{\s*this\.graphics\.strokeColor = uiColor\(BattleUiTokens\.colors\.highlight, 120\);\s*this\.graphics\.lineWidth = 4;/s,
+  );
+  assert.match(
+    cityHealthBarViewSource,
+    /if \(this\.flashTimeLeft > 0\) \{\s*this\.graphics\.strokeColor = uiColor\(Color\.WHITE, 180\);\s*this\.graphics\.lineWidth = 3;/s,
+  );
+
+  assert.equal(cityHealthBarViewSource.includes('const scale ='), false);
+  assert.equal(cityHealthBarViewSource.includes('* scale'), false);
+  assert.equal(cityHealthBarViewSource.includes('node.setScale'), false);
+  assert.equal(/delayed|trailing|secondary health layer/i.test(cityHealthBarViewSource), false);
+  assert.equal(/second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource), false);
+  assert.equal(/Color\.WHITE,\s*70/.test(cityHealthBarViewSource), false);
+  assert.equal(
+    /fillColor = uiColor\(Color\.WHITE[\s\S]*roundRect\(frameLeft,\s*frameBottom,\s*this\.width,\s*48[\s\S]*fill\(\);/i.test(
+      cityHealthBarViewSource,
+    ),
+    false,
+  );
+});
