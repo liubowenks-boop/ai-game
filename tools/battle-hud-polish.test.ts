@@ -156,6 +156,11 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
     'private getSlotColor(',
     'private getVisualSlotRect(',
   );
+  const getVisualSlotRectSource = sourceSection(
+    gridPlacementSource,
+    'private getVisualSlotRect(',
+    'private drawSlotButton(',
+  );
   const refreshSlotPortraitSource = sourceSection(
     gridPlacementSource,
     'private refreshSlotPortrait(',
@@ -184,6 +189,10 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(
     getSlotColorSource,
     /return slot\.row === 'front' \? new Color\(80, 39, 28, 230\) : new Color\(65, 34, 27, 230\);/,
+  );
+  assert.match(
+    getVisualSlotRectSource,
+    /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
   );
   assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
   assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);

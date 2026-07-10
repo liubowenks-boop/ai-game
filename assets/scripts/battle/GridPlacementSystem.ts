@@ -217,7 +217,7 @@ export class GridPlacementSystem {
     };
 
     return (
-      positions[slot.index] ?? { x: slot.position.x, y: slot.position.y, width: 108, height: 66 }
+      positions[slot.index] ?? { x: slot.position.x, y: slot.position.y, width: 82, height: 82 }
     );
   }
 
