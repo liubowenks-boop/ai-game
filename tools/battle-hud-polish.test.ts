@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
 import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
+
+const gridPlacementSource = readFileSync(
+  'assets/scripts/battle/GridPlacementSystem.ts',
+  'utf8',
+);
+
+function sourceSection(source: string, start: string, end: string): string {
+  const startIndex = source.indexOf(start);
+  assert.notEqual(startIndex, -1, `source should contain start marker: ${start}`);
+
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  assert.notEqual(endIndex, -1, `source should contain end marker: ${end}`);
+  assert.ok(endIndex > startIndex, `end marker should follow start marker: ${end}`);
+
+  return source.slice(startIndex, endIndex);
+}
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
@@ -116,4 +133,91 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(cityHealthBar, gridSlotFront2), false);
+});
+
+runTest('deployable positions draw circles instead of rounded rectangles', () => {
+  const drawSlotButtonSource = sourceSection(
+    gridPlacementSource,
+    'private drawSlotButton(',
+    'private refreshSlotPortrait(',
+  );
+  const drawPlainButtonSource = sourceSection(
+    gridPlacementSource,
+    'private drawPlainButton(',
+    'private createLabel(',
+  );
+  const getSlotTextSource = sourceSection(
+    gridPlacementSource,
+    'private getSlotText(',
+    'private getSlotColor(',
+  );
+  const getSlotColorSource = sourceSection(
+    gridPlacementSource,
+    'private getSlotColor(',
+    'private getVisualSlotRect(',
+  );
+  const refreshSlotPortraitSource = sourceSection(
+    gridPlacementSource,
+    'private refreshSlotPortrait(',
+    'private createButton(',
+  );
+  const createButtonSource = sourceSection(
+    gridPlacementSource,
+    'private createButton(',
+    'private drawPlainButton(',
+  );
+
+  assert.match(drawSlotButtonSource, /const radius = view\.width \/ 2;/);
+  assert.match(drawSlotButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
+  assert.equal(drawSlotButtonSource.includes('roundRect'), false);
+  assert.match(drawSlotButtonSource, /new Color\(190, 116, 70, 255\)/);
+  assert.match(drawSlotButtonSource, /new Color\(255, 226, 151, 255\)/);
+  assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
+  assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
+  assert.equal(drawPlainButtonSource.includes('roundRect'), false);
+  assert.match(getSlotTextSource, /return slot\.hero \? '' : slot\.label;/);
+  assert.match(
+    getSlotColorSource,
+    /return slot\.row === 'front' \? new Color\(80, 39, 28, 230\) : new Color\(65, 34, 27, 230\);/,
+  );
+  assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
+  assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);
+  assert.match(refreshSlotPortraitSource, /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/);
+  assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.ELLIPSE;/);
+  assert.match(refreshSlotPortraitSource, /mask\.segments = 48;/);
+  assert.match(createButtonSource, /labelNode\.setPosition\(0, 0, 0\);/);
+});
+
+runTest('formation animation keeps ring centers fixed', () => {
+  const updateAnimationsSource = sourceSection(
+    gridPlacementSource,
+    'public updateAnimations(',
+    'public recruitFromUpgrade(',
+  );
+
+  assert.match(
+    updateAnimationsSource,
+    /view\.node\.setPosition\(view\.baseX \?\? view\.node\.position\.x, view\.baseY \?\? view\.node\.position\.y, 0\);/,
+  );
+  assert.match(updateAnimationsSource, /view\.node\.setScale\(1, 1, 1\);/);
+  assert.match(updateAnimationsSource, /view\.node\.angle = 0;/);
+  assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(/);
+  assert.match(updateAnimationsSource, /view\.portraitNode\.setScale\(/);
+  assert.match(updateAnimationsSource, /view\.portraitNode\.angle = pose\.rotation \* 0\.35;/);
+  assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(pose\.offsetX \* 0\.35, pose\.offsetY \* 0\.35, 0\);/);
+  assert.match(updateAnimationsSource, /const focusScale = highlighted \? 1\.04 : 1;/);
+  assert.equal(
+    /\(view\.baseX \?\? view\.node\.position\.x\) \+ pose\.offsetX/.test(
+      updateAnimationsSource,
+    ),
+    false,
+  );
+  assert.equal(
+    /\(view\.baseY \?\? view\.node\.position\.y\) \+ pose\.offsetY/.test(
+      updateAnimationsSource,
+    ),
+    false,
+  );
+  assert.equal(/view\.node\.setScale\(focusScale \*/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.angle = pose\.rotation/.test(updateAnimationsSource), false);
 });

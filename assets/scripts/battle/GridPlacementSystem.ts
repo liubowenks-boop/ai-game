@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Button, Color, Graphics, Label, Layers, Node, UITransform } from 'cc';
+import { Button, Color, Graphics, Label, Layers, Mask, Node, UITransform } from 'cc';
 
 import {
   applyBattleLabelStyle,
@@ -97,7 +97,7 @@ export class GridPlacementSystem {
     for (const slot of this.model.slots) {
       const view = this.slotButtons[slot.index];
       const highlighted = Boolean(slot.hero && slot.hero.id === this.highlightedHeroId);
-      view.label.string = this.getSlotText(slot, this.highlightedHeroId);
+      view.label.string = this.getSlotText(slot);
       view.label.color =
         slot.hero && highlighted
           ? new Color(255, 238, 96, 255)
@@ -120,10 +120,17 @@ export class GridPlacementSystem {
         continue;
       }
 
+      view.node.setPosition(view.baseX ?? view.node.position.x, view.baseY ?? view.node.position.y, 0);
+      view.node.setScale(1, 1, 1);
+      view.node.angle = 0;
+
+      if (view.portraitNode) {
+        view.portraitNode.setPosition(0, 0, 0);
+        view.portraitNode.setScale(1, 1, 1);
+        view.portraitNode.angle = 0;
+      }
+
       if (!slot.hero) {
-        view.node.setPosition(view.baseX ?? view.node.position.x, view.baseY ?? view.node.position.y, 0);
-        view.node.setScale(1, 1, 1);
-        view.node.angle = 0;
         continue;
       }
 
@@ -146,13 +153,11 @@ export class GridPlacementSystem {
         'hero',
       );
       const focusScale = highlighted ? 1.04 : 1;
-      view.node.setPosition(
-        (view.baseX ?? view.node.position.x) + pose.offsetX,
-        (view.baseY ?? view.node.position.y) + pose.offsetY,
-        0,
-      );
-      view.node.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
-      view.node.angle = pose.rotation;
+      if (view.portraitNode) {
+        view.portraitNode.setPosition(pose.offsetX * 0.35, pose.offsetY * 0.35, 0);
+        view.portraitNode.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
+        view.portraitNode.angle = pose.rotation * 0.35;
+      }
     }
   }
 
@@ -194,22 +199,12 @@ export class GridPlacementSystem {
     return view;
   }
 
-  private getSlotText(slot: GridSlotState, highlightedHeroId = 0): string {
-    if (!slot.hero) {
-      return t('grid.slotEmpty', { slotLabel: slot.label });
-    }
-
-    const mark = slot.hero.id === highlightedHeroId ? '★' : '';
-    return t('grid.slotHero', {
-      slotLabel: slot.label,
-      focus: mark,
-      heroName: slot.hero.name,
-      level: slot.hero.level,
-    });
+  private getSlotText(slot: GridSlotState): string {
+    return slot.hero ? '' : slot.label;
   }
 
   private getSlotColor(slot: GridSlotState): Color {
-    return slot.row === 'front' ? new Color(84, 98, 128, 255) : new Color(76, 82, 104, 255);
+    return slot.row === 'front' ? new Color(80, 39, 28, 230) : new Color(65, 34, 27, 230);
   }
 
   private getVisualSlotRect(slot: GridSlotState): RectSpec {
@@ -227,36 +222,24 @@ export class GridPlacementSystem {
   }
 
   private drawSlotButton(view: ButtonView, slot: GridSlotState, highlighted: boolean): void {
-    const alpha = slot.hero ? (highlighted ? 255 : 205) : 125;
-    const color = slot.hero
-      ? highlighted
-        ? new Color(110, 126, 168, 255)
-        : view.baseColor
-      : new Color(view.baseColor.r, view.baseColor.g, view.baseColor.b, alpha);
+    const radius = view.width / 2;
 
     view.graphics.clear();
+    view.graphics.fillColor = view.baseColor;
+    view.graphics.circle(0, 0, radius);
+    view.graphics.fill();
+
+    view.graphics.strokeColor = new Color(190, 116, 70, 255);
+    view.graphics.lineWidth = 2;
+    view.graphics.circle(0, 0, radius);
+    view.graphics.stroke();
 
     if (highlighted) {
-      view.graphics.strokeColor = new Color(255, 238, 96, 145);
-      view.graphics.lineWidth = 9;
-      view.graphics.roundRect(
-        -view.width / 2 - 5,
-        -view.height / 2 - 5,
-        view.width + 10,
-        view.height + 10,
-        10,
-      );
+      view.graphics.strokeColor = new Color(255, 226, 151, 255);
+      view.graphics.lineWidth = 3;
+      view.graphics.circle(0, 0, radius + 4);
       view.graphics.stroke();
     }
-
-    view.graphics.fillColor = color;
-    view.graphics.strokeColor = highlighted
-      ? new Color(255, 244, 138, 255)
-      : new Color(255, 255, 255, slot.hero ? 120 : 70);
-    view.graphics.lineWidth = highlighted ? 4 : 2;
-    view.graphics.roundRect(-view.width / 2, -view.height / 2, view.width, view.height, 6);
-    view.graphics.fill();
-    view.graphics.stroke();
   }
 
   private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
@@ -279,16 +262,27 @@ export class GridPlacementSystem {
       view.portraitNode.destroy();
     }
 
+    const portraitSize = view.width - 16;
+    const portraitNode = new Node('SlotHeroPortraitMask');
+    this.setUiLayer(portraitNode);
+    const portraitTransform = portraitNode.addComponent(UITransform);
+    portraitTransform.setContentSize(portraitSize, portraitSize);
+    const mask = portraitNode.addComponent(Mask);
+    mask.type = Mask.Type.ELLIPSE;
+    mask.segments = 48;
+    portraitNode.setPosition(0, 0, 0);
+    view.node.addChild(portraitNode);
+    portraitNode.setSiblingIndex(0);
+
     view.portraitFilename = filename;
-    view.portraitNode = createUiArtSkinNode(
-      view.node,
+    view.portraitNode = portraitNode;
+    createUiArtSkinNode(
+      portraitNode,
       filename,
-      view.height - 10,
-      view.height - 10,
+      portraitSize,
+      portraitSize,
       'SlotHeroPortrait',
     );
-    view.portraitNode.setPosition(-view.width / 2 + view.height / 2, 0, 0);
-    view.portraitNode.setSiblingIndex(1);
   }
 
   private createButton(
@@ -320,7 +314,7 @@ export class GridPlacementSystem {
       lineHeightMultiplier: 1.18,
       overflow: 'shrink',
     });
-    labelNode.setPosition(16, -9, 0);
+    labelNode.setPosition(0, 0, 0);
     node.addChild(labelNode);
 
     const view = { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
@@ -330,11 +324,15 @@ export class GridPlacementSystem {
   }
 
   private drawPlainButton(view: ButtonView): void {
+    const radius = view.width / 2;
+
     view.graphics.fillColor = view.baseColor;
-    view.graphics.strokeColor = new Color(255, 255, 255, 120);
-    view.graphics.lineWidth = 2;
-    view.graphics.roundRect(-view.width / 2, -view.height / 2, view.width, view.height, 6);
+    view.graphics.circle(0, 0, radius);
     view.graphics.fill();
+
+    view.graphics.strokeColor = new Color(190, 116, 70, 255);
+    view.graphics.lineWidth = 2;
+    view.graphics.circle(0, 0, radius);
     view.graphics.stroke();
   }
 
