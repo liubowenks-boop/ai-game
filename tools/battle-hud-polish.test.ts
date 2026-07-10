@@ -170,8 +170,13 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(drawSlotButtonSource, /const radius = view\.width \/ 2;/);
   assert.match(drawSlotButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
   assert.equal(drawSlotButtonSource.includes('roundRect'), false);
+  assert.equal(drawSlotButtonSource.includes('radius +'), false);
   assert.match(drawSlotButtonSource, /new Color\(190, 116, 70, 255\)/);
   assert.match(drawSlotButtonSource, /new Color\(255, 226, 151, 255\)/);
+  assert.match(
+    drawSlotButtonSource,
+    /if \(highlighted\) \{\s*view\.graphics\.strokeColor = new Color\(255, 226, 151, 255\);\s*view\.graphics\.lineWidth = 6;\s*view\.graphics\.circle\(0, 0, radius\);\s*view\.graphics\.stroke\(\);\s*\}/,
+  );
   assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
   assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
   assert.equal(drawPlainButtonSource.includes('roundRect'), false);

@@ -229,17 +229,17 @@ export class GridPlacementSystem {
     view.graphics.circle(0, 0, radius);
     view.graphics.fill();
 
+    if (highlighted) {
+      view.graphics.strokeColor = new Color(255, 226, 151, 255);
+      view.graphics.lineWidth = 6;
+      view.graphics.circle(0, 0, radius);
+      view.graphics.stroke();
+    }
+
     view.graphics.strokeColor = new Color(190, 116, 70, 255);
     view.graphics.lineWidth = 2;
     view.graphics.circle(0, 0, radius);
     view.graphics.stroke();
-
-    if (highlighted) {
-      view.graphics.strokeColor = new Color(255, 226, 151, 255);
-      view.graphics.lineWidth = 3;
-      view.graphics.circle(0, 0, radius + 4);
-      view.graphics.stroke();
-    }
   }
 
   private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
