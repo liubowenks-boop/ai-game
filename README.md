@@ -20,6 +20,7 @@
 - 同名英雄在同格或相邻格触发自动合成，最高 Lv4。
 - 召唤流初始上阵 3 名英雄，可通过卡牌提升到 5 名。
 - 英雄配置包含：弓手、火药师、冰法师、毒师、护卫、鼓手、治疗师、咒术师。
+- 固定副将“雷法师”常驻后1，与主角独立攻击。
 - 敌人配置包含：普通、快速、厚血、远程、Boss。
 - 波次节奏为 1-3 波教学、4 波精英、5 波 Boss，之后循环强化。
 - `BattleMain.scene` 已作为正式局内入口场景，包含可编辑的 UI Layer 骨架。
@@ -33,6 +34,8 @@
 - `assets/scripts/data/BattleConfig.ts`：英雄、敌人、三流派强化卡配置。后续调数值优先改这里。
 - `assets/scripts/battle/EnemySystem.ts`：敌人原型节点创建与同步。
 - `assets/scripts/battle/PlayerAutoAttackSystem.ts`：主角自动攻击表现，使用简单连线反馈。
+- `assets/scripts/battle/ThunderMagePresentation.ts`：固定雷法师的 Spine 播放、帧映射和蓝白雷击表现。
+- `assets/scripts/data/CompanionConfig.ts`：雷法师身份、站位、伤害、攻击间隔与资源配置。
 - `assets/scripts/battle/WaveSystem.ts`：波次 UI 刷新。
 - `assets/scripts/battle/CityHealthSystem.ts`：城池血量和状态 UI 刷新。
 - `assets/scripts/battle/GridPlacementSystem.ts`：招募、放置、棋盘按钮和合成刷新。
@@ -47,6 +50,14 @@
 - 普通攻速下，攻击动画播放时长为 `0.7` 秒；金色飞弹和命中特效继续由 `PlayerAutoAttackSystem` 独立负责。
 - 动画时长会随实际攻击间隔自动同步：`攻速倍率 = 基础攻击间隔 / 当前攻击间隔`，`动画时长 = clamp(0.7 / 攻速倍率, 0.22, 1.4)` 秒。攻速提高时，主角攻击动画相应加快。
 - `AnimationConfig.ts` 中的 `PLAYER_ATTACK_ANIMATION_BASE_DURATION`、`PLAYER_ATTACK_ANIMATION_MIN_DURATION` 与 `PLAYER_ATTACK_ANIMATION_MAX_DURATION` 是统一调参入口。
+
+## 固定副将：雷法师
+
+- Spine 资源位于 `assets/resources/spine/hero_thunder_mage/`，使用透明背景并固定显示在“后1”圆形站位。
+- “后1”为固定副将保留位，不参与普通英雄招募、上阵、合成或底部头像栏计数。
+- 基础攻击伤害为 `7`，基础攻击间隔为 `0.6` 秒；攻击目标是存活敌人中最靠近城墙的一个。
+- 实际攻击间隔会受鼓手等攻速增益影响；动画时长与该实际间隔同步，并限制在 `0.25` 至 `1.2` 秒之间。
+- 攻击使用蓝白雷击和透明命中爆发；主角原有 Spine 动画、金色飞弹与命中特效保持不变。
 
 ## 环境安装
 
@@ -100,6 +111,7 @@ npm run test:animation
 
 ```bash
 npm run test:spine-import
+npm run test:thunder-mage-import
 ```
 
 设置 Cocos 预览默认竖屏：
