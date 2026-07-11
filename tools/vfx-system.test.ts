@@ -210,3 +210,19 @@ runTest('authored v2 textures keep alpha, metadata and manifest entries', () => 
   assert.ok(generatorSource.includes('spec.filename.startswith("fx_v2_")'));
   assert.ok(generatorSource.includes('missing authored VFX texture'));
 });
+
+runTest('runtime vfx system owns pooled particle lifecycle and additive blending', () => {
+  const source = readFileSync('assets/scripts/battle/BattleVfxSystem.ts', 'utf8');
+  assert.match(source, /class BattleVfxSystem/);
+  assert.match(source, /async preload\(\)/);
+  assert.match(source, /playAttackEvent\(/);
+  assert.match(source, /playWallImpact\(/);
+  assert.match(source, /playEnemyDeath\(/);
+  assert.match(source, /setPlacementMarkers\(/);
+  assert.match(source, /resetSystem\(\)/);
+  assert.match(source, /stopSystem\(\)/);
+  assert.match(source, /gfx\.BlendFactor\.ONE/);
+  assert.match(source, /clear\(\)/);
+  assert.match(source, /dispose\(\)/);
+  assert.equal(source.includes('autoRemoveOnFinish = true'), false);
+});
