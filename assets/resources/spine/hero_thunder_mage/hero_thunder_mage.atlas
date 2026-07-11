@@ -1,0 +1,61 @@
+hero_thunder_mage.png
+size: 3492,442
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+frame_0
+  rotate: false
+  xy: 7, 24
+  size: 336, 393
+  orig: 336, 393
+  offset: 0, 0
+  index: -1
+frame_1
+  rotate: false
+  xy: 371, 2
+  size: 307, 437
+  orig: 307, 437
+  offset: 0, 0
+  index: -1
+frame_2
+  rotate: false
+  xy: 712, 2
+  size: 323, 438
+  orig: 323, 438
+  offset: 0, 0
+  index: -1
+frame_3
+  rotate: false
+  xy: 1049, 3
+  size: 347, 435
+  orig: 347, 435
+  offset: 0, 0
+  index: -1
+frame_4
+  rotate: false
+  xy: 1438, 12
+  size: 267, 417
+  orig: 267, 417
+  offset: 0, 0
+  index: -1
+frame_5
+  rotate: false
+  xy: 1758, 20
+  size: 325, 401
+  orig: 325, 401
+  offset: 0, 0
+  index: -1
+frame_6
+  rotate: false
+  xy: 2137, 30
+  size: 265, 382
+  orig: 265, 382
+  offset: 0, 0
+  index: -1
+frame_7
+  rotate: false
+  xy: 2465, 37
+  size: 307, 367
+  orig: 307, 367
+  offset: 0, 0
+  index: -1
