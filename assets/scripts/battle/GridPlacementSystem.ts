@@ -21,6 +21,7 @@ import {
 
 interface ButtonView {
   node: Node;
+  unitNode?: Node;
   graphics: Graphics;
   label: Label;
   width: number;
@@ -38,18 +39,24 @@ export class GridPlacementSystem {
   private pendingHeroName = '';
   private pendingMessage = '';
   private readonly root: Node;
+  private readonly unitRoot: Node;
   private readonly titleLabel: Label;
   private readonly pendingLabel: Label;
   private readonly slotButtons: ButtonView[] = [];
   private highlightedHeroId = 0;
 
   public constructor(
-    parent: Node,
+    backingParent: Node,
+    unitParent: Node,
     private readonly model: BattleMvpModel,
   ) {
-    this.root = new Node('GridPlacementSystem');
+    this.root = new Node('GridPlacementBacking');
     this.setUiLayer(this.root);
-    parent.addChild(this.root);
+    backingParent.addChild(this.root);
+
+    this.unitRoot = new Node('GridPlacementUnits');
+    this.setUiLayer(this.unitRoot);
+    unitParent.addChild(this.unitRoot);
 
     const title = this.createLabel(
       t('grid.title', { heroes: 0, maxHeroes: this.model.build.summon.maxBoardHeroes, dps: 0 }),
@@ -79,6 +86,9 @@ export class GridPlacementSystem {
       const button = this.createSlotButton(slot);
       this.slotButtons[slot.index] = button;
       this.root.addChild(button.node);
+      if (button.unitNode) {
+        this.unitRoot.addChild(button.unitNode);
+      }
     }
 
     this.refresh();
@@ -120,9 +130,15 @@ export class GridPlacementSystem {
         continue;
       }
 
-      view.node.setPosition(view.baseX ?? view.node.position.x, view.baseY ?? view.node.position.y, 0);
-      view.node.setScale(1, 1, 1);
-      view.node.angle = 0;
+      view.unitNode?.setPosition(
+        view.baseX ?? view.unitNode.position.x,
+        view.baseY ?? view.unitNode.position.y,
+        0,
+      );
+      view.unitNode?.setScale(1, 1, 1);
+      if (view.unitNode) {
+        view.unitNode.angle = 0;
+      }
 
       if (view.portraitNode) {
         view.portraitNode.setPosition(0, 0, 0);
@@ -177,6 +193,10 @@ export class GridPlacementSystem {
       rect.height,
       this.getSlotColor(slot),
     );
+    const unitNode = new Node(`WallSlotUnit${slot.index}`);
+    this.setUiLayer(unitNode);
+    unitNode.setPosition(rect.x, rect.y, 0);
+    view.unitNode = unitNode;
     const button = view.node.getComponent(Button);
     if (button) {
       button.interactable = !slot.reservedBy;
@@ -209,20 +229,19 @@ export class GridPlacementSystem {
   }
 
   private getSlotText(slot: GridSlotState): string {
-    return slot.hero || slot.reservedBy ? '' : slot.label;
+    return '';
   }
 
-  private getSlotColor(slot: GridSlotState): Color {
-    return slot.row === 'front' ? new Color(80, 39, 28, 230) : new Color(65, 34, 27, 230);
+  private getSlotColor(_slot: GridSlotState): Color {
+    return new Color(65, 34, 27, 210);
   }
 
   private getVisualSlotRect(slot: GridSlotState): RectSpec {
     const positions: Record<number, RectSpec> = {
-      0: BattleUiV4Layout.gridSlotFront1,
-      1: BattleUiV4Layout.gridSlotFront2,
-      2: BattleUiV4Layout.gridSlotFront3,
-      3: BattleUiV4Layout.gridSlotBack1,
-      4: BattleUiV4Layout.gridSlotBack2,
+      0: BattleUiV4Layout.wallSlotOrdinary1,
+      1: BattleUiV4Layout.wallSlotOrdinary2,
+      2: BattleUiV4Layout.wallSlotOrdinary3,
+      3: BattleUiV4Layout.wallSlotThunderMage,
     };
 
     return (
@@ -288,7 +307,7 @@ export class GridPlacementSystem {
     mask.type = Mask.Type.ELLIPSE;
     mask.segments = 48;
     portraitNode.setPosition(0, 0, 0);
-    view.node.addChild(portraitNode);
+    view.unitNode?.addChild(portraitNode);
     portraitNode.setSiblingIndex(0);
 
     view.portraitFilename = filename;

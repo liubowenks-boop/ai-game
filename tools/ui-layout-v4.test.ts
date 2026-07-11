@@ -62,12 +62,30 @@ function main(): void {
   const placementTitle = assertRect(layoutMap, 'placementTitle');
   const placementPending = assertRect(layoutMap, 'placementPending');
   const upgradeScrim = assertRect(layoutMap, 'upgradeScrim');
-  const gridSlotFront1 = assertRect(layoutMap, 'gridSlotFront1');
-  const gridSlotFront2 = assertRect(layoutMap, 'gridSlotFront2');
-  const gridSlotFront3 = assertRect(layoutMap, 'gridSlotFront3');
-  const gridSlotBack1 = assertRect(layoutMap, 'gridSlotBack1');
-  const gridSlotBack2 = assertRect(layoutMap, 'gridSlotBack2');
+  const wallSlotThunderMage = assertRect(layoutMap, 'wallSlotThunderMage');
+  const wallSlotOrdinary1 = assertRect(layoutMap, 'wallSlotOrdinary1');
+  const wallSlotOrdinary2 = assertRect(layoutMap, 'wallSlotOrdinary2');
+  const wallSlotOrdinary3 = assertRect(layoutMap, 'wallSlotOrdinary3');
   const mainHeroUnit = assertRect(layoutMap, 'mainHeroUnit');
+  const formation = [
+    wallSlotThunderMage,
+    wallSlotOrdinary1,
+    mainHeroUnit,
+    wallSlotOrdinary2,
+    wallSlotOrdinary3,
+  ];
+
+  assert(
+    JSON.stringify(formation.map((rect) => rect.x)) === JSON.stringify([-240, -120, 0, 120, 240]),
+    'wall formation uses five evenly spaced x positions',
+  );
+  assert(
+    formation.every((rect) => rect.y === -320),
+    'wall formation shares one y coordinate',
+  );
+  for (let index = 1; index < formation.length; index += 1) {
+    assert(!rectsOverlap(formation[index - 1], formation[index]), 'adjacent wall units overlap');
+  }
 
   assert(!rectsOverlap(cityHealthBar, comboBadge), 'combo badge overlaps city health bar');
   assert(!rectsOverlap(cityHealthBar, statusLabel), 'status label overlaps city health bar');
@@ -124,14 +142,7 @@ function main(): void {
     'centered upgrade panel should not overlap bottom hero bar',
   );
 
-  for (const gridRect of [
-    gridSlotFront1,
-    gridSlotFront2,
-    gridSlotFront3,
-    gridSlotBack1,
-    gridSlotBack2,
-    mainHeroUnit,
-  ]) {
+  for (const gridRect of formation) {
     assert(!rectsOverlap(statusLabel, gridRect), 'status label overlaps board units');
     assert(!rectsOverlap(buildHintLabel, gridRect), 'build hint overlaps board units');
     assert(!rectsOverlap(placementTitle, gridRect), 'placement title overlaps board units');

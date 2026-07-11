@@ -40,58 +40,38 @@ function requireRect(key: keyof typeof BattleUiV4Layout): RectSpec {
   return rect;
 }
 
-runTest('formation uses two aligned rows with a protected main-hero center', () => {
-  const frontRects = [
-    requireRect('gridSlotFront1'),
-    requireRect('gridSlotFront2'),
-    requireRect('gridSlotFront3'),
-  ];
-  const backRects = [
-    requireRect('gridSlotBack1'),
+runTest('formation uses one aligned wall row with a protected main-hero center', () => {
+  const formation = [
+    requireRect('wallSlotThunderMage'),
+    requireRect('wallSlotOrdinary1'),
     requireRect('mainHeroUnit'),
-    requireRect('gridSlotBack2'),
+    requireRect('wallSlotOrdinary2'),
+    requireRect('wallSlotOrdinary3'),
   ];
 
   assert.deepEqual(
-    frontRects.map((rect) => rect.x),
-    [-210, 0, 210],
+    formation.map((rect) => rect.x),
+    [-240, -120, 0, 120, 240],
   );
   assert.deepEqual(
-    frontRects.map((rect) => rect.y),
-    [-300, -300, -300],
+    formation.map((rect) => rect.y),
+    [-320, -320, -320, -320, -320],
   );
-  assert.equal(frontRects[1].x - frontRects[0].x, frontRects[2].x - frontRects[1].x);
-  assert.equal(new Set(frontRects.map((rect) => rect.y)).size, 1);
-  assert.ok(frontRects.every((rect) => rect.width === 82 && rect.height === 82));
-
-  assert.deepEqual(
-    backRects.map((rect) => rect.x),
-    [-210, 0, 210],
-  );
-  assert.deepEqual(
-    backRects.map((rect) => rect.y),
-    [-410, -410, -410],
-  );
-  assert.equal(backRects[1].x - backRects[0].x, backRects[2].x - backRects[1].x);
-  assert.equal(new Set(backRects.map((rect) => rect.y)).size, 1);
-  assert.ok(
-    [backRects[0], backRects[2]].every((rect) => rect.width === 82 && rect.height === 82),
-  );
-  assert.deepEqual(
-    { width: backRects[1].width, height: backRects[1].height },
-    { width: 120, height: 120 },
-  );
+  assert.ok(formation.every((rect) => rect.width <= 96 && rect.height <= 112));
+  for (let index = 1; index < formation.length; index += 1) {
+    assert.equal(rectsOverlap(formation[index - 1], formation[index]), false);
+  }
 
   const model = new BattleMvpModel();
   assert.deepEqual(
     model.slots.map((slot) => slot.position.x),
-    [-210, 0, 210, -210, 210],
+    [-120, 120, 240, -240],
   );
   assert.deepEqual(
     model.slots.map((slot) => slot.position.y),
-    [-300, -300, -300, -410, -410],
+    [-320, -320, -320, -320],
   );
-  assert.deepEqual(model.playerPosition, { x: 0, y: -410 });
+  assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;
@@ -176,14 +156,14 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
   const placementTitle = requireRect('placementTitle');
   const placementPending = requireRect('placementPending');
   const cityHealthBar = requireRect('cityHealthBar');
-  const gridSlotFront2 = requireRect('gridSlotFront2');
+  const wallSlotOrdinary1 = requireRect('wallSlotOrdinary1');
 
   assert.equal(rectsOverlap(mainHeroUnit, placementTitle), false);
   assert.equal(rectsOverlap(mainHeroUnit, placementPending), false);
   assert.equal(rectsOverlap(mainHeroUnit, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
-  assert.equal(rectsOverlap(cityHealthBar, gridSlotFront2), false);
+  assert.equal(rectsOverlap(cityHealthBar, wallSlotOrdinary1), false);
 });
 
 runTest('bottom rail creates six text-free rectangular portrait slots', () => {
@@ -303,12 +283,13 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
   assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
   assert.equal(drawPlainButtonSource.includes('roundRect'), false);
-  assert.match(getSlotTextSource, /return slot\.hero \|\| slot\.reservedBy \? '' : slot\.label;/);
-  assert.match(
-    getSlotColorSource,
-    /return slot\.row === 'front' \? new Color\(80, 39, 28, 230\) : new Color\(65, 34, 27, 230\);/,
-  );
-  assert.match(getVisualSlotRectSource, /gridSlotBack1/);
+  assert.match(getSlotTextSource, /return '';/);
+  assert.match(getSlotColorSource, /return new Color\(65, 34, 27, 210\);/);
+  assert.match(getVisualSlotRectSource, /wallSlotThunderMage/);
+  assert.match(getVisualSlotRectSource, /wallSlotOrdinary1/);
+  assert.match(getVisualSlotRectSource, /wallSlotOrdinary2/);
+  assert.match(getVisualSlotRectSource, /wallSlotOrdinary3/);
+  assert.equal(/gridSlotFront|gridSlotBack/.test(getVisualSlotRectSource), false);
   assert.match(
     getVisualSlotRectSource,
     /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
@@ -331,7 +312,14 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(refreshSlotPortraitSource, /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/);
   assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.ELLIPSE;/);
   assert.match(refreshSlotPortraitSource, /mask\.segments = 48;/);
+  assert.match(refreshSlotPortraitSource, /view\.unitNode\?\.addChild\(portraitNode\);/);
   assert.match(createButtonSource, /labelNode\.setPosition\(0, 0, 0\);/);
+  assert.match(
+    gridPlacementSource,
+    /public constructor\(\s*backingParent: Node,\s*unitParent: Node,\s*private readonly model: BattleMvpModel,/s,
+  );
+  assert.match(gridPlacementSource, /new Node\('GridPlacementBacking'\)/);
+  assert.match(gridPlacementSource, /new Node\('GridPlacementUnits'\)/);
 });
 
 runTest('formation animation keeps ring centers fixed', () => {
@@ -341,12 +329,9 @@ runTest('formation animation keeps ring centers fixed', () => {
     'public recruitFromUpgrade(',
   );
 
-  assert.match(
-    updateAnimationsSource,
-    /view\.node\.setPosition\(view\.baseX \?\? view\.node\.position\.x, view\.baseY \?\? view\.node\.position\.y, 0\);/,
-  );
-  assert.match(updateAnimationsSource, /view\.node\.setScale\(1, 1, 1\);/);
-  assert.match(updateAnimationsSource, /view\.node\.angle = 0;/);
+  assert.match(updateAnimationsSource, /view\.unitNode\?\.setPosition\(/);
+  assert.match(updateAnimationsSource, /view\.unitNode\?\.setScale\(1, 1, 1\);/);
+  assert.match(updateAnimationsSource, /view\.unitNode\.angle = 0;/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.setScale\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.angle = pose\.rotation \* 0\.35;/);
@@ -364,8 +349,9 @@ runTest('formation animation keeps ring centers fixed', () => {
     ),
     false,
   );
-  assert.equal(/view\.node\.setScale\(focusScale \*/.test(updateAnimationsSource), false);
-  assert.equal(/view\.node\.angle = pose\.rotation/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.setPosition/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.setScale/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.angle/.test(updateAnimationsSource), false);
 });
 
 runTest('city health bar is fixed, immediate, and independently readable', () => {
