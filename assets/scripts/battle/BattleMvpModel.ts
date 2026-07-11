@@ -4,6 +4,7 @@ import {
   EnemyKind,
   HERO_CONFIGS,
   HeroConfig,
+  HeroRole,
   UPGRADE_CARD_CONFIGS,
   UpgradeCardConfig,
   UpgradeCardId,
@@ -11,7 +12,7 @@ import {
 import { FixedCompanionConfig, THUNDER_MAGE_COMPANION } from '../data/CompanionConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 
-export type { BuildSchool, EnemyKind, UpgradeCardId } from '../data/BattleConfig';
+export type { BuildSchool, EnemyKind, HeroRole, UpgradeCardId } from '../data/BattleConfig';
 
 export interface BattlePoint {
   x: number;
@@ -66,6 +67,13 @@ export interface AttackEvent {
   source: 'main' | 'companion' | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
   enemyPosition: BattlePoint;
   critical?: boolean;
+  originPosition?: BattlePoint;
+  heroId?: number;
+  heroName?: string;
+  heroRole?: HeroRole;
+  impactKind: 'primary' | 'splash' | 'status';
+  targetKind: EnemyKind;
+  killed: boolean;
 }
 
 export interface BattleTickResult {
@@ -122,6 +130,11 @@ type WavePhase = 'tutorial' | 'elite' | 'boss';
 interface DamageOptions {
   ignoreArmor?: boolean;
   critical?: boolean;
+  originPosition?: BattlePoint;
+  heroId?: number;
+  heroName?: string;
+  heroRole?: HeroRole;
+  impactKind?: AttackEvent['impactKind'];
 }
 
 interface SpawnEnemyParams {
@@ -579,7 +592,10 @@ export class BattleMvpModel {
           this.build.fire.burnDamagePerSecond *
           this.build.fire.burnDamageMultiplier *
           deltaSeconds;
-        this.damageEnemy(enemy, damage, 'burn', result, { ignoreArmor: true });
+        this.damageEnemy(enemy, damage, 'burn', result, {
+          ignoreArmor: true,
+          impactKind: 'status',
+        });
         enemy.burnTimeLeft = Math.max(0, enemy.burnTimeLeft - deltaSeconds);
 
         if (enemy.burnTimeLeft <= 0) {
@@ -593,7 +609,10 @@ export class BattleMvpModel {
 
       if (enemy.poisonStacks > 0 && enemy.poisonTimeLeft > 0) {
         const damage = enemy.poisonStacks * 1.8 * deltaSeconds;
-        this.damageEnemy(enemy, damage, 'poison', result, { ignoreArmor: true });
+        this.damageEnemy(enemy, damage, 'poison', result, {
+          ignoreArmor: true,
+          impactKind: 'status',
+        });
         enemy.poisonTimeLeft = Math.max(0, enemy.poisonTimeLeft - deltaSeconds);
 
         if (enemy.poisonTimeLeft <= 0) {
@@ -685,7 +704,11 @@ export class BattleMvpModel {
     const damage = critical
       ? this.mainAttackDamage * this.build.thunder.critMultiplier
       : this.mainAttackDamage;
-    this.damageEnemy(target, damage, 'main', result, { critical });
+    this.damageEnemy(target, damage, 'main', result, {
+      critical,
+      originPosition: this.playerPosition,
+      impactKind: 'primary',
+    });
     this.applyFireOnHit(target);
     this.applyThunderChain(target, damage, result);
     this.attackTimer += this.mainAttackInterval;
@@ -705,7 +728,11 @@ export class BattleMvpModel {
       return;
     }
 
-    this.damageEnemy(target, this.options.companionAttackDamage, 'companion', result);
+    this.damageEnemy(target, this.options.companionAttackDamage, 'companion', result, {
+      originPosition: THUNDER_MAGE_COMPANION.position,
+      heroName: THUNDER_MAGE_COMPANION.name,
+      impactKind: 'primary',
+    });
     this.companionAttackTimer += this.getCompanionAttackInterval();
   }
 
@@ -728,7 +755,15 @@ export class BattleMvpModel {
       }
 
       const damage = this.getHeroDps(hero) * auraMultiplier * deltaSeconds;
-      this.damageEnemy(target, damage, 'hero_dps', result);
+      const originPosition = this.slots.find((slot) => slot.index === hero.slotIndex)?.position;
+      const presentation: DamageOptions = {
+        originPosition,
+        heroId: hero.id,
+        heroName: hero.name,
+        heroRole: config.role,
+        impactKind: 'primary',
+      };
+      this.damageEnemy(target, damage, 'hero_dps', result, presentation);
 
       if (config.role === 'area') {
         const splashTargets = this.findNearestEnemies(
@@ -738,7 +773,10 @@ export class BattleMvpModel {
           config.radius ?? 100,
         );
         splashTargets.forEach((enemy) =>
-          this.damageEnemy(enemy, damage * 0.45, 'hero_dps', result),
+          this.damageEnemy(enemy, damage * 0.45, 'hero_dps', result, {
+            ...presentation,
+            impactKind: 'splash',
+          }),
         );
       } else if (config.role === 'slow' || config.role === 'guard') {
         this.applySlow(target, config.slowMultiplier ?? 0.65, config.slowDuration ?? 1);
@@ -766,21 +804,29 @@ export class BattleMvpModel {
       ? vulnerableDamage
       : Math.max(0.25, vulnerableDamage - enemy.armor);
     enemy.hp = Math.max(0, enemy.hp - finalDamage);
-    result.attackEvents.push({
-      enemyId: enemy.id,
-      damage: finalDamage,
-      source,
-      enemyPosition: { ...enemy.position },
-      critical: options.critical,
-    });
-
-    if (enemy.hp <= 0) {
+    const killed = enemy.hp <= 0;
+    if (killed) {
       enemy.alive = false;
 
       if (!result.killedEnemyIds.includes(enemy.id)) {
         result.killedEnemyIds.push(enemy.id);
       }
     }
+    result.attackEvents.push({
+      enemyId: enemy.id,
+      damage: finalDamage,
+      source,
+      enemyPosition: { ...enemy.position },
+      critical: options.critical,
+      originPosition: options.originPosition ? { ...options.originPosition } : undefined,
+      heroId: options.heroId,
+      heroName: options.heroName,
+      heroRole: options.heroRole,
+      impactKind:
+        options.impactKind ?? (source === 'burn' || source === 'poison' ? 'status' : 'primary'),
+      targetKind: enemy.kind,
+      killed,
+    });
   }
 
   private damageCity(damage: number, result: BattleTickResult): void {
@@ -838,6 +884,10 @@ export class BattleMvpModel {
         damage * this.build.thunder.chainDamageMultiplier,
         'thunder_chain',
         result,
+        {
+          originPosition: primary.position,
+          impactKind: 'splash',
+        },
       );
     });
   }

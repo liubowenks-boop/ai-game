@@ -628,3 +628,52 @@ runTest('default prototype coordinates fit the Cocos 720x1280 portrait preview v
     assert.ok(slot.position.y <= halfHeight);
   }
 });
+
+runTest('attack events expose stable presentation metadata for every attacker', () => {
+  const mainModel = new BattleMvpModel({
+    waveInterval: 99,
+    heroBaseDps: 0,
+    companionAttackDamage: 0,
+    random: () => 1,
+  });
+  mainModel.startBattle();
+  const mainTarget = mainModel.spawnEnemy({ x: 36, y: -150, hp: 5, speed: 0 });
+  const mainEvent = mainModel.tick(0.01).attackEvents[0];
+  assert.deepEqual(mainEvent.originPosition, mainModel.playerPosition);
+  assert.equal(mainEvent.impactKind, 'primary');
+  assert.equal(mainEvent.targetKind, mainTarget.kind);
+  assert.equal(mainEvent.killed, true);
+
+  const companionModel = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+  });
+  companionModel.startBattle();
+  companionModel.spawnEnemy({ hp: 100, speed: 0 });
+  const companionEvent = companionModel.tick(0.01).attackEvents[0];
+  assert.equal(companionEvent.heroName, '雷法师');
+  assert.deepEqual(companionEvent.originPosition, companionModel.getFixedCompanion().position);
+  assert.equal(companionEvent.impactKind, 'primary');
+
+  const heroModel = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    companionAttackDamage: 0,
+    heroBaseDps: 20,
+  });
+  const hero = heroModel.placeHero(0, '火药师');
+  assert.ok(hero);
+  heroModel.startBattle();
+  heroModel.spawnEnemy({ x: -15, y: -180, hp: 100, speed: 0 });
+  heroModel.spawnEnemy({ x: 5, y: -175, hp: 100, speed: 0 });
+  const heroEvents = heroModel.tick(0.1).attackEvents.filter((event) => event.source === 'hero_dps');
+  const primary = heroEvents.find((event) => event.impactKind === 'primary');
+  const splash = heroEvents.find((event) => event.impactKind === 'splash');
+  assert.equal(primary?.heroId, hero?.id);
+  assert.equal(primary?.heroName, '火药师');
+  assert.equal(primary?.heroRole, 'area');
+  assert.deepEqual(primary?.originPosition, heroModel.slots[0].position);
+  assert.equal(splash?.heroId, hero?.id);
+  assert.equal(splash?.impactKind, 'splash');
+});
