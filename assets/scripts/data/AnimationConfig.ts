@@ -1,4 +1,5 @@
 import type { EnemyKind } from './BattleConfig';
+import { THUNDER_MAGE_COMPANION } from './CompanionConfig';
 
 export type UnitAnimationState =
   | 'idle'
@@ -48,6 +49,34 @@ export const PLAYER_ATTACK_ANIMATION_MAX_DURATION = 1.4;
 export const PLAYER_ATTACK_SPINE_DURATION = PLAYER_ATTACK_ANIMATION_BASE_DURATION;
 export const PLAYER_ATTACK_SPINE_SPEED =
   PLAYER_ATTACK_SPINE_SOURCE_DURATION / PLAYER_ATTACK_ANIMATION_BASE_DURATION;
+
+export const THUNDER_MAGE_SPINE_SOURCE_DURATION = 1;
+export const THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION = 0.6;
+export const THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION = 0.25;
+export const THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION = 1.2;
+
+export interface ThunderMageAttackAnimationTiming {
+  animationDuration: number;
+  spinePlaybackSpeed: number;
+}
+
+export function resolveThunderMageAttackAnimationTiming(
+  currentInterval: number,
+): ThunderMageAttackAnimationTiming {
+  const safeInterval =
+    Number.isFinite(currentInterval) && currentInterval > 0
+      ? currentInterval
+      : THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION;
+  const animationDuration = Math.min(
+    THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION,
+    Math.max(THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION, safeInterval),
+  );
+
+  return {
+    animationDuration,
+    spinePlaybackSpeed: THUNDER_MAGE_SPINE_SOURCE_DURATION / animationDuration,
+  };
+}
 
 export interface PlayerAttackAnimationTiming {
   attackSpeedMultiplier: number;
@@ -193,6 +222,25 @@ function playerProfile(): UnitAnimationProfile {
 }
 
 export const PLAYER_ANIMATION_PROFILE: UnitAnimationProfile = playerProfile();
+
+export const THUNDER_MAGE_ANIMATION_PROFILE: UnitAnimationProfile = {
+  id: 'hero_thunder_mage',
+  displayName: '雷法师',
+  subject: 'hero',
+  renderer: 'spine',
+  spineAssetBase: THUNDER_MAGE_COMPANION.spineAssetBase,
+  clips: [
+    clip('idle', THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, true, 'attack', {
+      renderer: 'spine',
+      spineAssetBase: THUNDER_MAGE_COMPANION.spineAssetBase,
+    }),
+    clip('attack', THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, false, 'attack', {
+      renderer: 'spine',
+      spineAssetBase: THUNDER_MAGE_COMPANION.spineAssetBase,
+      speed: THUNDER_MAGE_SPINE_SOURCE_DURATION / THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION,
+    }),
+  ],
+};
 
 export const HERO_ANIMATION_PROFILES: Record<string, UnitAnimationProfile> = {
   弓手: heroProfile('hero_archer', '弓手'),

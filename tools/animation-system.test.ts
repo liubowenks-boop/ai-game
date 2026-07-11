@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import * as AnimationConfig from '../assets/scripts/data/AnimationConfig';
+import { THUNDER_MAGE_COMPANION } from '../assets/scripts/data/CompanionConfig';
 import {
+  computeProceduralAnimationPose,
+  createUnitAnimationRuntime,
+  isUnitAnimationComplete,
+  requestUnitAnimation,
+  resolveEnemyAnimationState,
+  tickUnitAnimation,
+} from '../assets/scripts/battle/UnitAnimationSystem';
+
+const {
   ENEMY_ANIMATION_PROFILES,
   HERO_ANIMATION_PROFILES,
   PLAYER_ATTACK_ANIMATION_BASE_DURATION,
@@ -11,18 +22,15 @@ import {
   REQUIRED_ENEMY_ANIMATION_STATES,
   REQUIRED_HERO_ANIMATION_STATES,
   SPINE_ASSET_REQUIREMENTS,
+  THUNDER_MAGE_ANIMATION_PROFILE,
+  THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION,
+  THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION,
+  THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION,
+  resolveThunderMageAttackAnimationTiming,
   getEnemyAnimationProfile,
   getHeroAnimationProfile,
   resolvePlayerAttackAnimationTiming,
-} from '../assets/scripts/data/AnimationConfig';
-import {
-  computeProceduralAnimationPose,
-  createUnitAnimationRuntime,
-  isUnitAnimationComplete,
-  requestUnitAnimation,
-  resolveEnemyAnimationState,
-  tickUnitAnimation,
-} from '../assets/scripts/battle/UnitAnimationSystem';
+} = AnimationConfig;
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
@@ -48,6 +56,55 @@ runTest('animation profiles cover required hero and enemy states', () => {
   assert.equal(getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_attack'), true);
   assert.equal(getHeroAnimationProfile('弓手').id, 'hero_archer');
   assert.equal(PLAYER_ANIMATION_PROFILE.clips.some((clip) => clip.state === 'attack'), true);
+});
+
+runTest('thunder mage attack timing clamps to the configured source duration', () => {
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, 0.6);
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION, 0.25);
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION, 1.2);
+
+  const base = resolveThunderMageAttackAnimationTiming(0.6);
+  const fast = resolveThunderMageAttackAnimationTiming(0.3);
+  const clampLow = resolveThunderMageAttackAnimationTiming(0.01);
+  const clampHigh = resolveThunderMageAttackAnimationTiming(10);
+  const fallbackZero = resolveThunderMageAttackAnimationTiming(0);
+  const fallbackNegative = resolveThunderMageAttackAnimationTiming(-1);
+  const fallbackNaN = resolveThunderMageAttackAnimationTiming(Number.NaN);
+  const fallbackInfinity = resolveThunderMageAttackAnimationTiming(Number.POSITIVE_INFINITY);
+
+  assert.equal(base.animationDuration, 0.6);
+  assert.equal(base.spinePlaybackSpeed, 1 / 0.6);
+  assert.equal(fast.animationDuration, 0.3);
+  assert.equal(fast.spinePlaybackSpeed, 1 / 0.3);
+  assert.equal(clampLow.animationDuration, 0.25);
+  assert.equal(clampLow.spinePlaybackSpeed, 1 / 0.25);
+  assert.equal(clampHigh.animationDuration, 1.2);
+  assert.equal(clampHigh.spinePlaybackSpeed, 1 / 1.2);
+  assert.equal(fallbackZero.animationDuration, 0.6);
+  assert.equal(fallbackNegative.animationDuration, 0.6);
+  assert.equal(fallbackNaN.animationDuration, 0.6);
+  assert.equal(fallbackInfinity.animationDuration, 0.6);
+});
+
+runTest('thunder mage profile uses the portable attack Spine asset', () => {
+  const idleClip = THUNDER_MAGE_ANIMATION_PROFILE.clips.find((clip) => clip.state === 'idle');
+  const attackClip = THUNDER_MAGE_ANIMATION_PROFILE.clips.find((clip) => clip.state === 'attack');
+
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.id, 'hero_thunder_mage');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.displayName, '雷法师');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.subject, 'hero');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.renderer, 'spine');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
+  assert.equal(Object.prototype.hasOwnProperty.call(HERO_ANIMATION_PROFILES, '雷法师'), false);
+  assert.ok(idleClip, 'thunder mage should define an idle clip');
+  assert.ok(attackClip, 'thunder mage should define an attack clip');
+  assert.equal(idleClip?.clipName, 'attack');
+  assert.equal(idleClip?.renderer, 'spine');
+  assert.equal(attackClip?.clipName, 'attack');
+  assert.equal(attackClip?.loop, false);
+  assert.equal(attackClip?.duration, 0.6);
+  assert.equal(attackClip?.renderer, 'spine');
+  assert.equal(attackClip?.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
 });
 
 runTest('main hero attack uses imported Spine animation asset', () => {
