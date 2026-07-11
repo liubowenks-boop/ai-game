@@ -98,8 +98,12 @@ runTest('thunder mage profile uses the portable attack Spine asset', () => {
   assert.equal(Object.prototype.hasOwnProperty.call(HERO_ANIMATION_PROFILES, '雷法师'), false);
   assert.ok(idleClip, 'thunder mage should define an idle clip');
   assert.ok(attackClip, 'thunder mage should define an attack clip');
+  assert.equal(idleClip?.duration, 1);
+  assert.equal(idleClip?.loop, true);
   assert.equal(idleClip?.clipName, 'attack');
   assert.equal(idleClip?.renderer, 'spine');
+  assert.equal(idleClip?.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
+  assert.equal(idleClip?.speed, 0);
   assert.equal(attackClip?.clipName, 'attack');
   assert.equal(attackClip?.loop, false);
   assert.equal(attackClip?.duration, 0.6);

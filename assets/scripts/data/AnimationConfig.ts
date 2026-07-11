@@ -230,9 +230,10 @@ export const THUNDER_MAGE_ANIMATION_PROFILE: UnitAnimationProfile = {
   renderer: 'spine',
   spineAssetBase: THUNDER_MAGE_COMPANION.spineAssetBase,
   clips: [
-    clip('idle', THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, true, 'attack', {
+    clip('idle', THUNDER_MAGE_SPINE_SOURCE_DURATION, true, 'attack', {
       renderer: 'spine',
       spineAssetBase: THUNDER_MAGE_COMPANION.spineAssetBase,
+      speed: 0,
     }),
     clip('attack', THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, false, 'attack', {
       renderer: 'spine',
