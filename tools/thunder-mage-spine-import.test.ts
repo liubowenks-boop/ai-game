@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { inflateSync } from 'node:zlib';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 const root = process.cwd();
 const assetDir = join(root, 'assets/resources/spine/hero_thunder_mage');
@@ -46,6 +46,7 @@ type PngRgbaImage = {
   width: number;
   height: number;
   rgba: Buffer;
+  rgbaAt(x: number, y: number): readonly [number, number, number, number];
   alphaAt(x: number, y: number): number;
 };
 
@@ -212,6 +213,11 @@ function readPngRgba(path: string): PngRgbaImage {
     width,
     height,
     rgba: pixels,
+    rgbaAt(x: number, y: number): readonly [number, number, number, number] {
+      assert.ok(x >= 0 && x < width && y >= 0 && y < height, `pixel out of bounds: ${x},${y}`);
+      const offset = (y * width + x) * bytesPerPixel;
+      return [pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]];
+    },
     alphaAt(x: number, y: number): number {
       assert.ok(x >= 0 && x < width && y >= 0 && y < height, `pixel out of bounds: ${x},${y}`);
       return pixels[(y * width + x) * bytesPerPixel + 3];
@@ -232,6 +238,110 @@ function crc32(bytes: Buffer): number {
   let crc = 0xffffffff;
   for (const byte of bytes) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBytes = Buffer.from(type, 'ascii');
+  const chunk = Buffer.alloc(data.length + 12);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBytes.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), data.length + 8);
+  return chunk;
+}
+
+function encodeRgbaPng(width: number, height: number, rgba: Buffer): Buffer {
+  const bytesPerPixel = 4;
+  const stride = width * bytesPerPixel;
+  assert.equal(rgba.length, width * height * bytesPerPixel);
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+
+  const scanlines = Buffer.alloc(height * (stride + 1));
+  for (let y = 0; y < height; y += 1) {
+    const targetOffset = y * (stride + 1);
+    scanlines[targetOffset] = 0;
+    rgba.copy(scanlines, targetOffset + 1, y * stride, (y + 1) * stride);
+  }
+
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(scanlines, { level: 9 })),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+function createFloodFillFixture(): {
+  width: number;
+  height: number;
+  rgba: Buffer;
+  atlas: string;
+} {
+  const regionSize = 9;
+  const regionCount = 8;
+  const width = regionSize * regionCount;
+  const height = regionSize;
+  const rgba = Buffer.alloc(width * height * 4);
+
+  function setPixel(x: number, y: number, red: number, green: number, blue: number): void {
+    const offset = (y * width + x) * 4;
+    rgba[offset] = red;
+    rgba[offset + 1] = green;
+    rgba[offset + 2] = blue;
+    rgba[offset + 3] = 255;
+  }
+
+  for (let regionIndex = 0; regionIndex < regionCount; regionIndex += 1) {
+    const regionX = regionIndex * regionSize;
+    for (let y = 0; y < regionSize; y += 1) {
+      for (let x = 0; x < regionSize; x += 1) {
+        const background = (x + y) % 2 === 0 ? 255 : 247;
+        setPixel(regionX + x, y, background, background, background);
+      }
+    }
+
+    setPixel(regionX + 1, 1, 60, 80, 120);
+    for (let y = 2; y <= 6; y += 1) {
+      for (let x = 2; x <= 6; x += 1) {
+        const isOutline = x === 2 || x === 6 || y === 2 || y === 6;
+        if (isOutline) setPixel(regionX + x, y, 20, 30, 40);
+        else setPixel(regionX + x, y, 255, 255, 255);
+      }
+    }
+  }
+
+  const atlasRegions = Array.from({ length: regionCount }, (_, index) => {
+    const x = index * regionSize;
+    return [
+      `frame_${index}`,
+      '  rotate: false',
+      `  xy: ${x}, 0`,
+      `  size: ${regionSize}, ${regionSize}`,
+      `  orig: ${regionSize}, ${regionSize}`,
+      '  offset: 0, 0',
+      '  index: -1',
+    ].join('\n');
+  }).join('\n');
+
+  return {
+    width,
+    height,
+    rgba,
+    atlas: [
+      'fixture.png',
+      `size: ${width},${height}`,
+      'format: RGBA8888',
+      'filter: Linear,Linear',
+      'repeat: none',
+      atlasRegions,
+      '',
+    ].join('\n'),
+  };
 }
 
 function runPrepare(args: string[]) {
@@ -420,12 +530,56 @@ try {
   assert.notEqual(oversizedResult.status, 0);
   assert.match(oversizedResult.stderr, /PNG dimensions exceed safety limit/);
 
-  const validResult = runPrepare([join(assetDir, `${assetName}.png`), atlasPath, outputPath]);
+  const fixture = createFloodFillFixture();
+  const fixtureSourcePath = join(tempDir, 'fixture-source.png');
+  const fixtureAtlasPath = join(tempDir, 'fixture.atlas');
+  writeFileSync(fixtureSourcePath, encodeRgbaPng(fixture.width, fixture.height, fixture.rgba));
+  writeFileSync(fixtureAtlasPath, fixture.atlas);
+
+  const validResult = runPrepare([fixtureSourcePath, fixtureAtlasPath, outputPath]);
   assert.equal(validResult.status, 0, validResult.stderr);
-  assert.equal(
-    createHash('sha256').update(readFileSync(outputPath)).digest('hex'),
-    'a72150d1aac31ac1653539110311e09519c8bb3e2500124cb8efa276efc35a18',
-  );
+  assert.match(validResult.stdout, /total: cleared 440 pixels/);
+
+  const processed = readPngRgba(outputPath);
+  assert.equal(processed.width, fixture.width);
+  assert.equal(processed.height, fixture.height);
+
+  let clearedPixels = 0;
+  for (let offset = 0; offset < fixture.rgba.length; offset += 4) {
+    assert.equal(processed.rgba[offset], fixture.rgba[offset], `red changed at byte ${offset}`);
+    assert.equal(
+      processed.rgba[offset + 1],
+      fixture.rgba[offset + 1],
+      `green changed at byte ${offset}`,
+    );
+    assert.equal(
+      processed.rgba[offset + 2],
+      fixture.rgba[offset + 2],
+      `blue changed at byte ${offset}`,
+    );
+    if (processed.rgba[offset + 3] !== fixture.rgba[offset + 3]) {
+      assert.equal(fixture.rgba[offset + 3], 255);
+      assert.equal(processed.rgba[offset + 3], 0);
+      clearedPixels += 1;
+    }
+  }
+  assert.equal(clearedPixels, 440);
+
+  for (let index = 0; index < 8; index += 1) {
+    const regionX = index * 9;
+    assert.deepEqual(processed.rgbaAt(regionX, 0), [255, 255, 255, 0]);
+    assert.deepEqual(processed.rgbaAt(regionX + 1, 0), [247, 247, 247, 0]);
+    assert.deepEqual(processed.rgbaAt(regionX + 4, 4), [255, 255, 255, 255]);
+    assert.deepEqual(processed.rgbaAt(regionX + 1, 1), [60, 80, 120, 255]);
+    assert.deepEqual(processed.rgbaAt(regionX + 2, 2), [20, 30, 40, 255]);
+  }
+
+  const firstHash = createHash('sha256').update(readFileSync(outputPath)).digest('hex');
+  const repeatedResult = runPrepare([fixtureSourcePath, fixtureAtlasPath, outputPath]);
+  assert.equal(repeatedResult.status, 0, repeatedResult.stderr);
+  assert.match(repeatedResult.stdout, /total: cleared 440 pixels; output unchanged/);
+  const repeatedHash = createHash('sha256').update(readFileSync(outputPath)).digest('hex');
+  assert.equal(repeatedHash, firstHash);
 } finally {
   rmSync(tempDir, { recursive: true, force: true });
 }
