@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 
 import {
   BATTLE_VFX_BUDGET,
@@ -10,10 +13,93 @@ import {
   resolveAttackVfxPreset,
   resolveHeroVfxPreset,
 } from '../assets/scripts/battle/BattleVfxLogic';
+import { UiArtAssets } from '../assets/scripts/ui/UiArtManifest';
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
   console.log(`pass: ${name}`);
+}
+
+function readPng(path: string): {
+  width: number;
+  height: number;
+  colorType: number;
+  alphaAt(x: number, y: number): number;
+  transparentRatio(): number;
+} {
+  const bytes = readFileSync(path);
+  assert.equal(bytes.toString('ascii', 1, 4), 'PNG');
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let colorType = 0;
+  let bitDepth = 0;
+  const idat: Buffer[] = [];
+  while (offset < bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.toString('ascii', offset + 4, offset + 8);
+    const data = bytes.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data.readUInt8(8);
+      colorType = data.readUInt8(9);
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset += length + 12;
+  }
+  assert.equal(bitDepth, 8);
+  assert.equal(colorType, 6);
+  const bpp = 4;
+  const stride = width * bpp;
+  const inflated = inflateSync(Buffer.concat(idat));
+  const pixels = Buffer.alloc(width * height * bpp);
+  let sourceOffset = 0;
+  const paeth = (left: number, up: number, upLeft: number): number => {
+    const prediction = left + up - upLeft;
+    const leftDistance = Math.abs(prediction - left);
+    const upDistance = Math.abs(prediction - up);
+    const upLeftDistance = Math.abs(prediction - upLeft);
+    if (leftDistance <= upDistance && leftDistance <= upLeftDistance) return left;
+    return upDistance <= upLeftDistance ? up : upLeft;
+  };
+  for (let y = 0; y < height; y += 1) {
+    const filter = inflated[sourceOffset];
+    sourceOffset += 1;
+    for (let index = 0; index < stride; index += 1) {
+      const rowStart = y * stride;
+      const raw = inflated[sourceOffset + index];
+      const left = index >= bpp ? pixels[rowStart + index - bpp] : 0;
+      const up = y > 0 ? pixels[rowStart - stride + index] : 0;
+      const upLeft = y > 0 && index >= bpp ? pixels[rowStart - stride + index - bpp] : 0;
+      let value = raw;
+      if (filter === 1) value += left;
+      else if (filter === 2) value += up;
+      else if (filter === 3) value += Math.floor((left + up) / 2);
+      else if (filter === 4) value += paeth(left, up, upLeft);
+      else assert.equal(filter, 0);
+      pixels[rowStart + index] = value & 0xff;
+    }
+    sourceOffset += stride;
+  }
+  return {
+    width,
+    height,
+    colorType,
+    alphaAt(x: number, y: number): number {
+      return pixels[(y * width + x) * bpp + 3];
+    },
+    transparentRatio(): number {
+      let transparent = 0;
+      for (let index = 3; index < pixels.length; index += bpp) {
+        if (pixels[index] < 16) transparent += 1;
+      }
+      return transparent / (width * height);
+    },
+  };
 }
 
 runTest('vfx presets map every battle role to a distinct readable element', () => {
@@ -80,3 +166,47 @@ runTest('critical reservations evict only the oldest decorative effect', () => {
   });
 });
 
+runTest('authored v2 textures keep alpha, metadata and manifest entries', () => {
+  const directory = join(process.cwd(), 'assets', 'bundles', 'ui', 'battle_fx_common');
+  const expected = new Map<string, readonly [number, number]>([
+    ['fx_v2_gold_projectile.png', [512, 128]],
+    ['fx_v2_fire_slash.png', [512, 256]],
+    ['fx_v2_thunder_bolt.png', [512, 128]],
+    ['fx_v2_ice_shard.png', [256, 128]],
+    ['fx_v2_poison_wisp.png', [256, 256]],
+    ['fx_v2_heal_orb.png', [256, 256]],
+    ['fx_v2_shield_impact.png', [256, 256]],
+    ['fx_v2_hit_star.png', [256, 256]],
+    ['fx_v2_smoke_debris.png', [256, 256]],
+    ['fx_v2_rune_marker.png', [256, 128]],
+  ]);
+
+  for (const [filename, size] of expected) {
+    const imagePath = join(directory, filename);
+    assert.ok(existsSync(imagePath), `missing ${filename}`);
+    assert.ok(existsSync(`${imagePath}.meta`), `missing ${filename}.meta`);
+    const png = readPng(imagePath);
+    assert.deepEqual([png.width, png.height], size);
+    assert.equal(png.colorType, 6);
+    assert.ok(png.transparentRatio() > 0.35, `${filename} needs transparent padding`);
+    const corners = [
+      png.alphaAt(0, 0),
+      png.alphaAt(png.width - 1, 0),
+      png.alphaAt(0, png.height - 1),
+      png.alphaAt(png.width - 1, png.height - 1),
+    ];
+    assert.ok(corners.filter((alpha) => alpha < 16).length >= 3);
+
+    const manifest = UiArtAssets[filename];
+    assert.ok(manifest, `missing manifest entry for ${filename}`);
+    assert.equal(manifest.atlas, 'battle_fx_common');
+    assert.equal(manifest.path, `battle_fx_common/${filename.replace('.png', '')}`);
+    assert.deepEqual([manifest.width, manifest.height], size);
+    assert.ok(manifest.uuid);
+    assert.ok(manifest.textureUuid);
+  }
+
+  const generatorSource = readFileSync('tools/generate_ui_art_assets.py', 'utf8');
+  assert.ok(generatorSource.includes('spec.filename.startswith("fx_v2_")'));
+  assert.ok(generatorSource.includes('missing authored VFX texture'));
+});

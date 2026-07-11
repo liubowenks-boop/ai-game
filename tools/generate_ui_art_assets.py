@@ -681,10 +681,15 @@ def main() -> None:
     for spec in specs:
         target_dir = RUNTIME_ROOT / spec.atlas
         target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / spec.filename
+        if spec.filename.startswith("fx_v2_"):
+            if not target_path.exists():
+                raise FileNotFoundError(f"missing authored VFX texture: {target_path}")
+            continue
         img = draw_asset(spec)
         if img.size != (spec.width, spec.height):
             img = img.resize((spec.width, spec.height), Image.Resampling.LANCZOS)
-        img.save(target_dir / spec.filename, optimize=True)
+        img.save(target_path, optimize=True)
 
     manifest = []
     for spec in specs:
