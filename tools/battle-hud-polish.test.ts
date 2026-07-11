@@ -96,6 +96,11 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;
   const highlightedPlayerScale = 1 + 0.065;
+  const heroBarStrokeWidth = 3;
+  const heroBarStrokeOuterTop =
+    BattleUiV4Layout.heroBar.y +
+    BattleUiV4Layout.heroBar.height / 2 +
+    heroBarStrokeWidth / 2;
   let dynamicAuraBottom = Number.POSITIVE_INFINITY;
 
   for (const state of animationStates) {
@@ -112,14 +117,16 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
   for (const infoRow of [BattleUiV4Layout.placementTitle, BattleUiV4Layout.placementPending]) {
     const infoTop = infoRow.y + infoRow.height / 2;
     const infoBottom = infoRow.y - infoRow.height / 2;
-    const heroBarTop = BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2;
 
-    assert.ok(infoTop <= dynamicAuraBottom, 'dynamic main-hero aura overlaps formation info');
-    assert.ok(infoBottom > heroBarTop, 'formation info should keep a gap above the hero bar');
+    assert.ok(infoTop < dynamicAuraBottom, 'dynamic main-hero aura needs a positive info gap');
+    assert.ok(
+      infoBottom > heroBarStrokeOuterTop,
+      'formation info needs a positive gap above the hero-bar stroke',
+    );
   }
 
-  assert.equal(BattleUiV4Layout.placementTitle.y, -491);
-  assert.equal(BattleUiV4Layout.placementPending.y, -491);
+  assert.equal(BattleUiV4Layout.placementTitle.y, -489);
+  assert.equal(BattleUiV4Layout.placementPending.y, -489);
   assert.equal(BattleUiV4Layout.heroBar.y, -552);
 });
 
