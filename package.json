@@ -11,6 +11,7 @@
     "test:hud-polish": "tsx tools/battle-hud-polish.test.ts",
     "test:scene": "tsx tools/scene-structure.test.ts",
     "test:animation": "tsx tools/animation-system.test.ts",
+    "test:vfx": "tsx tools/vfx-system.test.ts",
     "preview:portrait": "node tools/set-cocos-preview-portrait.mjs",
     "format": "prettier --write .",
     "lint": "echo \"lint not configured yet\""
