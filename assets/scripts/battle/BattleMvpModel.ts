@@ -222,7 +222,12 @@ export class BattleMvpModel {
   public tick(deltaSeconds: number): BattleTickResult {
     const result = this.createEmptyTickResult();
 
-    if (!this.running || this.gameOver || deltaSeconds <= 0) {
+    if (
+      !this.running ||
+      this.gameOver ||
+      !Number.isFinite(deltaSeconds) ||
+      deltaSeconds <= 0
+    ) {
       return result;
     }
 
@@ -425,10 +430,15 @@ export class BattleMvpModel {
   }
 
   public getCompanionAttackInterval(): number {
+    const configuredInterval = this.options.companionAttackInterval;
+    const baseInterval =
+      Number.isFinite(configuredInterval) && configuredInterval > 0
+        ? configuredInterval
+        : THUNDER_MAGE_COMPANION.attackInterval;
     const auraMultiplier = this.getHeroAuraMultiplier();
     const safeAuraMultiplier =
       Number.isFinite(auraMultiplier) && auraMultiplier > 0 ? auraMultiplier : 1;
-    return this.options.companionAttackInterval / safeAuraMultiplier;
+    return baseInterval / safeAuraMultiplier;
   }
 
   public getEnemyConfigs(): EnemyConfig[] {
@@ -675,7 +685,7 @@ export class BattleMvpModel {
   }
 
   private tickCompanionAttack(deltaSeconds: number, result: BattleTickResult): void {
-    this.companionAttackTimer = Math.max(0, this.companionAttackTimer - deltaSeconds);
+    this.companionAttackTimer -= deltaSeconds;
 
     if (this.companionAttackTimer > 0.0001 || this.options.companionAttackDamage <= 0) {
       return;
@@ -684,11 +694,12 @@ export class BattleMvpModel {
     const target = this.findEnemyClosestToCityWall();
 
     if (!target) {
+      this.companionAttackTimer = 0;
       return;
     }
 
     this.damageEnemy(target, this.options.companionAttackDamage, 'companion', result);
-    this.companionAttackTimer = this.getCompanionAttackInterval();
+    this.companionAttackTimer += this.getCompanionAttackInterval();
   }
 
   private tickHeroDps(deltaSeconds: number, result: BattleTickResult): void {

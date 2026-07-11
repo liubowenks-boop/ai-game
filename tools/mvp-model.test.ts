@@ -141,6 +141,65 @@ runTest('thunder mage attacks independently and resets its timer on restart', ()
   assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
 });
 
+runTest('battle tick ignores non-finite and non-positive deltas without polluting state', () => {
+  const invalidDeltas = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0, -0.1];
+
+  for (const deltaSeconds of invalidDeltas) {
+    const model = new BattleMvpModel({
+      waveInterval: 99,
+      mainAttackDamage: 0,
+      heroBaseDps: 0,
+    });
+
+    model.startBattle();
+    const target = model.spawnEnemy({ x: 10, y: 100, hp: 100, speed: 10 });
+    const positionBeforeTick = { ...target.position };
+    const invalidTick = model.tick(deltaSeconds);
+
+    assert.equal(invalidTick.attackEvents.length, 0);
+    assert.deepEqual(target.position, positionBeforeTick);
+    assert.equal(target.hp, 100);
+    assert.equal(model.wave, 0);
+    assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
+  }
+});
+
+runTest('thunder mage does not attack after game over even when running remains true', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+  });
+
+  model.startBattle();
+  const target = model.spawnEnemy({ hp: 100, speed: 0 });
+  model.gameOver = true;
+  model.running = true;
+
+  assert.equal(model.tick(1).attackEvents.length, 0);
+  assert.equal(target.hp, 100);
+});
+
+runTest('thunder mage preserves large-frame overshoot without attacking twice in one tick', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackDamage: 7,
+    companionAttackInterval: 0.6,
+  });
+
+  model.startBattle();
+  const target = model.spawnEnemy({ hp: 100, speed: 0 });
+  const ticks = [model.tick(0.4), model.tick(0.4), model.tick(0.4)];
+
+  assert.deepEqual(
+    ticks.map((tick) => tick.attackEvents.filter((event) => event.source === 'companion').length),
+    [1, 1, 1],
+  );
+  assert.equal(target.hp, 79);
+});
+
 runTest('thunder mage stays ready while no living target exists', () => {
   const model = new BattleMvpModel({
     waveInterval: 99,
@@ -198,6 +257,38 @@ runTest('thunder mage interval falls back to one when drummer aura is invalid', 
   assert.ok(drummer);
   drummer.level = Number.POSITIVE_INFINITY;
   assert.equal(model.getCompanionAttackInterval(), 0.6);
+});
+
+runTest('thunder mage falls back to default base interval before applying valid aura', () => {
+  const invalidIntervals = [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.6];
+  const expectedInterval = 0.6 / 1.12;
+
+  for (const companionAttackInterval of invalidIntervals) {
+    const model = new BattleMvpModel({ companionAttackInterval });
+    model.placeHero(0, '鼓手');
+
+    assert.ok(Math.abs(model.getCompanionAttackInterval() - expectedInterval) < 0.000001);
+  }
+});
+
+runTest('thunder mage damage applies vulnerability before subtracting armor', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackDamage: 7,
+  });
+
+  model.startBattle();
+  const target = model.spawnEnemy({ hp: 100, speed: 0, armor: 2 });
+  target.vulnerableMultiplier = 1.5;
+  target.vulnerableTimeLeft = 10;
+
+  const tick = model.tick(0.01);
+
+  assert.equal(tick.attackEvents[0].source, 'companion');
+  assert.equal(tick.attackEvents[0].damage, 8.5);
+  assert.equal(target.hp, 91.5);
 });
 
 runTest('thunder mage attacks do not trigger main hero fire or thunder effects', () => {
