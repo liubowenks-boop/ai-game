@@ -12,6 +12,7 @@ import {
   FixedCompanionConfig,
   THUNDER_MAGE_COMPANION,
 } from '../data/CompanionConfig';
+import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 
 export type { BuildSchool, EnemyKind, UpgradeCardId } from '../data/BattleConfig';
 
@@ -54,7 +55,7 @@ export interface HeroState {
 export interface GridSlotState {
   index: number;
   label: string;
-  row: 'front' | 'back';
+  row: 'wall';
   position: BattlePoint;
   reservedBy?: 'fixed_companion';
   hero?: HeroState;
@@ -141,7 +142,7 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   cityMaxHealth: 100,
   enemyDamage: 0.5,
   enemyStartY: 470,
-  cityLineY: -210,
+  cityLineY: BATTLE_WALL_LAYOUT.cityLineY,
   enemyBaseHp: 20,
   enemyBaseSpeed: 34,
   enemyWallHoldSeconds: 3,
@@ -152,20 +153,19 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   companionAttackDamage: THUNDER_MAGE_COMPANION.attackDamage,
   companionAttackInterval: THUNDER_MAGE_COMPANION.attackInterval,
   heroBaseDps: 5,
-  playerPosition: { x: 0, y: -410 },
+  playerPosition: { ...BATTLE_WALL_LAYOUT.mainHero },
   random: Math.random,
 };
 
 const GRID_ADJACENCY: Record<number, number[]> = {
-  0: [1, 3],
-  1: [0, 2, 3, 4],
-  2: [1, 4],
-  3: [0, 1, 4],
-  4: [1, 2, 3],
+  0: [1],
+  1: [0, 2],
+  2: [1],
+  3: [],
 };
 
 const UPGRADE_OFFER_ROTATION: UpgradeCardId[][] = [
-  ['fire_burn_damage_30', 'thunder_chain_plus_1', 'summon_slots_plus_1'],
+  ['fire_burn_damage_30', 'thunder_chain_plus_1', 'summon_hero_damage_20'],
   ['fire_spread_plus_1', 'thunder_crit_plus_10', 'summon_hero_damage_20'],
 ];
 
@@ -331,18 +331,7 @@ export class BattleMvpModel {
   }
 
   public offerUpgradeCards(): UpgradeCardState[] {
-    const ids = UPGRADE_OFFER_ROTATION[
-      this.upgradeOfferCount % UPGRADE_OFFER_ROTATION.length
-    ].map((id) => {
-      if (
-        id === 'summon_slots_plus_1' &&
-        this.build.summon.maxBoardHeroes >= this.getOrdinarySlotCapacity()
-      ) {
-        return 'summon_hero_damage_20';
-      }
-
-      return id;
-    });
+    const ids = UPGRADE_OFFER_ROTATION[this.upgradeOfferCount % UPGRADE_OFFER_ROTATION.length];
     this.upgradeOfferCount += 1;
     this.pendingUpgradeCards = ids.map((id) => ({ ...this.getUpgradeConfig(id) }));
     return this.pendingUpgradeCards;
@@ -359,10 +348,7 @@ export class BattleMvpModel {
     } else if (cardId === 'thunder_crit_plus_10') {
       this.build.thunder.critChance = Math.min(0.85, this.build.thunder.critChance + 0.1);
     } else if (cardId === 'summon_slots_plus_1') {
-      this.build.summon.maxBoardHeroes = Math.min(
-        this.getOrdinarySlotCapacity(),
-        this.build.summon.maxBoardHeroes + 1,
-      );
+      return false;
     } else if (cardId === 'summon_hero_damage_20') {
       this.build.summon.heroDamageMultiplier *= 1.2;
     } else {
@@ -482,17 +468,31 @@ export class BattleMvpModel {
 
   private createInitialSlots(): GridSlotState[] {
     return [
-      { index: 0, label: '前1', row: 'front', position: { x: -210, y: -300 } },
-      { index: 1, label: '前2', row: 'front', position: { x: 0, y: -300 } },
-      { index: 2, label: '前3', row: 'front', position: { x: 210, y: -300 } },
+      {
+        index: 0,
+        label: '',
+        row: 'wall',
+        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[0] },
+      },
+      {
+        index: 1,
+        label: '',
+        row: 'wall',
+        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[1] },
+      },
+      {
+        index: 2,
+        label: '',
+        row: 'wall',
+        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[2] },
+      },
       {
         index: 3,
-        label: '后1',
-        row: 'back',
-        position: { x: -210, y: -410 },
+        label: '',
+        row: 'wall',
+        position: { ...BATTLE_WALL_LAYOUT.thunderMage },
         reservedBy: 'fixed_companion',
       },
-      { index: 4, label: '后2', row: 'back', position: { x: 210, y: -410 } },
     ];
   }
 

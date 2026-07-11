@@ -80,7 +80,7 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
   );
 });
 
-runTest('thunder mage permanently reserves back slot one outside the ordinary hero count', () => {
+runTest('thunder mage permanently reserves the far-left wall slot outside the ordinary hero count', () => {
   const model = new BattleMvpModel();
   const companion = model.getFixedCompanion();
 
@@ -89,14 +89,14 @@ runTest('thunder mage permanently reserves back slot one outside the ordinary he
     name: '雷法师',
     description: '雷电速攻支援',
     slotIndex: 3,
-    position: { x: -210, y: -410 },
+    position: { x: -240, y: -320 },
     attackDamage: 7,
     attackInterval: 0.6,
     displayScale: 0.22,
     spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
   });
   companion.position.x = 999;
-  assert.deepEqual(model.getFixedCompanion().position, { x: -210, y: -410 });
+  assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -320 });
 
   assert.equal(model.slots[3].reservedBy, 'fixed_companion');
   assert.equal(model.placeHero(3, '弓手'), undefined);
@@ -108,34 +108,58 @@ runTest('thunder mage permanently reserves back slot one outside the ordinary he
   assert.equal(model.getHeroes().length, 3);
 });
 
-runTest('fixed companion layout caps ordinary board heroes at four', () => {
+runTest('five-unit wall formation caps ordinary board heroes at three', () => {
   const model = new BattleMvpModel();
+
+  assert.deepEqual(model.slots.map((slot) => slot.index), [0, 1, 2, 3]);
+  assert.deepEqual(model.slots.slice(0, 3).map((slot) => slot.position), [
+    { x: -120, y: -320 },
+    { x: 120, y: -320 },
+    { x: 240, y: -320 },
+  ]);
+  assert.deepEqual(model.slots[3], {
+    index: 3,
+    label: '',
+    row: 'wall',
+    position: { x: -240, y: -320 },
+    reservedBy: 'fixed_companion',
+  });
+  assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
+  assert.equal(model.options.cityLineY, -290);
 
   assert.ok(model.placeHero(0, '弓手'));
   assert.ok(model.placeHero(1, '火药师'));
   assert.ok(model.placeHero(2, '冰法师'));
-
-  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), true);
-  assert.ok(model.placeHero(4, '毒师'));
-  assert.equal(model.getHeroes().length, 4);
-
-  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), true);
-  assert.equal(model.build.summon.maxBoardHeroes, 4);
+  assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.build.summon.maxBoardHeroes, 3);
+  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
   assert.equal(model.placeHero(3, '护卫'), undefined);
-  assert.equal(model.getHeroes().length, 4);
+  assert.equal(model.placeHero(4, '护卫'), undefined);
+  assert.equal(model.getHeroes().length, 3);
 });
 
-runTest('slot upgrade becomes summon damage after the four-hero cap', () => {
+runTest('upgrade rotation never offers the retired slot expansion card', () => {
   const model = new BattleMvpModel();
 
-  model.applyUpgradeCard('summon_slots_plus_1');
-  model.applyUpgradeCard('summon_slots_plus_1');
+  const firstOfferIds = model.offerUpgradeCards().map((card) => card.id);
+  const secondOfferIds = model.offerUpgradeCards().map((card) => card.id);
 
-  const offeredIds = model.offerUpgradeCards().map((card) => card.id);
+  assert.equal(firstOfferIds.includes('summon_slots_plus_1'), false);
+  assert.equal(secondOfferIds.includes('summon_slots_plus_1'), false);
+  assert.equal(firstOfferIds.includes('summon_hero_damage_20'), true);
+  assert.equal(secondOfferIds.includes('summon_hero_damage_20'), true);
+  assert.equal(new Set(firstOfferIds).size, 3);
+  assert.equal(new Set(secondOfferIds).size, 3);
+});
 
-  assert.equal(offeredIds.includes('summon_slots_plus_1'), false);
-  assert.equal(offeredIds.includes('summon_hero_damage_20'), true);
-  assert.equal(new Set(offeredIds).size, 3);
+runTest('ordinary wall slots use linear adjacency and exclude the companion slot', () => {
+  const model = new BattleMvpModel();
+
+  assert.deepEqual(model.getAdjacentSlotIndexes(0), [1]);
+  assert.deepEqual(model.getAdjacentSlotIndexes(1), [0, 2]);
+  assert.deepEqual(model.getAdjacentSlotIndexes(2), [1]);
+  assert.deepEqual(model.getAdjacentSlotIndexes(3), []);
+  assert.equal(model.getAdjacentSlotIndexes(0).includes(2), false);
 });
 
 runTest('thunder mage attacks independently and resets its timer on restart', () => {
@@ -405,9 +429,10 @@ runTest('upgrade cards are always tied to fire, thunder, or summon builds', () =
   assert.equal(model.build.thunder.chainTargets, chainTargets + 1);
 
   model.offerUpgradeCards();
-  const maxHeroes = model.build.summon.maxBoardHeroes;
-  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), true);
-  assert.equal(model.build.summon.maxBoardHeroes, maxHeroes + 1);
+  const heroDamageMultiplier = model.build.summon.heroDamageMultiplier;
+  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
+  assert.equal(model.applyUpgradeCard('summon_hero_damage_20'), true);
+  assert.equal(model.build.summon.heroDamageMultiplier, heroDamageMultiplier * 1.2);
 });
 
 runTest('fire build adds stackable burn and spread pressure', () => {
@@ -543,7 +568,7 @@ runTest('recruited adjacent same-name heroes merge up to level 4', () => {
 });
 
 runTest(
-  'summon build limits board growth then turns extra slots and hero attack into DPS gains',
+  'summon build keeps three ordinary slots and turns its card into DPS gains',
   () => {
     const model = new BattleMvpModel({
       heroBaseDps: 5,
@@ -556,10 +581,9 @@ runTest(
     assert.equal(model.getHeroes().length, 3);
     assert.equal(model.placeHero(3, '毒师'), undefined);
 
-    const dpsBeforeCard = model.getTotalHeroDps();
-    model.applyUpgradeCard('summon_slots_plus_1');
-    assert.notEqual(model.placeHero(4, '毒师'), undefined);
-    assert.ok(model.getTotalHeroDps() > dpsBeforeCard);
+    assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
+    assert.equal(model.placeHero(4, '毒师'), undefined);
+    assert.equal(model.getHeroes().length, 3);
 
     const dpsBeforeDamageCard = model.getTotalHeroDps();
     model.applyUpgradeCard('summon_hero_damage_20');
@@ -580,7 +604,7 @@ runTest('default prototype coordinates fit the Cocos 720x1280 portrait preview v
   assert.ok(model.options.enemyStartY <= halfHeight);
   assert.ok(model.options.cityLineY >= -halfHeight);
   assert.ok(model.playerPosition.y >= -halfHeight);
-  assert.equal(model.options.cityLineY, -210);
+  assert.equal(model.options.cityLineY, -290);
   assert.ok(model.options.cityLineY > model.slots[0].position.y);
 
   for (const slot of model.slots) {
