@@ -10,13 +10,15 @@ The Thunder Mage is a fixed companion rather than a recruited board hero or a co
 
 - It always occupies formation slot index `3` (`后1`) at `(-210, -410)`.
 - It does not count toward `maxBoardHeroes`.
+- The approved five-circle layout therefore caps ordinary board heroes at `4` while the fixed companion occupies `后1`.
 - It cannot be recruited, merged, replaced, or moved.
 - Ordinary heroes cannot be placed into the reserved `后1` slot.
 - The existing bottom portrait rail remains dedicated to recruited board heroes.
+- Once ordinary heroes reach the `4`-hero cap, future `summon_slots_plus_1` offers are replaced by `summon_hero_damage_20`.
 
 ## Character Configuration
 
-The companion configuration is separate from `HERO_CONFIGS` so existing recruit rotation and board capacity remain stable.
+The companion configuration is separate from `HERO_CONFIGS` so recruit rotation remains unchanged and the approved four-hero ordinary board cap stays explicit.
 
 | Field | Value |
 | --- | --- |
@@ -117,7 +119,7 @@ Automated tests cover:
 - required normalized files and Cocos metadata;
 - Spine version `3.8.x`, portable `attack` animation name, eight frame attachments, one-second timeline, atlas references, and transparent region corners;
 - fixed companion identity, position, damage, and base interval;
-- reservation of slot `3` without reducing recruit capacity;
+- reservation of slot `3` with the ordinary board-hero cap fixed at `4`;
 - attack suppression before battle, after game over, and without a target;
 - independent attack events, target selection, damage cadence, restart timer reset, and attack-speed aura behavior;
 - companion Spine profile, timing clamp, frame mapping, resource loading, and visual node scale;

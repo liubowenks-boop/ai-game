@@ -80,7 +80,7 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
   );
 });
 
-runTest('thunder mage permanently reserves back slot one without using recruit capacity', () => {
+runTest('thunder mage permanently reserves back slot one outside the ordinary hero count', () => {
   const model = new BattleMvpModel();
   const companion = model.getFixedCompanion();
 
@@ -106,6 +106,36 @@ runTest('thunder mage permanently reserves back slot one without using recruit c
   assert.ok(model.placeHero(1, '火药师'));
   assert.ok(model.placeHero(2, '冰法师'));
   assert.equal(model.getHeroes().length, 3);
+});
+
+runTest('fixed companion layout caps ordinary board heroes at four', () => {
+  const model = new BattleMvpModel();
+
+  assert.ok(model.placeHero(0, '弓手'));
+  assert.ok(model.placeHero(1, '火药师'));
+  assert.ok(model.placeHero(2, '冰法师'));
+
+  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), true);
+  assert.ok(model.placeHero(4, '毒师'));
+  assert.equal(model.getHeroes().length, 4);
+
+  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), true);
+  assert.equal(model.build.summon.maxBoardHeroes, 4);
+  assert.equal(model.placeHero(3, '护卫'), undefined);
+  assert.equal(model.getHeroes().length, 4);
+});
+
+runTest('slot upgrade becomes summon damage after the four-hero cap', () => {
+  const model = new BattleMvpModel();
+
+  model.applyUpgradeCard('summon_slots_plus_1');
+  model.applyUpgradeCard('summon_slots_plus_1');
+
+  const offeredIds = model.offerUpgradeCards().map((card) => card.id);
+
+  assert.equal(offeredIds.includes('summon_slots_plus_1'), false);
+  assert.equal(offeredIds.includes('summon_hero_damage_20'), true);
+  assert.equal(new Set(offeredIds).size, 3);
 });
 
 runTest('thunder mage attacks independently and resets its timer on restart', () => {

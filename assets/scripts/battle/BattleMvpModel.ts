@@ -331,7 +331,18 @@ export class BattleMvpModel {
   }
 
   public offerUpgradeCards(): UpgradeCardState[] {
-    const ids = UPGRADE_OFFER_ROTATION[this.upgradeOfferCount % UPGRADE_OFFER_ROTATION.length];
+    const ids = UPGRADE_OFFER_ROTATION[
+      this.upgradeOfferCount % UPGRADE_OFFER_ROTATION.length
+    ].map((id) => {
+      if (
+        id === 'summon_slots_plus_1' &&
+        this.build.summon.maxBoardHeroes >= this.getOrdinarySlotCapacity()
+      ) {
+        return 'summon_hero_damage_20';
+      }
+
+      return id;
+    });
     this.upgradeOfferCount += 1;
     this.pendingUpgradeCards = ids.map((id) => ({ ...this.getUpgradeConfig(id) }));
     return this.pendingUpgradeCards;
@@ -349,7 +360,7 @@ export class BattleMvpModel {
       this.build.thunder.critChance = Math.min(0.85, this.build.thunder.critChance + 0.1);
     } else if (cardId === 'summon_slots_plus_1') {
       this.build.summon.maxBoardHeroes = Math.min(
-        this.slots.length,
+        this.getOrdinarySlotCapacity(),
         this.build.summon.maxBoardHeroes + 1,
       );
     } else if (cardId === 'summon_hero_damage_20') {
@@ -483,6 +494,10 @@ export class BattleMvpModel {
       },
       { index: 4, label: '后2', row: 'back', position: { x: 210, y: -410 } },
     ];
+  }
+
+  private getOrdinarySlotCapacity(): number {
+    return this.slots.filter((slot) => !slot.reservedBy).length;
   }
 
   private createInitialBuild(): BattleBuildState {
