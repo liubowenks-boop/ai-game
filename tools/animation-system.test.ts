@@ -342,3 +342,54 @@ runTest('player attacks render golden projectiles with transparent 2d particle h
   assert.equal(autoAttackSource.includes('new Color(255, 96, 32'), true);
   assert.equal(autoAttackSource.includes('distance / 1000'), true);
 });
+
+runTest('thunder mage presentation owns its companion spine and electric effects', () => {
+  const presentationSource = readFileSync('assets/scripts/battle/ThunderMagePresentation.ts', 'utf8');
+
+  assert.equal(presentationSource.includes('THUNDER_MAGE_ANIMATION_PROFILE'), true);
+  assert.equal(presentationSource.includes('getAnimationClipSpec'), true);
+  assert.equal(presentationSource.includes('resolveThunderMageAttackAnimationTiming'), true);
+  assert.equal(presentationSource.includes("new Node('ThunderMageCompanion')"), true);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.position.x'), true);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.position.y'), true);
+  assert.equal(presentationSource.includes("new Node('ThunderMageAttackSpine')"), true);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.displayScale'), true);
+  assert.equal(presentationSource.includes('0.22'), true);
+  assert.equal(presentationSource.includes('premultipliedAlpha = false'), true);
+  assert.equal(presentationSource.includes("resources.load(attackClip.spineAssetBase, sp.SkeletonData"), true);
+  assert.equal(presentationSource.includes("event.source === 'companion'"), true);
+  assert.equal(presentationSource.includes('loading'), true);
+  assert.equal(presentationSource.includes('loaded'), true);
+  assert.equal(presentationSource.includes('warned'), true);
+  assert.equal(presentationSource.includes('console.warn'), true);
+  assert.equal(presentationSource.includes("setAttachment('frame', 'frame_0')"), true);
+  assert.equal(presentationSource.includes("setAttachment('frame', `frame_${frameIndex}`)"), true);
+  assert.equal(presentationSource.includes('Math.min(7, Math.floor(progress * 8))'), true);
+  assert.equal(presentationSource.includes('new Color(118, 224, 255'), true);
+  assert.equal(presentationSource.includes('new Color(247, 252, 255'), true);
+  assert.equal(presentationSource.includes('roundRect('), false);
+  assert.equal(presentationSource.includes('fillRect('), false);
+  assert.equal(presentationSource.includes('Sprite'), false);
+});
+
+runTest('battle controller delegates thunder mage presentation lifecycle', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('ThunderMagePresentation'), true);
+  assert.equal(controllerSource.includes('thunderMagePresentation'), true);
+  assert.equal(
+    controllerSource.includes('new ThunderMagePresentation(this.battleLayer, (node) => this.setUiLayer(node))'),
+    true,
+  );
+  assert.equal(
+    controllerSource.includes(
+      'this.thunderMagePresentation.handleTickResult(result, this.model.getCompanionAttackInterval())',
+    ),
+    true,
+  );
+  assert.equal(controllerSource.includes('this.thunderMagePresentation.update(presentationDelta)'), true);
+  assert.equal(controllerSource.includes('this.thunderMagePresentation.clear()'), true);
+  assert.equal(controllerSource.includes("event.source === 'companion'"), false);
+  assert.equal(controllerSource.includes('resolveThunderMageAttackAnimationTiming'), false);
+  assert.equal(controllerSource.includes('ThunderMageCompanion'), false);
+});

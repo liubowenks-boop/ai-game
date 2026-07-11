@@ -46,6 +46,7 @@ import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
 import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
+import { ThunderMagePresentation } from './ThunderMagePresentation';
 import {
   UnitAnimationRuntime,
   computeProceduralAnimationPose,
@@ -96,6 +97,7 @@ export class BattleController extends Component {
   private playerAttackSpineLoaded = false;
   private pendingPlayerAttackSpine = false;
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
+  private thunderMagePresentation!: ThunderMagePresentation;
   private playerAuraGraphics!: Graphics;
   private playerAttackEffectsGraphics!: Graphics;
   private startButtonLabel!: Label;
@@ -147,6 +149,8 @@ export class BattleController extends Component {
       return;
     }
 
+    const presentationDelta = Math.min(deltaTime, 1 / 30);
+    this.thunderMagePresentation.update(presentationDelta);
     this.cityHealthBarView.update(deltaTime);
 
     if (this.upgradeCardSystem.isShowing()) {
@@ -159,6 +163,7 @@ export class BattleController extends Component {
 
     const result = this.model.tick(deltaTime);
 
+    this.thunderMagePresentation.handleTickResult(result, this.model.getCompanionAttackInterval());
     this.requestPlayerAnimationFromResult(result);
     this.processReadabilityResult(result);
     this.updateReadability(deltaTime);
@@ -208,6 +213,7 @@ export class BattleController extends Component {
     this.waveSystem = new WaveSystem(hudViews.waveLabel);
     this.autoAttackSystem = new PlayerAutoAttackSystem(this.battleLayer, this.playerNode);
     this.gridPlacementSystem = new GridPlacementSystem(this.battleLayer, this.model);
+    this.thunderMagePresentation = new ThunderMagePresentation(this.battleLayer, (node) => this.setUiLayer(node));
     this.upgradeCardSystem = new UpgradeCardSystem(
       this.upgradePanelLayer,
       this.model,
@@ -220,12 +226,21 @@ export class BattleController extends Component {
 
   private startBattle(): void {
     this.model.startBattle();
+    this.clear();
     this.playerAnimation = createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
     this.enemySystem.clear();
     this.upgradeCardSystem.hide();
-    this.clearReadabilityFeedback();
     this.startButtonLabel.string = t('hud.restart');
     this.refreshUi();
+  }
+
+  public clear(): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    this.thunderMagePresentation.clear();
+    this.clearReadabilityFeedback();
   }
 
   private refreshUi(): void {
