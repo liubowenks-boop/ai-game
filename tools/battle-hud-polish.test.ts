@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
+import { computeProceduralAnimationPose } from '../assets/scripts/battle/UnitAnimationSystem';
 import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
 
 const gridPlacementSource = readFileSync(
@@ -91,8 +92,34 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
     [-300, -300, -300, -410, -410],
   );
   assert.deepEqual(model.playerPosition, { x: 0, y: -410 });
-  assert.equal(BattleUiV4Layout.placementTitle.y, -487);
-  assert.equal(BattleUiV4Layout.placementPending.y, -487);
+
+  const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
+  const auraOuterRadius = 58 + 3 / 2;
+  const highlightedPlayerScale = 1 + 0.065;
+  let dynamicAuraBottom = Number.POSITIVE_INFINITY;
+
+  for (const state of animationStates) {
+    for (let sample = 0; sample <= 2000; sample += 1) {
+      const pose = computeProceduralAnimationPose(state, sample / 1000, 'hero');
+      const frameBottom =
+        model.playerPosition.y +
+        pose.offsetY -
+        auraOuterRadius * highlightedPlayerScale * pose.scaleY;
+      dynamicAuraBottom = Math.min(dynamicAuraBottom, frameBottom);
+    }
+  }
+
+  for (const infoRow of [BattleUiV4Layout.placementTitle, BattleUiV4Layout.placementPending]) {
+    const infoTop = infoRow.y + infoRow.height / 2;
+    const infoBottom = infoRow.y - infoRow.height / 2;
+    const heroBarTop = BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2;
+
+    assert.ok(infoTop <= dynamicAuraBottom, 'dynamic main-hero aura overlaps formation info');
+    assert.ok(infoBottom > heroBarTop, 'formation info should keep a gap above the hero bar');
+  }
+
+  assert.equal(BattleUiV4Layout.placementTitle.y, -491);
+  assert.equal(BattleUiV4Layout.placementPending.y, -491);
   assert.equal(BattleUiV4Layout.heroBar.y, -552);
 });
 
