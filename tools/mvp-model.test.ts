@@ -80,43 +80,52 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
   );
 });
 
-runTest('thunder mage permanently reserves the far-left wall slot outside the ordinary hero count', () => {
-  const model = new BattleMvpModel();
-  const companion = model.getFixedCompanion();
+runTest(
+  'thunder mage permanently reserves the far-left wall slot outside the ordinary hero count',
+  () => {
+    const model = new BattleMvpModel();
+    const companion = model.getFixedCompanion();
 
-  assert.deepEqual(companion, {
-    id: 'hero_thunder_mage',
-    name: '雷法师',
-    description: '雷电速攻支援',
-    slotIndex: 3,
-    position: { x: -240, y: -320 },
-    attackDamage: 7,
-    attackInterval: 0.6,
-    displayScale: 0.22,
-    spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
-  });
-  companion.position.x = 999;
-  assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -320 });
+    assert.deepEqual(companion, {
+      id: 'hero_thunder_mage',
+      name: '雷法师',
+      description: '雷电速攻支援',
+      slotIndex: 3,
+      position: { x: -240, y: -320 },
+      attackDamage: 7,
+      attackInterval: 0.6,
+      displayScale: 0.22,
+      spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
+    });
+    companion.position.x = 999;
+    assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -320 });
 
-  assert.equal(model.slots[3].reservedBy, 'fixed_companion');
-  assert.equal(model.placeHero(3, '弓手'), undefined);
-  assert.equal(model.slots[3].hero, undefined);
+    assert.equal(model.slots[3].reservedBy, 'fixed_companion');
+    assert.equal(model.placeHero(3, '弓手'), undefined);
+    assert.equal(model.slots[3].hero, undefined);
 
-  assert.ok(model.placeHero(0, '弓手'));
-  assert.ok(model.placeHero(1, '火药师'));
-  assert.ok(model.placeHero(2, '冰法师'));
-  assert.equal(model.getHeroes().length, 3);
-});
+    assert.ok(model.placeHero(0, '弓手'));
+    assert.ok(model.placeHero(1, '火药师'));
+    assert.ok(model.placeHero(2, '冰法师'));
+    assert.equal(model.getHeroes().length, 3);
+  },
+);
 
 runTest('five-unit wall formation caps ordinary board heroes at three', () => {
   const model = new BattleMvpModel();
 
-  assert.deepEqual(model.slots.map((slot) => slot.index), [0, 1, 2, 3]);
-  assert.deepEqual(model.slots.slice(0, 3).map((slot) => slot.position), [
-    { x: -120, y: -320 },
-    { x: 120, y: -320 },
-    { x: 240, y: -320 },
-  ]);
+  assert.deepEqual(
+    model.slots.map((slot) => slot.index),
+    [0, 1, 2, 3],
+  );
+  assert.deepEqual(
+    model.slots.slice(0, 3).map((slot) => slot.position),
+    [
+      { x: -120, y: -320 },
+      { x: 120, y: -320 },
+      { x: 240, y: -320 },
+    ],
+  );
   assert.deepEqual(model.slots[3], {
     index: 3,
     label: '',
@@ -178,7 +187,10 @@ runTest('thunder mage attacks independently and resets its timer on restart', ()
   const target = model.spawnEnemy({ hp: 100, speed: 0 });
   const first = model.tick(0.01);
 
-  assert.deepEqual(first.attackEvents.map((event) => event.source), ['companion']);
+  assert.deepEqual(
+    first.attackEvents.map((event) => event.source),
+    ['companion'],
+  );
   assert.equal(first.attackEvents[0].damage, 7);
   assert.equal(model.findEnemy(target.id)?.hp, 93);
   assert.equal(
@@ -359,7 +371,10 @@ runTest('thunder mage attacks do not trigger main hero fire or thunder effects',
   const secondary = model.spawnEnemy({ x: 20, y: -180, hp: 100, speed: 0 });
   const tick = model.tick(0.01);
 
-  assert.deepEqual(tick.attackEvents.map((event) => event.source), ['companion']);
+  assert.deepEqual(
+    tick.attackEvents.map((event) => event.source),
+    ['companion'],
+  );
   assert.equal(primary.burnStacks, 0);
   assert.equal(secondary.hp, 100);
 });
@@ -567,34 +582,31 @@ runTest('recruited adjacent same-name heroes merge up to level 4', () => {
   );
 });
 
-runTest(
-  'summon build keeps three ordinary slots and turns its card into DPS gains',
-  () => {
-    const model = new BattleMvpModel({
-      heroBaseDps: 5,
-    });
+runTest('summon build keeps three ordinary slots and turns its card into DPS gains', () => {
+  const model = new BattleMvpModel({
+    heroBaseDps: 5,
+  });
 
-    model.placeHero(0, '弓手');
-    model.placeHero(1, '火药师');
-    model.placeHero(2, '冰法师');
+  model.placeHero(0, '弓手');
+  model.placeHero(1, '火药师');
+  model.placeHero(2, '冰法师');
 
-    assert.equal(model.getHeroes().length, 3);
-    assert.equal(model.placeHero(3, '毒师'), undefined);
+  assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.placeHero(3, '毒师'), undefined);
 
-    assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
-    assert.equal(model.placeHero(4, '毒师'), undefined);
-    assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
+  assert.equal(model.placeHero(4, '毒师'), undefined);
+  assert.equal(model.getHeroes().length, 3);
 
-    const dpsBeforeDamageCard = model.getTotalHeroDps();
-    model.applyUpgradeCard('summon_hero_damage_20');
-    assert.ok(model.getTotalHeroDps() > dpsBeforeDamageCard);
+  const dpsBeforeDamageCard = model.getTotalHeroDps();
+  model.applyUpgradeCard('summon_hero_damage_20');
+  assert.ok(model.getTotalHeroDps() > dpsBeforeDamageCard);
 
-    model.placeHero(0, '弓手');
+  model.placeHero(0, '弓手');
 
-    const archer = model.getHeroes().find((hero) => hero.name === '弓手');
-    assert.equal(archer?.level, 2);
-  },
-);
+  const archer = model.getHeroes().find((hero) => hero.name === '弓手');
+  assert.equal(archer?.level, 2);
+});
 
 runTest('default prototype coordinates fit the Cocos 720x1280 portrait preview viewport', () => {
   const model = new BattleMvpModel();

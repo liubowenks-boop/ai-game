@@ -268,3 +268,115 @@ runTest('terrain asset files, alpha, metadata and generated UUID manifest agree'
   );
   assert.equal(new Set(Object.values(manifest)).size, BATTLE_TERRAIN_LAYERS.length);
 });
+
+runTest('terrain presentation owns atomic fallback and stable render roots', () => {
+  const presentationPath = join(
+    process.cwd(),
+    'assets',
+    'scripts',
+    'battle',
+    'BattleTerrainPresentation.ts',
+  );
+  assert.ok(existsSync(presentationPath), 'BattleTerrainPresentation.ts must exist');
+  const source = readFileSync(presentationPath, 'utf8');
+
+  assert.match(source, /BATTLE_TERRAIN_ASSET_UUIDS/);
+  assert.match(source, /assetManager\.loadAny/);
+  assert.match(source, /createBattleTerrainLoadState/);
+  assert.match(source, /resolveBattleTerrainMode/);
+  assert.match(source, /LegacyBattleBackground/);
+  assert.match(source, /private loadGeneration = 0;/);
+  assert.match(source, /private readonly warnedFailures = new Set<string>\(\);/);
+  assert.match(source, /generation !== this\.loadGeneration/);
+  assert.match(source, /isValid\(this\.root, true\)/);
+  assert.match(source, /this\.legacyBackground\.active = mode !== 'modular';/);
+  assert.match(source, /spec\.required \? 'required' : 'optional'/);
+
+  const renderOrder = [
+    'TerrainBase',
+    'TerrainRoad',
+    'TerrainRuinsLeft',
+    'TerrainRuinsRight',
+    'TerrainAtmosphereBack',
+    'CityWallBack',
+    'EnemiesLayer',
+    'WallUnitBackingRings',
+    'WallUnitsLayer',
+    'CityWallFront',
+    'PlayerAndCompanionProjectiles',
+    'BattleFeedbackLayer',
+  ];
+  let previousIndex = -1;
+  for (const nodeName of renderOrder) {
+    const sourceIndex = source.indexOf(`'${nodeName}'`);
+    assert.ok(sourceIndex > previousIndex, `${nodeName} must follow the configured render order`);
+    previousIndex = sourceIndex;
+  }
+});
+
+runTest('battle controller routes combat visuals through terrain render layers', () => {
+  const controllerSource = readFileSync(
+    join(process.cwd(), 'assets', 'scripts', 'battle', 'BattleController.ts'),
+    'utf8',
+  );
+  const thunderMageSource = readFileSync(
+    join(process.cwd(), 'assets', 'scripts', 'battle', 'ThunderMagePresentation.ts'),
+    'utf8',
+  );
+
+  assert.match(controllerSource, /private terrainPresentation!: BattleTerrainPresentation;/);
+  assert.match(controllerSource, /new BattleTerrainPresentation\(/);
+  assert.match(controllerSource, /this\.terrainPresentation\.preload\(\);/);
+  assert.match(
+    controllerSource,
+    /this\.feedbackLayer = this\.terrainPresentation\.layers\.feedback;/,
+  );
+  assert.match(
+    controllerSource,
+    /this\.terrainPresentation\.layers\.enemies\.addChild\(enemyTemplate\);/,
+  );
+  assert.match(
+    controllerSource,
+    /this\.terrainPresentation\.layers\.units\.addChild\(existingPlayer\);/,
+  );
+  assert.match(
+    controllerSource,
+    /this\.drawCityLine\(this\.terrainPresentation\.layers\.enemies\);/,
+  );
+  assert.match(
+    controllerSource,
+    /this\.createPlayerNode\(this\.terrainPresentation\.layers\.units\)/,
+  );
+  assert.match(
+    controllerSource,
+    /new PlayerAutoAttackSystem\(\s*this\.terrainPresentation\.layers\.projectiles,\s*this\.playerNode,\s*\)/s,
+  );
+  assert.match(
+    controllerSource,
+    /new GridPlacementSystem\(\s*this\.terrainPresentation\.layers\.unitBacking,\s*this\.terrainPresentation\.layers\.units,\s*this\.model,\s*\)/s,
+  );
+  assert.equal(controllerSource.includes('this.drawBackground(this.battleLayer)'), false);
+  assert.equal(
+    controllerSource.includes(
+      'this.feedbackLayer.setSiblingIndex(this.battleLayer.children.length - 1)',
+    ),
+    false,
+  );
+  assert.match(controllerSource, /this\.terrainPresentation\?\.dispose\(\);/);
+  const redrawCityLineSource = controllerSource.slice(
+    controllerSource.indexOf('private redrawCityLine('),
+    controllerSource.indexOf('private createReadabilityUi('),
+  );
+  assert.match(
+    redrawCityLineSource,
+    /this\.cityLineGraphics\.fill\(\);\s*if \(!focused\) \{\s*return;\s*\}/s,
+  );
+
+  assert.match(
+    thunderMageSource,
+    /public constructor\(\s*unitParent: Node,\s*effectParent: Node,\s*setUiLayer:/s,
+  );
+  assert.match(thunderMageSource, /unitParent\.addChild\(this\.rootNode\);/);
+  assert.match(thunderMageSource, /effectParent\.addChild\(this\.effectsNode\);/);
+  assert.match(thunderMageSource, /this\.rootNode\.position\.x \+ THUNDER_MAGE_STAFF_OFFSET\.x/);
+});

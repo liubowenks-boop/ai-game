@@ -15,10 +15,10 @@
   - 火系：灼烧伤害、火焰扩散
   - 雷系：连锁次数、暴击率
   - 召唤系：上阵数量、英雄伤害
-- 可以点击“招募英雄”，再点击空格放置到简化棋盘。
-- 棋盘包含前排 3 格、后排 2 格。
+- 选择召唤系强化后，可以点击城墙上的空圆形站位放置普通英雄。
+- 城墙阵型固定为一条横排：雷法师、3 名普通英雄和主角，共 5 名角色。
 - 同名英雄在同格或相邻格触发自动合成，最高 Lv4。
-- 召唤流初始上阵 3 名普通英雄，可通过卡牌提升到 4 名。
+- 普通英雄上阵上限固定为 3 名，不再通过强化卡扩容。
 - 英雄配置包含：弓手、火药师、冰法师、毒师、护卫、鼓手、治疗师、咒术师。
 - 固定副将“雷法师”常驻后1，与主角独立攻击。
 - 敌人配置包含：普通、快速、厚血、远程、Boss。
@@ -30,8 +30,10 @@
 
 - `assets/scenes/BattleMain.scene`：正式局内入口场景，承载 `BattleRoot` 和 UI Layer 骨架。
 - `assets/scripts/battle/BattleController.ts`：Cocos 入口组件，优先复用场景里的 UI Layer，缺失时自动创建兜底，并协调各系统。
+- `assets/scripts/battle/BattleTerrainPresentation.ts`：模块化地形加载、渲染分层和旧背景降级入口。
 - `assets/scripts/battle/BattleMvpModel.ts`：无 Cocos 依赖的 MVP 规则模型，负责战斗状态、刷怪、城血、自动攻击、强化和合成。
 - `assets/scripts/data/BattleConfig.ts`：英雄、敌人、三流派强化卡配置。后续调数值优先改这里。
+- `assets/scripts/data/BattleTerrainConfig.ts`：地形层、城墙深度和五人站位的统一配置。
 - `assets/scripts/battle/EnemySystem.ts`：敌人原型节点创建与同步。
 - `assets/scripts/battle/PlayerAutoAttackSystem.ts`：主角自动攻击表现，使用简单连线反馈。
 - `assets/scripts/battle/ThunderMagePresentation.ts`：固定雷法师的 Spine 播放、帧映射和蓝白雷击表现。
@@ -53,12 +55,20 @@
 
 ## 固定副将：雷法师
 
-- Spine 资源位于 `assets/resources/spine/hero_thunder_mage/`，使用透明背景并固定显示在“后1”圆形站位。
-- “后1”为固定副将保留位，不参与普通英雄招募、上阵、合成或底部头像栏计数；当前阵型的普通英雄上阵上限为 `4`。
-- 普通英雄达到 4 人上限后，后续“上阵英雄+1”会替换为“英雄伤害+20%”，不会出现无效卡牌。
+- Spine 资源位于 `assets/resources/spine/hero_thunder_mage/`，使用透明背景并固定显示在城墙最左侧站位。
+- 雷法师为固定副将，不参与普通英雄招募、上阵、合成或底部头像栏计数；当前阵型的普通英雄上阵上限为 `3`。
+- 召唤系强化固定提供“英雄伤害+20%”并进入放置流程，不再出现“上阵英雄+1”扩容卡。
 - 基础攻击伤害为 `7`，基础攻击间隔为 `0.6` 秒；攻击目标是存活敌人中最靠近城墙的一个。
 - 实际攻击间隔会受鼓手等攻速增益影响；动画时长与该实际间隔同步，并限制在 `0.25` 至 `1.2` 秒之间。
 - 攻击使用蓝白雷击和透明命中爆发；主角原有 Spine 动画、金色飞弹与命中特效保持不变。
+
+## 模块化沙关地形
+
+- 地形保持原有沙关、荒漠废墟主题，资源位于 `assets/bundles/battle_common/`。
+- 画面由地表底图、道路、左右废墟、后景气氛、城墙后片和城墙前片组成；敌人、站位圆环、角色和弹道按固定深度插入这些层之间。
+- 城墙整体后移到画面下方，主角、固定雷法师和 3 名普通英雄站在城墙顶面同一横排；城墙前片会自然遮住角色脚部。
+- 必需地形资源加载失败时会保留旧版 `battle_bg_sandgate_720x1280.png`，可选装饰层失败时只跳过对应层，不阻断战斗。
+- 资源 UUID 清单由 `tools/generate-battle-terrain-manifest.mjs` 生成；地形契约和降级状态可通过 `npm run test:terrain` 验证。
 
 ## 环境安装
 
@@ -106,6 +116,12 @@ npm run test:scene
 ```bash
 npm run test:ui-layout
 npm run test:animation
+```
+
+运行模块化地形检查：
+
+```bash
+npm run test:terrain
 ```
 
 运行 Spine 资源导入检查：

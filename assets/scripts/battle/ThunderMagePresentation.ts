@@ -1,13 +1,5 @@
 // @ts-nocheck
-import {
-  Color,
-  Graphics,
-  Node,
-  UITransform,
-  resources,
-  sp,
-  Vec3,
-} from 'cc';
+import { Color, Graphics, Node, UITransform, resources, sp, Vec3 } from 'cc';
 
 import {
   THUNDER_MAGE_ANIMATION_PROFILE,
@@ -52,6 +44,7 @@ const THUNDER_MAGE_BURST_CORE = new Color(247, 252, 255, 255);
 const THUNDER_MAGE_PROJECTILE_MIN_DURATION = 0.16;
 const THUNDER_MAGE_PROJECTILE_MAX_DURATION = 0.22;
 const THUNDER_MAGE_BURST_DURATION = 0.2;
+const THUNDER_MAGE_STAFF_OFFSET = new Vec3(0, 40, 0);
 
 const thunderMageSkeletonLoader = new ThunderMageSkeletonLoadCoordinator<sp.SkeletonData>();
 const thunderMagePresentationOwners = new WeakMap<Node, ThunderMagePresentation>();
@@ -71,15 +64,20 @@ export class ThunderMagePresentation {
   private spineMode: 'hidden' | 'idle' | 'attack' = 'hidden';
   private spineFrameIndex = 0;
 
-  public constructor(parent: Node, setUiLayer: (node: Node) => void) {
+  public constructor(unitParent: Node, effectParent: Node, setUiLayer: (node: Node) => void) {
     this.setUiLayer = setUiLayer;
 
-    this.rootNode = parent.getChildByName('ThunderMageCompanion') ?? new Node('ThunderMageCompanion');
-    this.removeDuplicateNamedChildren(parent, this.rootNode);
+    this.rootNode =
+      unitParent.getChildByName('ThunderMageCompanion') ?? new Node('ThunderMageCompanion');
+    this.removeDuplicateNamedChildren(unitParent, this.rootNode);
     this.setUiLayer(this.rootNode);
-    this.rootNode.setPosition(THUNDER_MAGE_COMPANION.position.x, THUNDER_MAGE_COMPANION.position.y, 0);
+    this.rootNode.setPosition(
+      THUNDER_MAGE_COMPANION.position.x,
+      THUNDER_MAGE_COMPANION.position.y,
+      0,
+    );
     if (!this.rootNode.parent) {
-      parent.addChild(this.rootNode);
+      unitParent.addChild(this.rootNode);
     }
 
     this.attackSpineNode =
@@ -97,22 +95,27 @@ export class ThunderMagePresentation {
     if (!this.attackSpineNode.parent) {
       this.rootNode.addChild(this.attackSpineNode);
     }
-    this.attackSpine = this.attackSpineNode.getComponent(sp.Skeleton) ?? this.attackSpineNode.addComponent(sp.Skeleton);
+    this.attackSpine =
+      this.attackSpineNode.getComponent(sp.Skeleton) ??
+      this.attackSpineNode.addComponent(sp.Skeleton);
     this.attackSpine.premultipliedAlpha = false;
 
-    this.effectsNode = parent.getChildByName('ThunderMageEffects') ?? new Node('ThunderMageEffects');
-    this.removeDuplicateNamedChildren(parent, this.effectsNode);
+    this.effectsNode =
+      effectParent.getChildByName('ThunderMageEffects') ?? new Node('ThunderMageEffects');
+    this.removeDuplicateNamedChildren(effectParent, this.effectsNode);
     this.removeChildrenExcept(this.effectsNode);
     this.setUiLayer(this.effectsNode);
-    const effectsTransform = this.effectsNode.getComponent(UITransform) ?? this.effectsNode.addComponent(UITransform);
+    const effectsTransform =
+      this.effectsNode.getComponent(UITransform) ?? this.effectsNode.addComponent(UITransform);
     effectsTransform.setContentSize(720, 1280);
     this.effectsNode.setPosition(0, 0, 0);
-    this.effectsGraphics = this.effectsNode.getComponent(Graphics) ?? this.effectsNode.addComponent(Graphics);
+    this.effectsGraphics =
+      this.effectsNode.getComponent(Graphics) ?? this.effectsNode.addComponent(Graphics);
     this.effectsGraphics.clear();
     if (!this.effectsNode.parent) {
-      parent.addChild(this.effectsNode);
+      effectParent.addChild(this.effectsNode);
     }
-    this.effectsNode.setSiblingIndex(parent.children.length - 1);
+    this.effectsNode.setSiblingIndex(effectParent.children.length - 1);
 
     thunderMagePresentationOwners.set(this.rootNode, this);
     this.ensureSkeletonLoaded();
@@ -138,7 +141,11 @@ export class ThunderMagePresentation {
         sourceDuration: THUNDER_MAGE_SPINE_SOURCE_DURATION,
       };
 
-      const from = new Vec3(-210, -370, 0);
+      const from = new Vec3(
+        this.rootNode.position.x + THUNDER_MAGE_STAFF_OFFSET.x,
+        this.rootNode.position.y + THUNDER_MAGE_STAFF_OFFSET.y,
+        0,
+      );
       const to = new Vec3(event.enemyPosition.x, event.enemyPosition.y, 0);
       this.projectiles.push({
         from,
@@ -238,7 +245,10 @@ export class ThunderMagePresentation {
         }
       },
       (error) => {
-        console.warn(`Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`, error);
+        console.warn(
+          `Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`,
+          error,
+        );
       },
     );
   }
@@ -371,11 +381,7 @@ export class ThunderMagePresentation {
     const position = this.lerp(projectile.from, projectile.to, eased);
     const direction = this.normalize(projectile.from, projectile.to);
     const sway = Math.sin(progress * Math.PI * 3) * (1 - progress) * 16;
-    const kink = new Vec3(
-      position.x + direction.y * sway,
-      position.y - direction.x * sway,
-      0,
-    );
+    const kink = new Vec3(position.x + direction.y * sway, position.y - direction.x * sway, 0);
     const mid = this.lerp(projectile.from, projectile.to, 0.54);
 
     this.effectsGraphics.strokeColor = new Color(
@@ -470,16 +476,15 @@ export class ThunderMagePresentation {
     const distance = Math.hypot(to.x - from.x, to.y - from.y);
     return Math.max(
       THUNDER_MAGE_PROJECTILE_MIN_DURATION,
-      Math.min(THUNDER_MAGE_PROJECTILE_MAX_DURATION, THUNDER_MAGE_PROJECTILE_MIN_DURATION + distance / 16000),
+      Math.min(
+        THUNDER_MAGE_PROJECTILE_MAX_DURATION,
+        THUNDER_MAGE_PROJECTILE_MIN_DURATION + distance / 16000,
+      ),
     );
   }
 
   private lerp(from: Vec3, to: Vec3, amount: number): Vec3 {
-    return new Vec3(
-      from.x + (to.x - from.x) * amount,
-      from.y + (to.y - from.y) * amount,
-      0,
-    );
+    return new Vec3(from.x + (to.x - from.x) * amount, from.y + (to.y - from.y) * amount, 0);
   }
 
   private normalize(from: Vec3, to: Vec3): Vec3 {

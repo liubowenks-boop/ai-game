@@ -304,7 +304,7 @@ export class GridPlacementSystem {
     const portraitTransform = portraitNode.addComponent(UITransform);
     portraitTransform.setContentSize(portraitSize, portraitSize);
     const mask = portraitNode.addComponent(Mask);
-    mask.type = Mask.Type.ELLIPSE;
+    mask.type = Mask.Type.GRAPHICS_ELLIPSE;
     mask.segments = 48;
     portraitNode.setPosition(0, 0, 0);
     view.unitNode?.addChild(portraitNode);
@@ -312,13 +312,7 @@ export class GridPlacementSystem {
 
     view.portraitFilename = filename;
     view.portraitNode = portraitNode;
-    createUiArtSkinNode(
-      portraitNode,
-      filename,
-      portraitSize,
-      portraitSize,
-      'SlotHeroPortrait',
-    );
+    createUiArtSkinNode(portraitNode, filename, portraitSize, portraitSize, 'SlotHeroPortrait');
   }
 
   private isFixedCompanionSlot(slot: GridSlotState): boolean {

@@ -5,16 +5,11 @@ import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
 import { computeProceduralAnimationPose } from '../assets/scripts/battle/UnitAnimationSystem';
 import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
 
-const gridPlacementSource = readFileSync(
-  'assets/scripts/battle/GridPlacementSystem.ts',
-  'utf8',
-);
-const battleUiComponentsSource = readFileSync(
-  'assets/scripts/ui/BattleUiComponents.ts',
-  'utf8',
-);
-const battleControllerSource = readFileSync(
-  'assets/scripts/battle/BattleController.ts',
+const gridPlacementSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
+const battleUiComponentsSource = readFileSync('assets/scripts/ui/BattleUiComponents.ts', 'utf8');
+const battleControllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+const upgradeCardSystemSource = readFileSync(
+  'assets/scripts/roguelike/UpgradeCardSystem.ts',
   'utf8',
 );
 
@@ -78,9 +73,7 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
   const highlightedPlayerScale = 1 + 0.065;
   const heroBarStrokeWidth = 3;
   const heroBarStrokeOuterTop =
-    BattleUiV4Layout.heroBar.y +
-    BattleUiV4Layout.heroBar.height / 2 +
-    heroBarStrokeWidth / 2;
+    BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2 + heroBarStrokeWidth / 2;
   let dynamicAuraBottom = Number.POSITIVE_INFINITY;
 
   for (const state of animationStates) {
@@ -189,7 +182,10 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot4/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot5/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
-  assert.match(heroAvatarSlotViewSource, /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s);
+  assert.match(
+    heroAvatarSlotViewSource,
+    /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s,
+  );
   assert.match(
     heroAvatarSlotViewSource,
     /for \(const legacyName of \['AvatarSkin', 'AvatarLabel'\]\) \{\s*const legacyNode = this\.node\.getChildByName\(legacyName\);\s*if \(legacyNode\) \{\s*legacyNode\.active = false;\s*\}\s*\}/s,
@@ -309,8 +305,11 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   );
   assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
   assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);
-  assert.match(refreshSlotPortraitSource, /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/);
-  assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.ELLIPSE;/);
+  assert.match(
+    refreshSlotPortraitSource,
+    /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/,
+  );
+  assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.GRAPHICS_ELLIPSE;/);
   assert.match(refreshSlotPortraitSource, /mask\.segments = 48;/);
   assert.match(refreshSlotPortraitSource, /view\.unitNode\?\.addChild\(portraitNode\);/);
   assert.match(createButtonSource, /labelNode\.setPosition\(0, 0, 0\);/);
@@ -335,18 +334,17 @@ runTest('formation animation keeps ring centers fixed', () => {
   assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.setScale\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.angle = pose\.rotation \* 0\.35;/);
-  assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(pose\.offsetX \* 0\.35, pose\.offsetY \* 0\.35, 0\);/);
+  assert.match(
+    updateAnimationsSource,
+    /view\.portraitNode\.setPosition\(pose\.offsetX \* 0\.35, pose\.offsetY \* 0\.35, 0\);/,
+  );
   assert.match(updateAnimationsSource, /const focusScale = highlighted \? 1\.04 : 1;/);
   assert.equal(
-    /\(view\.baseX \?\? view\.node\.position\.x\) \+ pose\.offsetX/.test(
-      updateAnimationsSource,
-    ),
+    /\(view\.baseX \?\? view\.node\.position\.x\) \+ pose\.offsetX/.test(updateAnimationsSource),
     false,
   );
   assert.equal(
-    /\(view\.baseY \?\? view\.node\.position\.y\) \+ pose\.offsetY/.test(
-      updateAnimationsSource,
-    ),
+    /\(view\.baseY \?\? view\.node\.position\.y\) \+ pose\.offsetY/.test(updateAnimationsSource),
     false,
   );
   assert.equal(/view\.node\.setPosition/.test(updateAnimationsSource), false);
@@ -389,10 +387,7 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
     cityHealthBarViewSource,
     /const fillRadius = Math\.min\(BattleUiTokens\.radius\.md,\s*fillWidth \/ 2,\s*trackHeight \/ 2\);/,
   );
-  assert.match(
-    cityHealthBarViewSource,
-    /const sheenWidth = Math\.max\(0,\s*fillWidth - 4\);/,
-  );
+  assert.match(cityHealthBarViewSource, /const sheenWidth = Math\.max\(0,\s*fillWidth - 4\);/);
   assert.match(
     cityHealthBarViewSource,
     /if \(sheenWidth > 0\) \{\s*this\.graphics\.fillColor = uiColor\(Color\.WHITE,\s*42\);\s*this\.graphics\.roundRect\([\s\S]*Math\.min\(2,\s*sheenWidth \/ 2\)/s,
@@ -408,7 +403,10 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
   assert.equal(cityHealthBarViewSource.includes('* scale'), false);
   assert.equal(cityHealthBarViewSource.includes('node.setScale'), false);
   assert.equal(/delayed|trailing|secondary health layer/i.test(cityHealthBarViewSource), false);
-  assert.equal(/second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource), false);
+  assert.equal(
+    /second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource),
+    false,
+  );
   assert.equal(/Color\.WHITE,\s*70/.test(cityHealthBarViewSource), false);
   assert.match(
     cityHealthBarViewSource,
@@ -430,5 +428,23 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
       cityHealthBarViewSource,
     ),
     false,
+  );
+});
+
+runTest('successful summon upgrades recruit one ordinary hero for wall placement', () => {
+  const createCardSource = sourceSection(
+    upgradeCardSystemSource,
+    'private createCard(',
+    'private drawDimmer(',
+  );
+
+  assert.match(createCardSource, /const applied = this\.model\.applyUpgradeCard\(card\.id\);/);
+  assert.match(
+    createCardSource,
+    /const hasOpenOrdinarySlot =\s*this\.model\.getHeroes\(\)\.length < this\.model\.build\.summon\.maxBoardHeroes;/s,
+  );
+  assert.match(
+    createCardSource,
+    /if \(applied && card\.school === 'summon' && hasOpenOrdinarySlot\) \{\s*this\.onRecruit\?\.\(\);\s*\}/s,
   );
 });

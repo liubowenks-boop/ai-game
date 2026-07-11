@@ -8,10 +8,7 @@ import {
   UpgradeCardConfig,
   UpgradeCardId,
 } from '../data/BattleConfig';
-import {
-  FixedCompanionConfig,
-  THUNDER_MAGE_COMPANION,
-} from '../data/CompanionConfig';
+import { FixedCompanionConfig, THUNDER_MAGE_COMPANION } from '../data/CompanionConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 
 export type { BuildSchool, EnemyKind, UpgradeCardId } from '../data/BattleConfig';
@@ -222,12 +219,7 @@ export class BattleMvpModel {
   public tick(deltaSeconds: number): BattleTickResult {
     const result = this.createEmptyTickResult();
 
-    if (
-      !this.running ||
-      this.gameOver ||
-      !Number.isFinite(deltaSeconds) ||
-      deltaSeconds <= 0
-    ) {
+    if (!this.running || this.gameOver || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       return result;
     }
 

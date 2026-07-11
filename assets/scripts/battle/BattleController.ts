@@ -21,7 +21,6 @@ import {
   BossHealthBarView,
   CityHealthBarView,
   ComboView,
-  createUiArtSkinNode,
   createPanelNode,
   HeroAvatarSlotView,
   ensureNamedUiChild,
@@ -46,6 +45,7 @@ import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
 import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
+import { BattleTerrainPresentation } from './BattleTerrainPresentation';
 import { ThunderMagePresentation } from './ThunderMagePresentation';
 import {
   UnitAnimationRuntime,
@@ -98,6 +98,7 @@ export class BattleController extends Component {
   private pendingPlayerAttackSpine = false;
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
   private thunderMagePresentation!: ThunderMagePresentation;
+  private terrainPresentation!: BattleTerrainPresentation;
   private playerAuraGraphics!: Graphics;
   private playerAttackEffectsGraphics!: Graphics;
   private startButtonLabel!: Label;
@@ -124,7 +125,8 @@ export class BattleController extends Component {
   private noticeLabel!: Label;
   private readonly floatingTexts: FloatingTextView[] = [];
   private readonly floatingTextSlots: Node[] = [];
-  private playerAnimation: UnitAnimationRuntime = createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
+  private playerAnimation: UnitAnimationRuntime =
+    createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
   private comboCount = 0;
   private comboTimeLeft = 0;
   private noticeTimeLeft = 0;
@@ -142,6 +144,10 @@ export class BattleController extends Component {
 
   public start(): void {
     this.initialize();
+  }
+
+  public onDestroy(): void {
+    this.terrainPresentation?.dispose();
   }
 
   public update(deltaTime: number): void {
@@ -183,37 +189,69 @@ export class BattleController extends Component {
       return;
     }
 
-    this.initialized = true;
     preloadBattleTextResources();
     preloadBattleFontResources();
     view.setDesignResolutionSize(this.stageWidth, this.stageHeight, ResolutionPolicy.FIXED_WIDTH);
 
     const canvas = this.createCanvas();
     this.battleLayer = this.createLayer('BattleLayer', canvas);
-    this.feedbackLayer = this.createLayer('BattleFeedbackLayer', this.battleLayer);
+    const existingFeedbackLayer = this.createLayer('BattleFeedbackLayer', this.battleLayer);
+    const enemyTemplate = this.battleLayer.getChildByName('EnemyVisualTemplate');
+    const existingPlayer = this.battleLayer.getChildByName('MainHeroPrefab');
+    const existingCityLine = this.battleLayer.getChildByName('CityBottomLine');
     this.midStatusLayer = this.createLayer('MidStatusLayer', canvas);
     this.topHudLayer = this.createLayer('TopHudLayer', canvas);
     this.bottomHudLayer = this.createLayer('BottomHudLayer', canvas);
     this.upgradePanelLayer = this.createLayer('UpgradePanelLayer', canvas);
 
-    this.drawBackground(this.battleLayer);
-    this.drawCityLine(this.battleLayer);
-    this.playerNode = this.createPlayerNode(this.battleLayer);
+    this.terrainPresentation = new BattleTerrainPresentation(
+      this.battleLayer,
+      this.stageWidth,
+      this.stageHeight,
+      (node) => this.setUiLayer(node),
+    );
+    this.feedbackLayer = this.terrainPresentation.layers.feedback;
+    if (existingFeedbackLayer !== this.feedbackLayer && existingFeedbackLayer.parent) {
+      existingFeedbackLayer.destroy();
+    }
+    if (existingCityLine) {
+      this.terrainPresentation.layers.enemies.addChild(existingCityLine);
+    }
+    if (enemyTemplate) {
+      this.terrainPresentation.layers.enemies.addChild(enemyTemplate);
+      enemyTemplate.active = false;
+    }
+    if (existingPlayer) {
+      this.terrainPresentation.layers.units.addChild(existingPlayer);
+    }
+    this.terrainPresentation.preload();
+
+    this.drawCityLine(this.terrainPresentation.layers.enemies);
+    this.terrainPresentation.layers.enemies.getChildByName('CityBottomLine')?.setSiblingIndex(0);
+    this.playerNode = this.createPlayerNode(this.terrainPresentation.layers.units);
 
     const hudViews = this.createTopHudLayer();
     const midViews = this.createMidStatusLayer();
     this.createBottomHudLayer();
     this.createReadabilityUi(this.feedbackLayer);
 
-    this.enemySystem = new EnemySystem(
-      this.battleLayer,
-      this.battleLayer.getChildByName('EnemyVisualTemplate'),
-    );
+    this.enemySystem = new EnemySystem(this.terrainPresentation.layers.enemies, enemyTemplate);
     this.cityHealthSystem = new CityHealthSystem(this.cityHealthBarView, midViews.statusLabel);
     this.waveSystem = new WaveSystem(hudViews.waveLabel);
-    this.autoAttackSystem = new PlayerAutoAttackSystem(this.battleLayer, this.playerNode);
-    this.gridPlacementSystem = new GridPlacementSystem(this.battleLayer, this.model);
-    this.thunderMagePresentation = new ThunderMagePresentation(this.battleLayer, (node) => this.setUiLayer(node));
+    this.autoAttackSystem = new PlayerAutoAttackSystem(
+      this.terrainPresentation.layers.projectiles,
+      this.playerNode,
+    );
+    this.gridPlacementSystem = new GridPlacementSystem(
+      this.terrainPresentation.layers.unitBacking,
+      this.terrainPresentation.layers.units,
+      this.model,
+    );
+    this.thunderMagePresentation = new ThunderMagePresentation(
+      this.terrainPresentation.layers.units,
+      this.terrainPresentation.layers.projectiles,
+      (node) => this.setUiLayer(node),
+    );
     this.upgradeCardSystem = new UpgradeCardSystem(
       this.upgradePanelLayer,
       this.model,
@@ -221,6 +259,7 @@ export class BattleController extends Component {
       () => this.gridPlacementSystem.recruitFromUpgrade(),
     );
 
+    this.initialized = true;
     this.refreshUi();
   }
 
@@ -521,49 +560,6 @@ export class BattleController extends Component {
     return ensureSceneLayer(parent, name, this.stageWidth, this.stageHeight);
   }
 
-  private drawBackground(parent: Node): void {
-    const background = new Node('PrototypeBackground');
-    this.setUiLayer(background);
-
-    const transform = background.addComponent(UITransform);
-    transform.setContentSize(this.stageWidth, this.stageHeight);
-
-    const graphics = background.addComponent(Graphics);
-    graphics.fillColor = new Color(34, 25, 21, 255);
-    graphics.rect(-this.stageWidth / 2, -this.stageHeight / 2, this.stageWidth, this.stageHeight);
-    graphics.fill();
-
-    graphics.fillColor = new Color(66, 48, 34, 255);
-    graphics.roundRect(-304, -438, 608, 980, 28);
-    graphics.fill();
-
-    graphics.fillColor = new Color(96, 66, 42, 210);
-    graphics.roundRect(-246, -404, 492, 890, 22);
-    graphics.fill();
-
-    graphics.strokeColor = new Color(255, 210, 116, 54);
-    graphics.lineWidth = 3;
-    graphics.moveTo(-170, 474);
-    graphics.lineTo(-224, -420);
-    graphics.moveTo(170, 474);
-    graphics.lineTo(224, -420);
-    graphics.stroke();
-
-    graphics.fillColor = new Color(86, 52, 38, 250);
-    graphics.rect(-this.stageWidth / 2, -this.stageHeight / 2, this.stageWidth, 178);
-    graphics.fill();
-
-    parent.addChild(background);
-    background.setSiblingIndex(0);
-    createUiArtSkinNode(
-      background,
-      'battle_bg_sandgate_720x1280.png',
-      this.stageWidth,
-      this.stageHeight,
-      'CommercialBattleBackground',
-    );
-  }
-
   private drawCityLine(parent: Node): void {
     const line = parent.getChildByName('CityBottomLine') ?? new Node('CityBottomLine');
     this.setUiLayer(line);
@@ -602,6 +598,10 @@ export class BattleController extends Component {
       visualCityLineY + this.stageHeight / 2 - 12,
     );
     this.cityLineGraphics.fill();
+
+    if (!focused) {
+      return;
+    }
 
     if (focused) {
       this.cityLineGraphics.strokeColor = new Color(255, 244, 170, 130);
@@ -674,7 +674,10 @@ export class BattleController extends Component {
           lineHeightMultiplier: BattleUiTokens.lineHeight.tight,
         },
       );
-      this.applyDamageNumberStyle(slot.getChildByName('FloatingTextLabel')?.getComponent(Label), BattleUiTokens.font.body);
+      this.applyDamageNumberStyle(
+        slot.getChildByName('FloatingTextLabel')?.getComponent(Label),
+        BattleUiTokens.font.body,
+      );
       this.floatingTextSlots.push(slot);
     }
   }
@@ -1034,7 +1037,8 @@ export class BattleController extends Component {
   }
 
   private createPlayerAttackSpineNode(player: Node): void {
-    const spineNode = player.getChildByName('MainHeroAttackSpine') ?? new Node('MainHeroAttackSpine');
+    const spineNode =
+      player.getChildByName('MainHeroAttackSpine') ?? new Node('MainHeroAttackSpine');
     this.setUiLayer(spineNode);
     spineNode.setPosition(0, 8, 0);
     spineNode.setScale(0.28, 0.28, 1);
@@ -1045,14 +1049,19 @@ export class BattleController extends Component {
     }
 
     this.playerAttackSpineNode = spineNode;
-    this.playerAttackSpine = spineNode.getComponent(sp.Skeleton) ?? spineNode.addComponent(sp.Skeleton);
+    this.playerAttackSpine =
+      spineNode.getComponent(sp.Skeleton) ?? spineNode.addComponent(sp.Skeleton);
     this.playerAttackSpine.premultipliedAlpha = false;
     spineNode.setSiblingIndex(Math.max(0, player.children.length - 1));
   }
 
   private preloadPlayerAttackSpine(): void {
     const attackClip = getAnimationClipSpec(this.playerAnimation.profile, 'attack');
-    if (attackClip.renderer !== 'spine' || !attackClip.spineAssetBase || this.playerAttackSpineLoading) {
+    if (
+      attackClip.renderer !== 'spine' ||
+      !attackClip.spineAssetBase ||
+      this.playerAttackSpineLoading
+    ) {
       return;
     }
 
@@ -1061,7 +1070,10 @@ export class BattleController extends Component {
       this.playerAttackSpineLoading = false;
 
       if (error || !skeletonData) {
-        console.warn(`Failed to load player attack Spine asset: ${attackClip.spineAssetBase}`, error);
+        console.warn(
+          `Failed to load player attack Spine asset: ${attackClip.spineAssetBase}`,
+          error,
+        );
         return;
       }
 
@@ -1132,10 +1144,7 @@ export class BattleController extends Component {
   }
 
   private isPlayerAttackSpineActive(): boolean {
-    return (
-      this.playerAttackSpineLoaded &&
-      this.isPlayerAttackInProgress()
-    );
+    return this.playerAttackSpineLoaded && this.isPlayerAttackInProgress();
   }
 
   private isPlayerAttackInProgress(): boolean {
@@ -1253,7 +1262,6 @@ export class BattleController extends Component {
     const view = pooledNode
       ? this.bindFloatingTextSlot(pooledNode, text, x, y, fontSize, color, width)
       : this.createLabel(text, x, y, fontSize, color, width, 52);
-    this.feedbackLayer.setSiblingIndex(this.battleLayer.children.length - 1);
     if (!view.node.parent) {
       this.feedbackLayer.addChild(view.node);
     }
