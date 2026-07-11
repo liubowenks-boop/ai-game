@@ -1,14 +1,14 @@
 # 英雄令
 
-《英雄令》当前是一个 **Cocos Creator 3.8 + TypeScript** 小游戏原型项目。本阶段已进入 **局内表现与商业 UI v4 准备阶段**。
+《英雄令》当前是一个 **Cocos Creator 3.8 + TypeScript** 小游戏项目。本阶段已完成写实沙关地形、五人城墙阵型和第一轮可复用战斗特效系统。
 
 当前版本已具备可运行战斗闭环、三流派构筑、基础商业 UI 骨架和第一轮场景承载层。不接入抖音/快手平台 API，不做存档、广告或支付系统。
 
 ## 当前已实现
 
 - 点击“开始战斗”后进入战斗。
-- 敌人每 2 秒从屏幕顶部生成一波，并直线向下移动。
-- 玩家主角固定在屏幕下方中心，自动攻击最近敌人。
+- 敌人按波次从屏幕顶部生成，并沿中央战场向城墙推进。
+- 玩家主角和固定雷法师站在城墙上，自动攻击最近敌人。
 - 敌人到达底线后扣除城池血量。
 - 城池血量为 0 时进入游戏失败状态。
 - 每隔一段时间弹出三选一强化卡，卡牌分为：
@@ -21,6 +21,9 @@
 - 普通英雄上阵上限固定为 3 名，不再通过强化卡扩容。
 - 英雄配置包含：弓手、火药师、冰法师、毒师、护卫、鼓手、治疗师、咒术师。
 - 固定副将“雷法师”常驻后1，与主角独立攻击。
+- 地形使用七层写实沙关资源，包含道路、左右废墟、气氛和前后城墙层。
+- 所有攻击事件统一路由到对象池化 `BattleVfxSystem`，提供职业弹道、命中、状态、死亡和城墙受击反馈。
+- 站位圆圈和可见红色防线已移除；怪物仍会在城墙前方的逻辑防线停止。
 - 敌人配置包含：普通、快速、厚血、远程、Boss。
 - 波次节奏为 1-3 波教学、4 波精英、5 波 Boss，之后循环强化。
 - `BattleMain.scene` 已作为正式局内入口场景，包含可编辑的 UI Layer 骨架。
@@ -35,8 +38,11 @@
 - `assets/scripts/data/BattleConfig.ts`：英雄、敌人、三流派强化卡配置。后续调数值优先改这里。
 - `assets/scripts/data/BattleTerrainConfig.ts`：地形层、城墙深度和五人站位的统一配置。
 - `assets/scripts/battle/EnemySystem.ts`：敌人原型节点创建与同步。
-- `assets/scripts/battle/PlayerAutoAttackSystem.ts`：主角自动攻击表现，使用简单连线反馈。
-- `assets/scripts/battle/ThunderMagePresentation.ts`：固定雷法师的 Spine 播放、帧映射和蓝白雷击表现。
+- `assets/scripts/battle/PlayerAutoAttackSystem.ts`：主角攻击事件路由器，把弹道与命中表现交给共享特效系统。
+- `assets/scripts/battle/ThunderMagePresentation.ts`：固定雷法师的 Spine 播放、帧映射和攻击事件路由。
+- `assets/scripts/battle/BattleVfxSystem.ts`：共享战斗特效运行时，负责资源缓存、对象池、粒子、Sprite 和 Graphics 降级。
+- `assets/scripts/battle/BattleVfxLogic.ts`：无 Cocos 依赖的特效节流和预算逻辑。
+- `assets/scripts/data/BattleVfxConfig.ts`：职业特效映射、纹理、并发预算与生命周期配置。
 - `assets/scripts/data/CompanionConfig.ts`：雷法师身份、站位、伤害、攻击间隔与资源配置。
 - `assets/scripts/battle/WaveSystem.ts`：波次 UI 刷新。
 - `assets/scripts/battle/CityHealthSystem.ts`：城池血量和状态 UI 刷新。
@@ -49,7 +55,7 @@
 ## 主角 Spine 攻击动画
 
 - 主角攻击资源位于 `assets/resources/spine/animation/`，运行时由 `BattleController` 加载并以透明背景叠加在主角位置。
-- 普通攻速下，攻击动画播放时长为 `0.7` 秒；金色飞弹和命中特效继续由 `PlayerAutoAttackSystem` 独立负责。
+- 普通攻速下，攻击动画播放时长为 `0.7` 秒；金色飞弹和命中特效由共享 `BattleVfxSystem` 负责。
 - 动画时长会随实际攻击间隔自动同步：`攻速倍率 = 基础攻击间隔 / 当前攻击间隔`，`动画时长 = clamp(0.7 / 攻速倍率, 0.22, 1.4)` 秒。攻速提高时，主角攻击动画相应加快。
 - `AnimationConfig.ts` 中的 `PLAYER_ATTACK_ANIMATION_BASE_DURATION`、`PLAYER_ATTACK_ANIMATION_MIN_DURATION` 与 `PLAYER_ATTACK_ANIMATION_MAX_DURATION` 是统一调参入口。
 
@@ -58,17 +64,25 @@
 - Spine 资源位于 `assets/resources/spine/hero_thunder_mage/`，使用透明背景并固定显示在城墙最左侧站位。
 - 雷法师为固定副将，不参与普通英雄招募、上阵、合成或底部头像栏计数；当前阵型的普通英雄上阵上限为 `3`。
 - 召唤系强化固定提供“英雄伤害+20%”并进入放置流程，不再出现“上阵英雄+1”扩容卡。
-- 基础攻击伤害为 `7`，基础攻击间隔为 `0.6` 秒；攻击目标是存活敌人中最靠近城墙的一个。
+- 基础攻击伤害为 `7`，基础攻击间隔为 `0.85` 秒；攻击目标是存活敌人中最靠近城墙的一个。
 - 实际攻击间隔会受鼓手等攻速增益影响；动画时长与该实际间隔同步，并限制在 `0.25` 至 `1.2` 秒之间。
 - 攻击使用蓝白雷击和透明命中爆发；主角原有 Spine 动画、金色飞弹与命中特效保持不变。
 
-## 模块化沙关地形
+## 写实沙关地形
 
 - 地形保持原有沙关、荒漠废墟主题，资源位于 `assets/bundles/battle_common/`。
-- 画面由地表底图、道路、左右废墟、后景气氛、城墙后片和城墙前片组成；敌人、站位圆环、角色和弹道按固定深度插入这些层之间。
+- 画面由地表底图、道路、左右废墟、后景气氛、城墙后片和城墙前片组成；敌人、角色和弹道按固定深度插入这些层之间。
 - 城墙整体后移到画面下方，主角、固定雷法师和 3 名普通英雄站在城墙顶面同一横排；城墙前片会自然遮住角色脚部。
+- 怪物在 `y=-235` 的不可见逻辑防线停止，英雄站位为 `y=-320`，两者保持 85 像素战术距离。
 - 必需地形资源加载失败时会保留旧版 `battle_bg_sandgate_720x1280.png`，可选装饰层失败时只跳过对应层，不阻断战斗。
 - 资源 UUID 清单由 `tools/generate-battle-terrain-manifest.mjs` 生成；地形契约和降级状态可通过 `npm run test:terrain` 验证。
+
+## 战斗特效系统
+
+- `assets/bundles/ui_art/` 内的 `fx_v2_*` 透明纹理由 `gpt-image-2` 逐张生成，再通过色键清理导入；本轮未使用外部素材包。
+- 主角、雷法师和 8 类普通英雄使用统一事件语义，根据职业映射到金色飞弹、火焰斩击、雷电、寒冰、毒雾、治疗、护盾等表现。
+- `BattleVfxSystem` 使用有界 Sprite、`ParticleSystem2D` 和 Graphics 对象池，并在资源缺失时自动降级，避免战斗逻辑被表现资源阻断。
+- 放置提示只在放置状态短暂显示符文标记，不恢复人物脚下常驻圆圈。
 
 ## 环境安装
 
@@ -124,6 +138,12 @@ npm run test:animation
 npm run test:terrain
 ```
 
+运行战斗特效映射、预算、资源和运行时结构检查：
+
+```bash
+npm run test:vfx
+```
+
 运行 Spine 资源导入检查：
 
 ```bash
@@ -161,8 +181,8 @@ npm run preview:portrait
 
 ## 当前不包含
 
-- 最终商用美术源文件、音频、字体
-- 复杂动画
+- 完整商用美术源文件、音频、字体
+- 全英雄独立 Spine 动画
 - 完整正式 UI 预制体
 - 平台 SDK、`tt` 或 `ks` API
 - 广告、存档、技能树

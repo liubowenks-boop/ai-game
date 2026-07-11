@@ -219,17 +219,7 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.equal(/Lv/.test(refreshHeroAvatarBarSource), false);
 });
 
-runTest('deployable positions draw circles instead of rounded rectangles', () => {
-  const drawSlotButtonSource = sourceSection(
-    gridPlacementSource,
-    'private drawSlotButton(',
-    'private refreshSlotPortrait(',
-  );
-  const drawPlainButtonSource = sourceSection(
-    gridPlacementSource,
-    'private drawPlainButton(',
-    'private createLabel(',
-  );
+runTest('deployable positions keep invisible hit targets without ground circles', () => {
   const createSlotButtonSource = sourceSection(
     gridPlacementSource,
     'private createSlotButton(',
@@ -253,7 +243,7 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   const getVisualSlotRectSource = sourceSection(
     gridPlacementSource,
     'private getVisualSlotRect(',
-    'private drawSlotButton(',
+    'private refreshSlotPortrait(',
   );
   const refreshSlotPortraitSource = sourceSection(
     gridPlacementSource,
@@ -263,22 +253,14 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   const createButtonSource = sourceSection(
     gridPlacementSource,
     'private createButton(',
-    'private drawPlainButton(',
+    'private createLabel(',
   );
 
-  assert.match(drawSlotButtonSource, /const radius = view\.width \/ 2;/);
-  assert.match(drawSlotButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
-  assert.equal(drawSlotButtonSource.includes('roundRect'), false);
-  assert.equal(drawSlotButtonSource.includes('radius +'), false);
-  assert.match(drawSlotButtonSource, /new Color\(190, 116, 70, 255\)/);
-  assert.match(drawSlotButtonSource, /new Color\(255, 226, 151, 255\)/);
-  assert.match(
-    drawSlotButtonSource,
-    /if \(highlighted\) \{\s*view\.graphics\.strokeColor = new Color\(255, 226, 151, 255\);\s*view\.graphics\.lineWidth = 6;\s*view\.graphics\.circle\(0, 0, radius\);\s*view\.graphics\.stroke\(\);\s*\}/,
-  );
-  assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
-  assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
-  assert.equal(drawPlainButtonSource.includes('roundRect'), false);
+  assert.equal(gridPlacementSource.includes('private drawSlotButton('), false);
+  assert.equal(gridPlacementSource.includes('private drawPlainButton('), false);
+  assert.equal(gridPlacementSource.includes('view.graphics.circle('), false);
+  assert.match(gridPlacementSource, /public getAvailablePlacementPoints\(\)/);
+  assert.match(gridPlacementSource, /public isPlacementModeActive\(\)/);
   assert.match(getSlotTextSource, /return '';/);
   assert.match(getSlotColorSource, /return new Color\(65, 34, 27, 210\);/);
   assert.match(getVisualSlotRectSource, /wallSlotThunderMage/);
@@ -313,9 +295,11 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(refreshSlotPortraitSource, /mask\.segments = 48;/);
   assert.match(refreshSlotPortraitSource, /view\.unitNode\?\.addChild\(portraitNode\);/);
   assert.match(createButtonSource, /labelNode\.setPosition\(0, 0, 0\);/);
+  assert.match(createButtonSource, /const graphics = node\.addComponent\(Graphics\);/);
+  assert.match(createButtonSource, /node\.addComponent\(Button\);/);
   assert.match(
     gridPlacementSource,
-    /public constructor\(\s*backingParent: Node,\s*unitParent: Node,\s*private readonly model: BattleMvpModel,/s,
+    /public constructor\(\s*backingParent: Node,\s*unitParent: Node,\s*private readonly model: BattleMvpModel,\s*private readonly battleVfx: BattleVfxSystem,/s,
   );
   assert.match(gridPlacementSource, /new Node\('GridPlacementBacking'\)/);
   assert.match(gridPlacementSource, /new Node\('GridPlacementUnits'\)/);
@@ -419,9 +403,9 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
   );
   assert.match(
     battleControllerSource,
-    /if \(result\.cityDamage > 0\) \{\s*this\.setVisualFocus\('city', 0\.72\);\s*\}/,
+    /if \(result\.cityDamage > 0\) \{[\s\S]*this\.battleVfx\.playWallImpact\([\s\S]*this\.setVisualFocus\('city', 0\.72\);\s*\}/,
   );
-  assert.match(battleControllerSource, /this\.redrawCityLine\(activeFocus === 'city'\);/);
+  assert.equal(battleControllerSource.includes('redrawCityLine('), false);
   assert.match(battleControllerSource, /this\.cityHealthSystem\.refresh\(this\.model, false\);/);
   assert.equal(
     /fillColor = uiColor\(Color\.WHITE[\s\S]*roundRect\(frameLeft,\s*frameBottom,\s*this\.width,\s*48[\s\S]*fill\(\);/i.test(

@@ -340,21 +340,20 @@ runTest('battle controller routes combat visuals through terrain render layers',
     controllerSource,
     /this\.terrainPresentation\.layers\.units\.addChild\(existingPlayer\);/,
   );
-  assert.match(
-    controllerSource,
-    /this\.drawCityLine\(this\.terrainPresentation\.layers\.enemies\);/,
-  );
+  assert.match(controllerSource, /existingCityLine\?\.destroy\(\);/);
+  assert.equal(controllerSource.includes('drawCityLine('), false);
+  assert.equal(controllerSource.includes('redrawCityLine('), false);
   assert.match(
     controllerSource,
     /this\.createPlayerNode\(this\.terrainPresentation\.layers\.units\)/,
   );
   assert.match(
     controllerSource,
-    /new PlayerAutoAttackSystem\(\s*this\.terrainPresentation\.layers\.projectiles,\s*this\.playerNode,\s*\)/s,
+    /new PlayerAutoAttackSystem\(this\.battleVfx\)/,
   );
   assert.match(
     controllerSource,
-    /new GridPlacementSystem\(\s*this\.terrainPresentation\.layers\.unitBacking,\s*this\.terrainPresentation\.layers\.units,\s*this\.model,\s*\)/s,
+    /new GridPlacementSystem\(\s*this\.terrainPresentation\.layers\.unitBacking,\s*this\.terrainPresentation\.layers\.units,\s*this\.model,\s*this\.battleVfx,\s*\)/s,
   );
   assert.equal(controllerSource.includes('this.drawBackground(this.battleLayer)'), false);
   assert.equal(
@@ -364,20 +363,11 @@ runTest('battle controller routes combat visuals through terrain render layers',
     false,
   );
   assert.match(controllerSource, /this\.terrainPresentation\?\.dispose\(\);/);
-  const redrawCityLineSource = controllerSource.slice(
-    controllerSource.indexOf('private redrawCityLine('),
-    controllerSource.indexOf('private createReadabilityUi('),
-  );
-  assert.match(
-    redrawCityLineSource,
-    /this\.cityLineGraphics\.fill\(\);\s*if \(!focused\) \{\s*return;\s*\}/s,
-  );
-
   assert.match(
     thunderMageSource,
-    /public constructor\(\s*unitParent: Node,\s*effectParent: Node,\s*setUiLayer:/s,
+    /public constructor\(\s*unitParent: Node,\s*setUiLayer: \(node: Node\) => void,\s*private readonly battleVfx: BattleVfxSystem,/s,
   );
   assert.match(thunderMageSource, /unitParent\.addChild\(this\.rootNode\);/);
-  assert.match(thunderMageSource, /effectParent\.addChild\(this\.effectsNode\);/);
-  assert.match(thunderMageSource, /this\.rootNode\.position\.x \+ THUNDER_MAGE_STAFF_OFFSET\.x/);
+  assert.equal(thunderMageSource.includes('effectParent.addChild'), false);
+  assert.match(thunderMageSource, /this\.battleVfx\.playAttackEvent\(event\);/);
 });
