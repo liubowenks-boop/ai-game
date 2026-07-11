@@ -16,6 +16,7 @@ runTest('starts battle and spawned enemies wait at the wall before damaging the 
     enemyBaseSpeed: 30,
     waveInterval: 99,
     mainAttackDamage: 0,
+    companionAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -48,6 +49,7 @@ runTest('main hero attacks the nearest enemy first', () => {
     waveInterval: 99,
     mainAttackDamage: 10,
     mainAttackInterval: 1,
+    companionAttackDamage: 0,
     heroBaseDps: 0,
     random: () => 1,
   });
@@ -78,6 +80,145 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
   );
 });
 
+runTest('thunder mage permanently reserves back slot one without using recruit capacity', () => {
+  const model = new BattleMvpModel();
+  const companion = model.getFixedCompanion();
+
+  assert.deepEqual(companion, {
+    id: 'hero_thunder_mage',
+    name: '雷法师',
+    description: '雷电速攻支援',
+    slotIndex: 3,
+    position: { x: -210, y: -410 },
+    attackDamage: 7,
+    attackInterval: 0.6,
+    displayScale: 0.22,
+    spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
+  });
+  companion.position.x = 999;
+  assert.deepEqual(model.getFixedCompanion().position, { x: -210, y: -410 });
+
+  assert.equal(model.slots[3].reservedBy, 'fixed_companion');
+  assert.equal(model.placeHero(3, '弓手'), undefined);
+  assert.equal(model.slots[3].hero, undefined);
+
+  assert.ok(model.placeHero(0, '弓手'));
+  assert.ok(model.placeHero(1, '火药师'));
+  assert.ok(model.placeHero(2, '冰法师'));
+  assert.equal(model.getHeroes().length, 3);
+});
+
+runTest('thunder mage attacks independently and resets its timer on restart', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackDamage: 7,
+    companionAttackInterval: 0.6,
+  });
+
+  model.spawnEnemy({ hp: 100, speed: 0 });
+  assert.equal(model.tick(1).attackEvents.length, 0);
+
+  model.startBattle();
+  const target = model.spawnEnemy({ hp: 100, speed: 0 });
+  const first = model.tick(0.01);
+
+  assert.deepEqual(first.attackEvents.map((event) => event.source), ['companion']);
+  assert.equal(first.attackEvents[0].damage, 7);
+  assert.equal(model.findEnemy(target.id)?.hp, 93);
+  assert.equal(
+    model.tick(0.58).attackEvents.some((event) => event.source === 'companion'),
+    false,
+  );
+  assert.equal(
+    model.tick(0.02).attackEvents.some((event) => event.source === 'companion'),
+    true,
+  );
+
+  model.startBattle();
+  model.spawnEnemy({ hp: 100, speed: 0 });
+  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
+});
+
+runTest('thunder mage stays ready while no living target exists', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+  });
+
+  model.startBattle();
+  assert.equal(model.tick(2).attackEvents.length, 0);
+
+  model.spawnEnemy({ hp: 100, speed: 0 });
+  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
+  assert.equal(model.tick(0.01).attackEvents.length, 0);
+});
+
+runTest('thunder mage targets the living enemy closest to the city wall', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+  });
+
+  model.startBattle();
+  const fartherFromWall = model.spawnEnemy({ x: 0, y: 0, hp: 100, speed: 0 });
+  const closerToWall = model.spawnEnemy({ x: 300, y: -190, hp: 100, speed: 0 });
+  const tick = model.tick(0.01);
+
+  assert.equal(tick.attackEvents[0].enemyId, closerToWall.id);
+  assert.equal(model.findEnemy(closerToWall.id)?.hp, 93);
+  assert.equal(model.findEnemy(fartherFromWall.id)?.hp, 100);
+});
+
+runTest('drummer aura shortens the thunder mage actual attack cadence', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackInterval: 0.6,
+  });
+
+  model.placeHero(0, '鼓手');
+  assert.ok(model.getCompanionAttackInterval() < 0.6);
+
+  model.startBattle();
+  model.spawnEnemy({ hp: 100, speed: 0 });
+  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
+  assert.equal(model.tick(0.52).attackEvents.length, 0);
+  assert.equal(model.tick(0.02).attackEvents[0].source, 'companion');
+});
+
+runTest('thunder mage interval falls back to one when drummer aura is invalid', () => {
+  const model = new BattleMvpModel({ companionAttackInterval: 0.6 });
+  const drummer = model.placeHero(0, '鼓手');
+
+  assert.ok(drummer);
+  drummer.level = Number.POSITIVE_INFINITY;
+  assert.equal(model.getCompanionAttackInterval(), 0.6);
+});
+
+runTest('thunder mage attacks do not trigger main hero fire or thunder effects', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    random: () => 0,
+  });
+
+  model.startBattle();
+  model.applyUpgradeCard('thunder_chain_plus_1');
+  const primary = model.spawnEnemy({ x: 0, y: -190, hp: 100, speed: 0 });
+  const secondary = model.spawnEnemy({ x: 20, y: -180, hp: 100, speed: 0 });
+  const tick = model.tick(0.01);
+
+  assert.deepEqual(tick.attackEvents.map((event) => event.source), ['companion']);
+  assert.equal(primary.burnStacks, 0);
+  assert.equal(secondary.hp, 100);
+});
+
 runTest('default enemy tuning is slower and less punishing for readable mobile combat', () => {
   const model = new BattleMvpModel();
   const enemyConfigs = model.getEnemyConfigs();
@@ -97,6 +238,7 @@ runTest('default main attack softens the opening wave without making it toothles
   const model = new BattleMvpModel({
     waveInterval: 99,
     heroBaseDps: 0,
+    companionAttackDamage: 0,
     random: () => 1,
   });
 
@@ -152,6 +294,7 @@ runTest('fire build adds stackable burn and spread pressure', () => {
     waveInterval: 99,
     mainAttackDamage: 1,
     mainAttackInterval: 0.5,
+    companionAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -178,6 +321,7 @@ runTest('thunder build can crit and chain to extra enemies', () => {
     waveInterval: 99,
     mainAttackDamage: 10,
     mainAttackInterval: 1,
+    companionAttackDamage: 0,
     heroBaseDps: 0,
     random: () => 0,
   });
@@ -204,6 +348,7 @@ runTest('wave rhythm produces tutorial waves, elite wave, and a pressure boss on
   const model = new BattleMvpModel({
     waveInterval: 99,
     mainAttackDamage: 0,
+    companionAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -292,14 +437,13 @@ runTest(
 
     const dpsBeforeCard = model.getTotalHeroDps();
     model.applyUpgradeCard('summon_slots_plus_1');
-    assert.notEqual(model.placeHero(3, '毒师'), undefined);
+    assert.notEqual(model.placeHero(4, '毒师'), undefined);
     assert.ok(model.getTotalHeroDps() > dpsBeforeCard);
 
     const dpsBeforeDamageCard = model.getTotalHeroDps();
     model.applyUpgradeCard('summon_hero_damage_20');
     assert.ok(model.getTotalHeroDps() > dpsBeforeDamageCard);
 
-    model.placeHero(4, '弓手');
     model.placeHero(0, '弓手');
 
     const archer = model.getHeroes().find((hero) => hero.name === '弓手');

@@ -8,6 +8,10 @@ import {
   UpgradeCardConfig,
   UpgradeCardId,
 } from '../data/BattleConfig';
+import {
+  FixedCompanionConfig,
+  THUNDER_MAGE_COMPANION,
+} from '../data/CompanionConfig';
 
 export type { BuildSchool, EnemyKind, UpgradeCardId } from '../data/BattleConfig';
 
@@ -52,6 +56,7 @@ export interface GridSlotState {
   label: string;
   row: 'front' | 'back';
   position: BattlePoint;
+  reservedBy?: 'fixed_companion';
   hero?: HeroState;
 }
 
@@ -60,7 +65,7 @@ export interface UpgradeCardState extends UpgradeCardConfig {}
 export interface AttackEvent {
   enemyId: number;
   damage: number;
-  source: 'main' | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
+  source: 'main' | 'companion' | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
   enemyPosition: BattlePoint;
   critical?: boolean;
 }
@@ -107,6 +112,8 @@ export interface BattleMvpOptions {
   upgradeInterval: number;
   mainAttackDamage: number;
   mainAttackInterval: number;
+  companionAttackDamage: number;
+  companionAttackInterval: number;
   heroBaseDps: number;
   playerPosition: BattlePoint;
   random: () => number;
@@ -142,6 +149,8 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   upgradeInterval: 10,
   mainAttackDamage: 11,
   mainAttackInterval: 0.7,
+  companionAttackDamage: THUNDER_MAGE_COMPANION.attackDamage,
+  companionAttackInterval: THUNDER_MAGE_COMPANION.attackInterval,
   heroBaseDps: 5,
   playerPosition: { x: 0, y: -410 },
   random: Math.random,
@@ -177,6 +186,7 @@ export class BattleMvpModel {
   private waveTimer = 0;
   private upgradeTimer = 0;
   private attackTimer = 0;
+  private companionAttackTimer = 0;
   private enemyIdSequence = 1;
   private heroIdSequence = 1;
   private recruitCursor = 0;
@@ -203,6 +213,7 @@ export class BattleMvpModel {
     this.waveTimer = 0;
     this.upgradeTimer = 0;
     this.attackTimer = 0;
+    this.companionAttackTimer = 0;
     this.upgradeOfferCount = 0;
     this.running = true;
     this.gameOver = false;
@@ -224,6 +235,7 @@ export class BattleMvpModel {
     }
 
     this.tickMainAttack(deltaSeconds, result);
+    this.tickCompanionAttack(deltaSeconds, result);
     this.tickHeroDps(deltaSeconds, result);
     this.removeInactiveEnemies(result);
     this.tickWave(deltaSeconds, result);
@@ -354,7 +366,7 @@ export class BattleMvpModel {
   public placeHero(slotIndex: number, heroName: string): HeroState | undefined {
     const slot = this.slots[slotIndex];
 
-    if (!slot) {
+    if (!slot || slot.reservedBy) {
       return undefined;
     }
 
@@ -405,6 +417,20 @@ export class BattleMvpModel {
     return HERO_CONFIGS.map((hero) => ({ ...hero }));
   }
 
+  public getFixedCompanion(): FixedCompanionConfig {
+    return {
+      ...THUNDER_MAGE_COMPANION,
+      position: { ...THUNDER_MAGE_COMPANION.position },
+    };
+  }
+
+  public getCompanionAttackInterval(): number {
+    const auraMultiplier = this.getHeroAuraMultiplier();
+    const safeAuraMultiplier =
+      Number.isFinite(auraMultiplier) && auraMultiplier > 0 ? auraMultiplier : 1;
+    return this.options.companionAttackInterval / safeAuraMultiplier;
+  }
+
   public getEnemyConfigs(): EnemyConfig[] {
     return ENEMY_CONFIGS.map((enemy) => ({ ...enemy }));
   }
@@ -438,7 +464,13 @@ export class BattleMvpModel {
       { index: 0, label: '前1', row: 'front', position: { x: -210, y: -300 } },
       { index: 1, label: '前2', row: 'front', position: { x: 0, y: -300 } },
       { index: 2, label: '前3', row: 'front', position: { x: 210, y: -300 } },
-      { index: 3, label: '后1', row: 'back', position: { x: -210, y: -410 } },
+      {
+        index: 3,
+        label: '后1',
+        row: 'back',
+        position: { x: -210, y: -410 },
+        reservedBy: 'fixed_companion',
+      },
       { index: 4, label: '后2', row: 'back', position: { x: 210, y: -410 } },
     ];
   }
@@ -640,6 +672,23 @@ export class BattleMvpModel {
     this.applyFireOnHit(target);
     this.applyThunderChain(target, damage, result);
     this.attackTimer += this.mainAttackInterval;
+  }
+
+  private tickCompanionAttack(deltaSeconds: number, result: BattleTickResult): void {
+    this.companionAttackTimer = Math.max(0, this.companionAttackTimer - deltaSeconds);
+
+    if (this.companionAttackTimer > 0.0001 || this.options.companionAttackDamage <= 0) {
+      return;
+    }
+
+    const target = this.findEnemyClosestToCityWall();
+
+    if (!target) {
+      return;
+    }
+
+    this.damageEnemy(target, this.options.companionAttackDamage, 'companion', result);
+    this.companionAttackTimer = this.getCompanionAttackInterval();
   }
 
   private tickHeroDps(deltaSeconds: number, result: BattleTickResult): void {
@@ -848,6 +897,17 @@ export class BattleMvpModel {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, count)
       .map((entry) => entry.enemy);
+  }
+
+  private findEnemyClosestToCityWall(): EnemyState | undefined {
+    return this.enemies
+      .filter((enemy) => enemy.alive && enemy.hp > 0)
+      .sort((a, b) => {
+        return (
+          Math.abs(a.position.y - this.options.cityLineY) -
+          Math.abs(b.position.y - this.options.cityLineY)
+        );
+      })[0];
   }
 
   private getHeroDps(hero: HeroState): number {
