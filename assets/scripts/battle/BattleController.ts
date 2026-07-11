@@ -147,6 +147,8 @@ export class BattleController extends Component {
       return;
     }
 
+    this.cityHealthBarView.update(deltaTime);
+
     if (this.upgradeCardSystem.isShowing()) {
       this.updateReadability(deltaTime);
       this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
@@ -227,8 +229,7 @@ export class BattleController extends Component {
   }
 
   private refreshUi(): void {
-    const activeFocus = this.getActiveVisualFocus();
-    this.cityHealthSystem.refresh(this.model, activeFocus === 'city');
+    this.cityHealthSystem.refresh(this.model, false);
     this.waveSystem.refresh(this.model);
     this.remainingEnemiesLabel.string = t('hud.remaining', { count: this.model.enemies.length });
     this.goldChipView.refresh(0);
@@ -439,15 +440,19 @@ export class BattleController extends Component {
       218,
     );
 
-    const avatarXs = [
-      BattleUiV4Layout.heroBar.x - 144,
-      BattleUiV4Layout.heroBar.x,
-      BattleUiV4Layout.heroBar.x + 144,
+    const avatarSlotRects = [
+      BattleUiV4Layout.heroAvatarSlot1,
+      BattleUiV4Layout.heroAvatarSlot2,
+      BattleUiV4Layout.heroAvatarSlot3,
+      BattleUiV4Layout.heroAvatarSlot4,
+      BattleUiV4Layout.heroAvatarSlot5,
+      BattleUiV4Layout.heroAvatarSlot6,
     ];
-    avatarXs.forEach((x, index) => {
+    avatarSlotRects.forEach((rect, index) => {
       this.heroAvatarViews.push(
-        new HeroAvatarSlotView(x, BattleUiV4Layout.heroBar.y, 72, this.bottomHudLayer, {
+        new HeroAvatarSlotView(rect.x, rect.y, rect.width, rect.height, this.bottomHudLayer, {
           hostNode: this.bottomHudLayer.getChildByName(`HeroAvatarSlot${index + 1}`),
+          nodeName: `HeroAvatarSlot${index + 1}`,
         }),
       );
     });
@@ -946,7 +951,6 @@ export class BattleController extends Component {
       const hero = heroes[index];
       this.heroAvatarViews[index].refresh(
         hero?.name ?? '',
-        hero?.level ?? 0,
         Boolean(hero && outputFocus.kind === 'hero' && hero.id === outputFocus.heroId),
       );
     }

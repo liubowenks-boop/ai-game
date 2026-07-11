@@ -883,7 +883,7 @@ export class BossHealthBarView {
 export class CityHealthBarView {
   public readonly node: Node;
   private readonly graphics: Graphics;
-  private readonly label: Label;
+  private readonly valueLabel: Label;
   private lastHealth = Number.NaN;
   private flashTimeLeft = 0;
 
@@ -901,47 +901,88 @@ export class CityHealthBarView {
     this.node.setPosition(x, y, 0);
 
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    transform.setContentSize(width, 46);
+    transform.setContentSize(width, 48);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    createUiArtSkinNode(this.node, 'hud_city_hp_bg.png', width, 44, 'CityHpSkin');
-
-    const labelView = bindOrCreateLabel(
+    const cityHpSkin = bindOrCreateUiArtSkinNode(
       this.node,
-      'CityHpLabel',
-      t('hud.cityHp', { current: 100, max: 100 }),
-      0,
-      -1,
-      BattleUiTokens.font.body,
-      BattleUiTokens.colors.textPrimary,
+      'hud_city_hp_bg.png',
       width,
       44,
+      'CityHpSkin',
     );
-    this.label = labelView.label;
+    cityHpSkin.active = false;
 
-    ensureNamedUiChild(this.node, 'CityHpBarBg', 0, 0, width, 30);
-    ensureNamedUiChild(this.node, 'CityHpBarFill', 0, 0, width, 30);
-    ensureNamedUiChild(this.node, 'CityHpHitFlash', 0, 0, width + 12, 42);
+    bindOrCreateLabel(
+      this.node,
+      'CityHpEmblemLabel',
+      '城池',
+      -width / 2 + 28,
+      0,
+      BattleUiTokens.font.tiny,
+      BattleUiTokens.colors.textPrimary,
+      44,
+      34,
+      {
+        fontRole: 'uiHud',
+      },
+    );
+
+    const valueLabelView = bindOrCreateLabel(
+      this.node,
+      'CityHpLabel',
+      '100/100',
+      width / 2 - 45,
+      0,
+      BattleUiTokens.font.caption,
+      BattleUiTokens.colors.textPrimary,
+      80,
+      28,
+      {
+        fontRole: 'damageNumber',
+      },
+    );
+    this.valueLabel = valueLabelView.label;
+
+    const cityHpBarBg = ensureNamedUiChild(this.node, 'CityHpBarBg', 0, 0, width, 30);
+    cityHpBarBg.active = false;
+    const cityHpBarFill = ensureNamedUiChild(this.node, 'CityHpBarFill', 0, 0, width, 30);
+    cityHpBarFill.active = false;
+    const cityHpHitFlash = ensureNamedUiChild(this.node, 'CityHpHitFlash', 0, 0, width + 12, 42);
+    cityHpHitFlash.active = false;
 
     if (!this.node.parent) {
       parent.addChild(this.node);
     }
   }
 
-  public refresh(current: number, max: number, focused: boolean): void {
+  public update(deltaTime: number): void {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0 || this.flashTimeLeft <= 0) {
+      return;
+    }
+
+    this.flashTimeLeft = Math.max(0, this.flashTimeLeft - deltaTime);
+  }
+
+  public refresh(current: number, max: number, _focused: boolean): void {
     if (!Number.isNaN(this.lastHealth) && current < this.lastHealth) {
       this.flashTimeLeft = 0.22;
     }
 
     this.lastHealth = current;
-    this.label.string = t('hud.cityHp', { current: Math.ceil(current), max });
+    const safeMax = Math.max(1, max);
+    const visibleCurrent = Math.max(0, Math.min(safeMax, current));
+    const ratio = Math.max(0, Math.min(1, visibleCurrent / safeMax));
+    this.valueLabel.string = `${Math.ceil(visibleCurrent)}/${Math.ceil(safeMax)}`;
 
-    const ratio = Math.max(0, Math.min(1, current / max));
-    const active = focused || this.flashTimeLeft > 0;
-    const scale = this.flashTimeLeft > 0 ? 1.06 : focused ? 1.025 : 1;
-    const barWidth = this.width * scale;
-    const barHeight = 30 * scale;
-    const left = -barWidth / 2;
-    const top = -barHeight / 2;
+    const frameLeft = -this.width / 2;
+    const frameBottom = -24;
+    const emblemX = frameLeft + 28;
+    const valueWidth = 80;
+    const trackLeft = frameLeft + 58;
+    const trackWidth = this.width - 58 - valueWidth - 10;
+    const trackBottom = -10;
+    const trackHeight = 20;
+    const fillWidth = trackWidth * ratio;
     const fillColor =
       ratio > 0.55
         ? BattleUiTokens.colors.summonGreen
@@ -951,38 +992,64 @@ export class CityHealthBarView {
 
     this.graphics.clear();
 
-    if (active) {
-      this.graphics.strokeColor =
-        this.flashTimeLeft > 0
-          ? uiColor(Color.WHITE, 150)
-          : uiColor(BattleUiTokens.colors.highlight, 100);
-      this.graphics.lineWidth = this.flashTimeLeft > 0 ? 12 : 8;
+    if (this.flashTimeLeft > 0) {
+      this.graphics.strokeColor = uiColor(Color.WHITE, 180);
+      this.graphics.lineWidth = 3;
       this.graphics.roundRect(
-        left - 6,
-        top - 6,
-        barWidth + 12,
-        barHeight + 12,
-        BattleUiTokens.radius.lg,
+        frameLeft - 5,
+        frameBottom - 5,
+        this.width + 10,
+        58,
+        BattleUiTokens.radius.lg + 4,
       );
       this.graphics.stroke();
     }
 
     this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelDeep, 228);
-    this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(frameLeft, frameBottom, this.width, 48, BattleUiTokens.radius.lg);
     this.graphics.fill();
-    this.graphics.fillColor = fillColor;
-    this.graphics.roundRect(left, top, barWidth * ratio, barHeight, BattleUiTokens.radius.md);
-    this.graphics.fill();
+
     this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, 210);
     this.graphics.lineWidth = BattleUiTokens.stroke.normal;
-    this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(frameLeft, frameBottom, this.width, 48, BattleUiTokens.radius.lg);
     this.graphics.stroke();
 
-    if (this.flashTimeLeft > 0) {
-      this.graphics.fillColor = uiColor(Color.WHITE, 70);
-      this.graphics.roundRect(left, top, barWidth, barHeight, BattleUiTokens.radius.md);
+    this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelBrown, 224);
+    this.graphics.circle(emblemX, 0, 20);
+    this.graphics.fill();
+
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, 200);
+    this.graphics.lineWidth = 2;
+    this.graphics.circle(emblemX, 0, 20);
+    this.graphics.stroke();
+
+    this.graphics.fillColor = uiColor(Color.BLACK, 188);
+    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.fill();
+
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeDark, 220);
+    this.graphics.lineWidth = 2;
+    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.stroke();
+
+    if (fillWidth > 0) {
+      const fillRadius = Math.min(BattleUiTokens.radius.md, fillWidth / 2, trackHeight / 2);
+      this.graphics.fillColor = fillColor;
+      this.graphics.roundRect(trackLeft, trackBottom, fillWidth, trackHeight, fillRadius);
       this.graphics.fill();
-      this.flashTimeLeft = Math.max(0, this.flashTimeLeft - 1 / 60);
+
+      const sheenWidth = Math.max(0, fillWidth - 4);
+      if (sheenWidth > 0) {
+        this.graphics.fillColor = uiColor(Color.WHITE, 42);
+        this.graphics.roundRect(
+          trackLeft + 2,
+          trackBottom + trackHeight - 6,
+          sheenWidth,
+          4,
+          Math.min(2, sheenWidth / 2),
+        );
+        this.graphics.fill();
+      }
     }
   }
 }
@@ -1113,92 +1180,72 @@ export class UltimateButtonView {
 export class HeroAvatarSlotView {
   public readonly node: Node;
   private readonly graphics: Graphics;
-  private readonly label: Label;
   private portraitNode?: Node;
   private portraitFilename = '';
 
   public constructor(
     x: number,
     y: number,
-    private readonly size: number,
+    public readonly width: number,
+    public readonly height: number,
     parent: Node,
     options: {
       hostNode?: Node | null;
+      nodeName?: string;
     } = {},
   ) {
-    this.node = options.hostNode ?? new Node('HeroAvatarSlotView');
+    this.node = options.hostNode ?? new Node(options.nodeName ?? 'HeroAvatarSlotView');
     setUiLayer(this.node);
     this.node.setPosition(x, y, 0);
+    this.node.active = true;
 
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    transform.setContentSize(size, size);
+    transform.setContentSize(width, height);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    bindOrCreateUiArtSkinNode(this.node, 'hud_avatar_slot_empty.png', size, size, 'AvatarSkin');
-    const labelView = bindOrCreateLabel(
-      this.node,
-      'AvatarLabel',
-      t('hud.empty'),
-      0,
-      -4,
-      BattleUiTokens.font.tiny,
-      BattleUiTokens.colors.textSecondary,
-      size,
-      size,
-    );
-    this.label = labelView.label;
+    for (const legacyName of ['AvatarSkin', 'AvatarLabel']) {
+      const legacyNode = this.node.getChildByName(legacyName);
+      if (legacyNode) {
+        legacyNode.active = false;
+      }
+    }
     if (!this.node.parent) {
       parent.addChild(this.node);
     }
-    this.refresh('', 0, false);
+    this.refresh('', false);
   }
 
-  public refresh(heroName: string, level: number, highlighted: boolean): void {
+  public refresh(heroName: string, highlighted: boolean): void {
     const occupied = Boolean(heroName);
     this.refreshPortrait(heroName);
-    this.label.string = occupied ? `${heroName}\nLv${level}` : t('hud.empty');
-    this.label.color = occupied
-      ? BattleUiTokens.colors.textPrimary
-      : BattleUiTokens.colors.textSecondary;
 
     this.graphics.clear();
-
-    if (highlighted) {
-      this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 150);
-      this.graphics.lineWidth = 8;
-      this.graphics.roundRect(
-        -this.size / 2 - 4,
-        -this.size / 2 - 4,
-        this.size + 8,
-        this.size + 8,
-        BattleUiTokens.radius.lg,
-      );
-      this.graphics.stroke();
-    }
-
     this.graphics.fillColor = occupied
-      ? uiColor(BattleUiTokens.colors.panelBrown, 235)
-      : uiColor(BattleUiTokens.colors.panelDeep, 160);
-    this.graphics.strokeColor = highlighted
-      ? BattleUiTokens.colors.highlight
-      : uiColor(BattleUiTokens.colors.strokeGold, occupied ? 170 : 80);
-    this.graphics.lineWidth = highlighted
-      ? BattleUiTokens.stroke.strong
-      : BattleUiTokens.stroke.normal;
+      ? uiColor(BattleUiTokens.colors.panelBrown, 188)
+      : uiColor(BattleUiTokens.colors.panelDeep, 108);
+    this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, occupied ? 132 : 72);
+    this.graphics.lineWidth = BattleUiTokens.stroke.thin;
     this.graphics.roundRect(
-      -this.size / 2,
-      -this.size / 2,
-      this.size,
-      this.size,
-      BattleUiTokens.radius.md,
+      -this.width / 2,
+      -this.height / 2,
+      this.width,
+      this.height,
+      BattleUiTokens.radius.sm,
     );
     this.graphics.fill();
     this.graphics.stroke();
 
-    this.graphics.fillColor = occupied
-      ? uiColor(BattleUiTokens.colors.primaryRed, 120)
-      : uiColor(BattleUiTokens.colors.textSecondary, 45);
-    this.graphics.circle(0, 13, 14);
-    this.graphics.fill();
+    if (highlighted) {
+      this.graphics.strokeColor = uiColor(BattleUiTokens.colors.primaryGold, 210);
+      this.graphics.lineWidth = BattleUiTokens.stroke.normal;
+      this.graphics.roundRect(
+        -this.width / 2 - 2,
+        -this.height / 2 - 2,
+        this.width + 4,
+        this.height + 4,
+        BattleUiTokens.radius.sm,
+      );
+      this.graphics.stroke();
+    }
   }
 
   private refreshPortrait(heroName: string): void {
@@ -1219,15 +1266,22 @@ export class HeroAvatarSlotView {
       return;
     }
 
+    if (filename !== this.portraitFilename && this.portraitNode) {
+      this.portraitNode.active = false;
+      this.portraitNode.destroy();
+      this.portraitNode = undefined;
+    }
+
     this.portraitFilename = filename;
-    this.portraitNode = bindOrCreateUiArtSkinNode(
+    this.portraitNode = createUiArtSkinNode(
       this.node,
       filename,
-      this.size - 12,
-      this.size - 12,
+      this.width - 6,
+      this.height - 6,
       'AvatarPortrait',
     );
     this.portraitNode.setSiblingIndex(1);
+    this.portraitNode.active = true;
   }
 }
 

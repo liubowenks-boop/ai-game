@@ -143,7 +143,7 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   mainAttackDamage: 11,
   mainAttackInterval: 0.7,
   heroBaseDps: 5,
-  playerPosition: { x: 0, y: -405 },
+  playerPosition: { x: 0, y: -410 },
   random: Math.random,
 };
 
@@ -435,11 +435,11 @@ export class BattleMvpModel {
 
   private createInitialSlots(): GridSlotState[] {
     return [
-      { index: 0, label: '前1', row: 'front', position: { x: -220, y: -285 } },
-      { index: 1, label: '前2', row: 'front', position: { x: 0, y: -285 } },
-      { index: 2, label: '前3', row: 'front', position: { x: 220, y: -285 } },
-      { index: 3, label: '后1', row: 'back', position: { x: -150, y: -405 } },
-      { index: 4, label: '后2', row: 'back', position: { x: 150, y: -405 } },
+      { index: 0, label: '前1', row: 'front', position: { x: -210, y: -300 } },
+      { index: 1, label: '前2', row: 'front', position: { x: 0, y: -300 } },
+      { index: 2, label: '前3', row: 'front', position: { x: 210, y: -300 } },
+      { index: 3, label: '后1', row: 'back', position: { x: -210, y: -410 } },
+      { index: 4, label: '后2', row: 'back', position: { x: 210, y: -410 } },
     ];
   }
 

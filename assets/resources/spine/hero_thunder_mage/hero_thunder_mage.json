@@ -1,0 +1,127 @@
+{
+  "skeleton": {
+    "hash": " ",
+    "spine": "3.8.75",
+    "x": 0,
+    "y": 0,
+    "width": 0,
+    "height": 0,
+    "images": "./",
+    "audio": ""
+  },
+  "bones": [
+    {
+      "name": "root"
+    }
+  ],
+  "slots": [
+    {
+      "name": "frame",
+      "bone": "root",
+      "attachment": "frame_0"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "frame": {
+          "frame_0": {
+            "x": 0,
+            "y": 0,
+            "width": 336,
+            "height": 393
+          },
+          "frame_1": {
+            "x": 0,
+            "y": 0,
+            "width": 307,
+            "height": 437
+          },
+          "frame_2": {
+            "x": 0,
+            "y": 0,
+            "width": 323,
+            "height": 438
+          },
+          "frame_3": {
+            "x": 0,
+            "y": 0,
+            "width": 347,
+            "height": 435
+          },
+          "frame_4": {
+            "x": 0,
+            "y": 0,
+            "width": 267,
+            "height": 417
+          },
+          "frame_5": {
+            "x": 0,
+            "y": 0,
+            "width": 325,
+            "height": 401
+          },
+          "frame_6": {
+            "x": 0,
+            "y": 0,
+            "width": 265,
+            "height": 382
+          },
+          "frame_7": {
+            "x": 0,
+            "y": 0,
+            "width": 307,
+            "height": 367
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "attack": {
+      "slots": {
+        "frame": {
+          "attachment": [
+            {
+              "time": 0,
+              "name": "frame_0"
+            },
+            {
+              "time": 0.125,
+              "name": "frame_1"
+            },
+            {
+              "time": 0.25,
+              "name": "frame_2"
+            },
+            {
+              "time": 0.375,
+              "name": "frame_3"
+            },
+            {
+              "time": 0.5,
+              "name": "frame_4"
+            },
+            {
+              "time": 0.625,
+              "name": "frame_5"
+            },
+            {
+              "time": 0.75,
+              "name": "frame_6"
+            },
+            {
+              "time": 0.875,
+              "name": "frame_7"
+            },
+            {
+              "time": 1,
+              "name": "frame_0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
