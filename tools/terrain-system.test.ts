@@ -112,10 +112,11 @@ function readPngPixels(path: string): PngPixels {
 }
 
 runTest('terrain config fixes the wall and five-unit formation coordinates', () => {
-  assert.equal(BATTLE_WALL_LAYOUT.cityLineY, -290);
-  assert.equal(BATTLE_WALL_LAYOUT.wallBackY, -365);
-  assert.equal(BATTLE_WALL_LAYOUT.wallFrontY, -385);
+  assert.equal(BATTLE_WALL_LAYOUT.cityLineY, -235);
+  assert.equal(BATTLE_WALL_LAYOUT.wallBackY, -400);
+  assert.equal(BATTLE_WALL_LAYOUT.wallFrontY, -470);
   assert.equal(BATTLE_WALL_LAYOUT.unitY, -320);
+  assert.equal(BATTLE_WALL_LAYOUT.cityLineY - BATTLE_WALL_LAYOUT.unitY, 85);
   assert.deepEqual(BATTLE_WALL_LAYOUT.thunderMage, { x: -240, y: -320 });
   assert.deepEqual(BATTLE_WALL_LAYOUT.ordinarySlots, [
     { x: -120, y: -320 },
@@ -173,14 +174,14 @@ runTest('terrain config defines the seven modular assets and stable render roots
       {
         id: 'wallBack',
         filename: 'battle_wall_back.png',
-        size: [720, 240],
+        size: [720, 480],
         required: true,
         expectsAlpha: true,
       },
       {
         id: 'wallFront',
         filename: 'battle_wall_front.png',
-        size: [720, 160],
+        size: [720, 340],
         required: false,
         expectsAlpha: true,
       },

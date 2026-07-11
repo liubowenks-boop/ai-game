@@ -20,9 +20,9 @@ export interface BattleTerrainLayerSpec {
 }
 
 export const BATTLE_WALL_LAYOUT = {
-  cityLineY: -290,
-  wallBackY: -365,
-  wallFrontY: -385,
+  cityLineY: -235,
+  wallBackY: -400,
+  wallFrontY: -470,
   unitY: -320,
   thunderMage: { x: -240, y: -320 },
   ordinarySlots: [
@@ -100,7 +100,7 @@ export const BATTLE_TERRAIN_LAYERS: readonly BattleTerrainLayerSpec[] = [
     filename: 'battle_wall_back.png',
     path: 'battle_common/battle_wall_back',
     width: 720,
-    height: 240,
+    height: 480,
     x: 0,
     y: BATTLE_WALL_LAYOUT.wallBackY,
     required: true,
@@ -112,7 +112,7 @@ export const BATTLE_TERRAIN_LAYERS: readonly BattleTerrainLayerSpec[] = [
     filename: 'battle_wall_front.png',
     path: 'battle_common/battle_wall_front',
     width: 720,
-    height: 160,
+    height: 340,
     x: 0,
     y: BATTLE_WALL_LAYOUT.wallFrontY,
     required: false,

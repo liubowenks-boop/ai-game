@@ -79,7 +79,16 @@ runTest('animation profiles cover required hero and enemy states', () => {
 });
 
 runTest('thunder mage attack timing clamps to the configured source duration', () => {
-  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, 0.6);
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, 0.85);
+  assert.equal(resolveThunderMageAttackAnimationTiming(0.85).spinePlaybackSpeed, 1 / 0.85);
+  assert.ok(
+    resolveThunderMageAttackAnimationTiming(0.5).spinePlaybackSpeed >
+      resolveThunderMageAttackAnimationTiming(0.85).spinePlaybackSpeed,
+  );
+  assert.ok(
+    resolveThunderMageAttackAnimationTiming(1.1).spinePlaybackSpeed <
+      resolveThunderMageAttackAnimationTiming(0.85).spinePlaybackSpeed,
+  );
   assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION, 0.25);
   assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION, 1.2);
 
@@ -100,10 +109,10 @@ runTest('thunder mage attack timing clamps to the configured source duration', (
   assert.equal(clampLow.spinePlaybackSpeed, 1 / 0.25);
   assert.equal(clampHigh.animationDuration, 1.2);
   assert.equal(clampHigh.spinePlaybackSpeed, 1 / 1.2);
-  assert.equal(fallbackZero.animationDuration, 0.6);
-  assert.equal(fallbackNegative.animationDuration, 0.6);
-  assert.equal(fallbackNaN.animationDuration, 0.6);
-  assert.equal(fallbackInfinity.animationDuration, 0.6);
+  assert.equal(fallbackZero.animationDuration, 0.85);
+  assert.equal(fallbackNegative.animationDuration, 0.85);
+  assert.equal(fallbackNaN.animationDuration, 0.85);
+  assert.equal(fallbackInfinity.animationDuration, 0.85);
 });
 
 runTest('thunder mage frame mapping clamps progress across frame 0 through 7', () => {
@@ -204,7 +213,7 @@ runTest('thunder mage profile uses the portable attack Spine asset', () => {
   assert.equal(idleClip?.speed, 0);
   assert.equal(attackClip?.clipName, 'attack');
   assert.equal(attackClip?.loop, false);
-  assert.equal(attackClip?.duration, 0.6);
+  assert.equal(attackClip?.duration, 0.85);
   assert.equal(attackClip?.renderer, 'spine');
   assert.equal(attackClip?.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
 });

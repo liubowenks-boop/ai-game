@@ -93,7 +93,7 @@ runTest(
       slotIndex: 3,
       position: { x: -240, y: -320 },
       attackDamage: 7,
-      attackInterval: 0.6,
+      attackInterval: 0.85,
       displayScale: 0.22,
       spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
     });
@@ -134,7 +134,7 @@ runTest('five-unit wall formation caps ordinary board heroes at three', () => {
     reservedBy: 'fixed_companion',
   });
   assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
-  assert.equal(model.options.cityLineY, -290);
+  assert.equal(model.options.cityLineY, -235);
 
   assert.ok(model.placeHero(0, '弓手'));
   assert.ok(model.placeHero(1, '火药师'));
@@ -327,7 +327,7 @@ runTest('thunder mage interval falls back to one when drummer aura is invalid', 
 
 runTest('thunder mage falls back to default base interval before applying valid aura', () => {
   const invalidIntervals = [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.6];
-  const expectedInterval = 0.6 / 1.12;
+  const expectedInterval = 0.85 / 1.12;
 
   for (const companionAttackInterval of invalidIntervals) {
     const model = new BattleMvpModel({ companionAttackInterval });
@@ -385,9 +385,11 @@ runTest('default enemy tuning is slower and less punishing for readable mobile c
   const fast = enemyConfigs.find((enemy) => enemy.kind === 'fast');
   const boss = enemyConfigs.find((enemy) => enemy.kind === 'boss');
 
-  assert.equal(model.options.enemyBaseSpeed, 34);
+  assert.equal(model.options.enemyBaseSpeed, 30);
   assert.equal(model.options.enemyDamage, 0.5);
-  assert.equal(model.options.enemyBaseHp, 20);
+  assert.equal(model.options.enemyBaseHp, 24);
+  assert.equal(model.options.cityLineY, -235);
+  assert.equal(model.options.companionAttackInterval, 0.85);
   assert.equal(model.options.mainAttackDamage, 11);
   assert.equal(model.options.waveInterval, 3);
   assert.ok((fast?.speedMultiplier ?? 99) <= 1.12);
@@ -616,7 +618,7 @@ runTest('default prototype coordinates fit the Cocos 720x1280 portrait preview v
   assert.ok(model.options.enemyStartY <= halfHeight);
   assert.ok(model.options.cityLineY >= -halfHeight);
   assert.ok(model.playerPosition.y >= -halfHeight);
-  assert.equal(model.options.cityLineY, -290);
+  assert.equal(model.options.cityLineY, -235);
   assert.ok(model.options.cityLineY > model.slots[0].position.y);
 
   for (const slot of model.slots) {
