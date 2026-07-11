@@ -11,6 +11,11 @@ import {
   resolveEnemyAnimationState,
   tickUnitAnimation,
 } from '../assets/scripts/battle/UnitAnimationSystem';
+import {
+  ThunderMageSkeletonLoadCoordinator,
+  advanceThunderMageProjectile,
+  resolveThunderMageAttackFrameIndex,
+} from '../assets/scripts/battle/ThunderMagePresentationLogic';
 
 const {
   ENEMY_ANIMATION_PROFILES,
@@ -84,6 +89,81 @@ runTest('thunder mage attack timing clamps to the configured source duration', (
   assert.equal(fallbackNegative.animationDuration, 0.6);
   assert.equal(fallbackNaN.animationDuration, 0.6);
   assert.equal(fallbackInfinity.animationDuration, 0.6);
+});
+
+runTest('thunder mage frame mapping clamps progress across frame 0 through 7', () => {
+  assert.equal(resolveThunderMageAttackFrameIndex(0, 1, 1), 0);
+  assert.equal(resolveThunderMageAttackFrameIndex(-1, 1, 1), 0);
+  assert.equal(resolveThunderMageAttackFrameIndex(Number.NaN, 1, 1), 0);
+  assert.equal(resolveThunderMageAttackFrameIndex(0, Number.POSITIVE_INFINITY, 1), 0);
+
+  for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
+    const elapsed = (frameIndex + 0.01) / 8;
+    assert.equal(resolveThunderMageAttackFrameIndex(elapsed, 1, 1), frameIndex);
+  }
+
+  assert.equal(resolveThunderMageAttackFrameIndex(1, 1, 1), 7);
+  assert.equal(resolveThunderMageAttackFrameIndex(10, 1, 1), 7);
+});
+
+runTest('thunder mage projectile advances once per delta and reports completion', () => {
+  const firstStep = advanceThunderMageProjectile(0, 0.2, 0.1);
+  assert.deepEqual(firstStep, { age: 0.1, complete: false });
+
+  const finalStep = advanceThunderMageProjectile(firstStep.age, 0.2, 0.1);
+  assert.deepEqual(finalStep, { age: 0.2, complete: true });
+});
+
+runTest('thunder mage shared skeleton loading broadcasts failure and retries later', () => {
+  const coordinator = new ThunderMageSkeletonLoadCoordinator<{ id: string }>();
+  const firstResults: string[] = [];
+  let loadCalls = 0;
+  let warningCalls = 0;
+  let finishFirstLoad: ((error?: unknown, value?: { id: string }) => void) | undefined;
+
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      finishFirstLoad = complete;
+    },
+    (result) => firstResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+  coordinator.request(
+    () => {
+      loadCalls += 1;
+    },
+    (result) => firstResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 1);
+  assert.equal(coordinator.loadState, 'loading');
+  finishFirstLoad?.(new Error('first load failed'));
+  assert.deepEqual(firstResults, ['warned', 'warned']);
+  assert.equal(warningCalls, 1);
+  assert.equal(coordinator.loadState, 'idle');
+
+  const retryResults: string[] = [];
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      complete(undefined, { id: 'loaded-on-retry' });
+    },
+    (result) => retryResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 2);
+  assert.deepEqual(retryResults, ['loaded']);
+  assert.equal(coordinator.loadState, 'loaded');
+  assert.equal(warningCalls, 1);
 });
 
 runTest('thunder mage profile uses the portable attack Spine asset', () => {
@@ -365,7 +445,8 @@ runTest('thunder mage presentation owns its companion spine and electric effects
   assert.equal(presentationSource.includes('console.warn'), true);
   assert.equal(presentationSource.includes("setAttachment('frame', 'frame_0')"), true);
   assert.equal(presentationSource.includes("setAttachment('frame', `frame_${frameIndex}`)"), true);
-  assert.equal(presentationSource.includes('Math.min(7, Math.floor(progress * 8))'), true);
+  assert.equal(presentationSource.includes('resolveThunderMageAttackFrameIndex'), true);
+  assert.equal(presentationSource.includes('advanceThunderMageProjectile'), true);
   assert.equal(presentationSource.includes('new Color(118, 224, 255'), true);
   assert.equal(presentationSource.includes('new Color(247, 252, 255'), true);
   assert.equal(presentationSource.includes('roundRect('), false);
@@ -382,8 +463,10 @@ runTest('thunder mage presentation reuses nodes and shares one skeleton load', (
   assert.equal(presentationSource.includes('ThunderMageBronzeRing'), false);
   assert.equal(presentationSource.includes('drawBronzeRing'), false);
   assert.equal(presentationSource.includes('THUNDER_MAGE_RING_'), false);
-  assert.equal(presentationSource.includes('thunderMageSkeletonLoadState'), true);
-  assert.equal(presentationSource.includes('thunderMageSkeletonData'), true);
+  assert.equal(presentationSource.includes('ThunderMageSkeletonLoadCoordinator'), true);
+  assert.equal(presentationSource.includes("result.state === 'warned'"), true);
+  assert.equal(presentationSource.includes("this.loadState = 'warned'"), true);
+  assert.equal(presentationSource.includes('projectile.age += deltaTime'), false);
   assert.equal(presentationSource.includes('thunderMagePresentationOwners'), true);
   assert.equal(presentationSource.includes('removeDuplicateNamedChildren'), true);
   assert.equal(presentationSource.includes('if (!this.attackSpineNode.parent)'), true);

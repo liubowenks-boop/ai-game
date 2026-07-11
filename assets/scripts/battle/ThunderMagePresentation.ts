@@ -17,8 +17,12 @@ import {
 } from '../data/AnimationConfig';
 import { THUNDER_MAGE_COMPANION } from '../data/CompanionConfig';
 import { BattleTickResult } from './BattleMvpModel';
-
-type SkeletonLoadState = 'idle' | 'loading' | 'loaded' | 'warned';
+import {
+  ThunderMageSkeletonLoadCoordinator,
+  advanceThunderMageProjectile,
+  resolveThunderMageAttackFrameIndex,
+} from './ThunderMagePresentationLogic';
+import type { ThunderMageSkeletonLoadState } from './ThunderMagePresentationLogic';
 
 interface ThunderMageAttackState {
   elapsed: number;
@@ -49,56 +53,8 @@ const THUNDER_MAGE_PROJECTILE_MIN_DURATION = 0.16;
 const THUNDER_MAGE_PROJECTILE_MAX_DURATION = 0.22;
 const THUNDER_MAGE_BURST_DURATION = 0.2;
 
-let thunderMageSkeletonLoadState: SkeletonLoadState = 'idle';
-let thunderMageSkeletonData: sp.SkeletonData | undefined;
-const thunderMageSkeletonConsumers = new Set<(skeletonData: sp.SkeletonData) => void>();
+const thunderMageSkeletonLoader = new ThunderMageSkeletonLoadCoordinator<sp.SkeletonData>();
 const thunderMagePresentationOwners = new WeakMap<Node, ThunderMagePresentation>();
-
-function publishThunderMageSkeletonData(skeletonData: sp.SkeletonData): void {
-  thunderMageSkeletonData = skeletonData;
-  thunderMageSkeletonLoadState = 'loaded';
-
-  const consumers = Array.from(thunderMageSkeletonConsumers);
-  thunderMageSkeletonConsumers.clear();
-  for (const consumer of consumers) {
-    consumer(skeletonData);
-  }
-}
-
-function requestThunderMageSkeletonData(
-  attackClip: ReturnType<typeof getAnimationClipSpec>,
-  consumer: (skeletonData: sp.SkeletonData) => void,
-): SkeletonLoadState {
-  if (thunderMageSkeletonData) {
-    consumer(thunderMageSkeletonData);
-    return 'loaded';
-  }
-
-  if (thunderMageSkeletonLoadState === 'warned') {
-    return 'warned';
-  }
-
-  thunderMageSkeletonConsumers.add(consumer);
-  if (thunderMageSkeletonLoadState === 'loading') {
-    return 'loading';
-  }
-
-  thunderMageSkeletonLoadState = 'loading';
-  resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
-    if (error || !skeletonData) {
-      thunderMageSkeletonConsumers.clear();
-      if (thunderMageSkeletonLoadState !== 'warned') {
-        thunderMageSkeletonLoadState = 'warned';
-        console.warn(`Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`, error);
-      }
-      return;
-    }
-
-    publishThunderMageSkeletonData(skeletonData);
-  });
-
-  return 'loading';
-}
 
 export class ThunderMagePresentation {
   private readonly attackClip = getAnimationClipSpec(THUNDER_MAGE_ANIMATION_PROFILE, 'attack');
@@ -110,7 +66,7 @@ export class ThunderMagePresentation {
   private readonly projectiles: ThunderMageProjectileState[] = [];
   private readonly bursts: ThunderMageBurstState[] = [];
   private readonly setUiLayer: (node: Node) => void;
-  private loadState: SkeletonLoadState = 'idle';
+  private loadState: ThunderMageSkeletonLoadState = 'idle';
   private activeAttack: ThunderMageAttackState | undefined;
   private spineMode: 'hidden' | 'idle' | 'attack' = 'hidden';
   private spineFrameIndex = 0;
@@ -243,31 +199,43 @@ export class ThunderMagePresentation {
 
     const existingSkeletonData = this.attackSpine.skeletonData;
     if (existingSkeletonData) {
-      publishThunderMageSkeletonData(existingSkeletonData);
+      thunderMageSkeletonLoader.publish(existingSkeletonData);
       this.loadState = 'loaded';
       this.applyIdlePose();
       return;
     }
 
-    const sharedState = requestThunderMageSkeletonData(attackClip, (skeletonData) => {
-      if (!this.isLive()) {
-        return;
-      }
+    this.loadState = 'loading';
+    thunderMageSkeletonLoader.request(
+      (complete) => {
+        resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
+          complete(error, skeletonData);
+        });
+      },
+      (result) => {
+        if (!this.isLive()) {
+          return;
+        }
 
-      this.attackSpine.skeletonData = skeletonData;
-      this.loadState = 'loaded';
+        if (result.state === 'warned') {
+          this.loadState = 'warned';
+          return;
+        }
 
-      if (this.activeAttack) {
-        this.beginAttackPose();
-        this.applyCurrentAttackFrame();
-      } else {
-        this.applyIdlePose();
-      }
-    });
+        this.attackSpine.skeletonData = result.value;
+        this.loadState = 'loaded';
 
-    if (this.loadState !== 'loaded') {
-      this.loadState = sharedState;
-    }
+        if (this.activeAttack) {
+          this.beginAttackPose();
+          this.applyCurrentAttackFrame();
+        } else {
+          this.applyIdlePose();
+        }
+      },
+      (error) => {
+        console.warn(`Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`, error);
+      },
+    );
   }
 
   private tickAttack(deltaTime: number): void {
@@ -297,9 +265,10 @@ export class ThunderMagePresentation {
 
   private tickProjectiles(deltaTime: number): void {
     for (const projectile of this.projectiles) {
-      projectile.age += deltaTime;
+      const timing = advanceThunderMageProjectile(projectile.age, projectile.duration, deltaTime);
+      projectile.age = timing.age;
 
-      if (!projectile.hitSpawned && projectile.age >= projectile.duration) {
+      if (!projectile.hitSpawned && timing.complete) {
         projectile.hitSpawned = true;
         this.spawnBurst(projectile.to);
       }
@@ -380,9 +349,11 @@ export class ThunderMagePresentation {
       this.beginAttackPose();
     }
 
-    const progress =
-      (this.activeAttack.elapsed * this.activeAttack.speed) / this.activeAttack.sourceDuration;
-    const frameIndex = Math.min(7, Math.floor(progress * 8));
+    const frameIndex = resolveThunderMageAttackFrameIndex(
+      this.activeAttack.elapsed,
+      this.activeAttack.speed,
+      this.activeAttack.sourceDuration,
+    );
     if (this.spineFrameIndex !== frameIndex) {
       this.attackSpine.setAttachment('frame', `frame_${frameIndex}`);
       this.spineFrameIndex = frameIndex;
