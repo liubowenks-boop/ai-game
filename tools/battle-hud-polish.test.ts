@@ -254,6 +254,16 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
     'private drawPlainButton(',
     'private createLabel(',
   );
+  const createSlotButtonSource = sourceSection(
+    gridPlacementSource,
+    'private createSlotButton(',
+    'private getSlotText(',
+  );
+  const reservedSlotHelperSource = sourceSection(
+    gridPlacementSource,
+    'private isFixedCompanionSlot(',
+    'private createButton(',
+  );
   const getSlotTextSource = sourceSection(
     gridPlacementSource,
     'private getSlotText(',
@@ -293,14 +303,28 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
   assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
   assert.equal(drawPlainButtonSource.includes('roundRect'), false);
-  assert.match(getSlotTextSource, /return slot\.hero \? '' : slot\.label;/);
+  assert.match(getSlotTextSource, /return slot\.hero \|\| slot\.reservedBy \? '' : slot\.label;/);
   assert.match(
     getSlotColorSource,
     /return slot\.row === 'front' \? new Color\(80, 39, 28, 230\) : new Color\(65, 34, 27, 230\);/,
   );
+  assert.match(getVisualSlotRectSource, /gridSlotBack1/);
   assert.match(
     getVisualSlotRectSource,
     /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
+  );
+  assert.match(
+    createSlotButtonSource,
+    /const button = view\.node\.getComponent\(Button\);\s*if \(button\) \{\s*button\.interactable = !slot\.reservedBy;\s*\}/s,
+  );
+  assert.match(
+    createSlotButtonSource,
+    /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return;\s*\}\s*if \(!this\.pendingHeroName\) \{/s,
+  );
+  assert.match(reservedSlotHelperSource, /return slot\.reservedBy === 'fixed_companion';/);
+  assert.match(
+    refreshSlotPortraitSource,
+    /if \(this\.isFixedCompanionSlot\(slot\) && !slot\.hero\) \{\s*if \(view\.portraitNode\) \{\s*view\.portraitNode\.active = false;\s*\}\s*view\.portraitFilename = '';\s*return;\s*\}/s,
   );
   assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
   assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);

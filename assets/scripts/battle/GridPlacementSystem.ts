@@ -177,7 +177,16 @@ export class GridPlacementSystem {
       rect.height,
       this.getSlotColor(slot),
     );
+    const button = view.node.getComponent(Button);
+    if (button) {
+      button.interactable = !slot.reservedBy;
+    }
+
     view.node.on(Button.EventType.CLICK, () => {
+      if (this.isFixedCompanionSlot(slot)) {
+        return;
+      }
+
       if (!this.pendingHeroName) {
         return;
       }
@@ -200,7 +209,7 @@ export class GridPlacementSystem {
   }
 
   private getSlotText(slot: GridSlotState): string {
-    return slot.hero ? '' : slot.label;
+    return slot.hero || slot.reservedBy ? '' : slot.label;
   }
 
   private getSlotColor(slot: GridSlotState): Color {
@@ -243,6 +252,14 @@ export class GridPlacementSystem {
   }
 
   private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
+    if (this.isFixedCompanionSlot(slot) && !slot.hero) {
+      if (view.portraitNode) {
+        view.portraitNode.active = false;
+      }
+      view.portraitFilename = '';
+      return;
+    }
+
     const filename = getHeroPortraitFilename(slot.hero?.name ?? '') ?? '';
 
     if (!filename) {
@@ -283,6 +300,10 @@ export class GridPlacementSystem {
       portraitSize,
       'SlotHeroPortrait',
     );
+  }
+
+  private isFixedCompanionSlot(slot: GridSlotState): boolean {
+    return slot.reservedBy === 'fixed_companion';
   }
 
   private createButton(
