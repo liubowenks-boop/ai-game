@@ -1,11 +1,5 @@
 export type BattleTerrainLayerId =
-  | 'base'
-  | 'road'
-  | 'ruinsLeft'
-  | 'ruinsRight'
-  | 'atmosphere'
-  | 'wallBack'
-  | 'wallFront';
+  'base' | 'road' | 'ruinsLeft' | 'ruinsRight' | 'atmosphere' | 'wallBack' | 'wallFront';
 
 export interface BattleTerrainPoint {
   readonly x: number;

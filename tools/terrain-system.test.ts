@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 
 import {
   BATTLE_TERRAIN_LAYERS,
   BATTLE_TERRAIN_RENDER_ROOTS,
   BATTLE_WALL_LAYOUT,
 } from '../assets/scripts/data/BattleTerrainConfig';
+import { BATTLE_TERRAIN_ASSET_UUIDS } from '../assets/scripts/data/BattleTerrainAssets.generated';
 import {
   createBattleTerrainLoadState,
   resolveBattleTerrainMode,
@@ -13,6 +17,98 @@ import {
 function runTest(name: string, testBody: () => void): void {
   testBody();
   console.log(`pass: ${name}`);
+}
+
+interface PngPixels {
+  width: number;
+  height: number;
+  colorType: number;
+  alphaAt(x: number, y: number): number;
+}
+
+function readPngPixels(path: string): PngPixels {
+  const bytes = readFileSync(path);
+  assert.equal(bytes.toString('ascii', 1, 4), 'PNG', `${path} must be a PNG`);
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idatChunks: Buffer[] = [];
+
+  while (offset < bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.toString('ascii', offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    const data = bytes.subarray(dataStart, dataEnd);
+
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data.readUInt8(8);
+      colorType = data.readUInt8(9);
+    } else if (type === 'IDAT') {
+      idatChunks.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+
+    offset = dataEnd + 4;
+  }
+
+  assert.equal(bitDepth, 8, `${path} must use 8-bit channels`);
+  assert.ok(colorType === 2 || colorType === 6, `${path} must be RGB or RGBA`);
+  const bytesPerPixel = colorType === 6 ? 4 : 3;
+  const stride = width * bytesPerPixel;
+  const inflated = inflateSync(Buffer.concat(idatChunks));
+  const pixels = Buffer.alloc(width * height * bytesPerPixel);
+  let sourceOffset = 0;
+
+  const paeth = (left: number, up: number, upLeft: number): number => {
+    const prediction = left + up - upLeft;
+    const leftDistance = Math.abs(prediction - left);
+    const upDistance = Math.abs(prediction - up);
+    const upLeftDistance = Math.abs(prediction - upLeft);
+    if (leftDistance <= upDistance && leftDistance <= upLeftDistance) return left;
+    return upDistance <= upLeftDistance ? up : upLeft;
+  };
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = inflated[sourceOffset];
+    sourceOffset += 1;
+    const rowStart = y * stride;
+
+    for (let byteIndex = 0; byteIndex < stride; byteIndex += 1) {
+      const raw = inflated[sourceOffset + byteIndex];
+      const left = byteIndex >= bytesPerPixel ? pixels[rowStart + byteIndex - bytesPerPixel] : 0;
+      const up = y > 0 ? pixels[rowStart - stride + byteIndex] : 0;
+      const upLeft =
+        y > 0 && byteIndex >= bytesPerPixel
+          ? pixels[rowStart - stride + byteIndex - bytesPerPixel]
+          : 0;
+      let value = raw;
+      if (filter === 1) value += left;
+      else if (filter === 2) value += up;
+      else if (filter === 3) value += Math.floor((left + up) / 2);
+      else if (filter === 4) value += paeth(left, up, upLeft);
+      else assert.equal(filter, 0, `${path} contains unsupported PNG filter ${filter}`);
+      pixels[rowStart + byteIndex] = value & 0xff;
+    }
+
+    sourceOffset += stride;
+  }
+
+  return {
+    width,
+    height,
+    colorType,
+    alphaAt(x: number, y: number): number {
+      if (colorType === 2) return 255;
+      return pixels[(y * width + x) * bytesPerPixel + 3];
+    },
+  };
 }
 
 runTest('terrain config fixes the wall and five-unit formation coordinates', () => {
@@ -123,4 +219,52 @@ runTest('required terrain layers switch atomically while optional failures degra
     ),
     'modular',
   );
+});
+
+runTest('terrain asset files, alpha, metadata and generated UUID manifest agree', () => {
+  const assetDirectory = join(process.cwd(), 'assets', 'bundles', 'battle_common');
+  const manifest = BATTLE_TERRAIN_ASSET_UUIDS as Record<string, string>;
+
+  for (const spec of BATTLE_TERRAIN_LAYERS) {
+    const imagePath = join(assetDirectory, spec.filename);
+    const metaPath = `${imagePath}.meta`;
+    assert.ok(existsSync(imagePath), `missing terrain image ${spec.filename}`);
+    assert.ok(existsSync(metaPath), `missing Cocos metadata ${spec.filename}.meta`);
+
+    const png = readPngPixels(imagePath);
+    assert.deepEqual(
+      { width: png.width, height: png.height },
+      { width: spec.width, height: spec.height },
+      `${spec.filename} has unexpected dimensions`,
+    );
+
+    const cornerAlphas = [
+      png.alphaAt(0, 0),
+      png.alphaAt(png.width - 1, 0),
+      png.alphaAt(0, png.height - 1),
+      png.alphaAt(png.width - 1, png.height - 1),
+    ];
+    if (spec.expectsAlpha) {
+      assert.equal(png.colorType, 6, `${spec.filename} must contain RGBA pixels`);
+      assert.ok(
+        cornerAlphas.filter((alpha) => alpha < 16).length >= 3,
+        `${spec.filename} must not contain a solid rectangular background`,
+      );
+    } else {
+      assert.ok(
+        cornerAlphas.every((alpha) => alpha === 255),
+        `${spec.filename} must be opaque`,
+      );
+    }
+
+    const metadata = JSON.parse(readFileSync(metaPath, 'utf8')) as { uuid?: string };
+    assert.equal(typeof metadata.uuid, 'string', `${spec.filename}.meta needs a UUID`);
+    assert.equal(manifest[spec.filename], metadata.uuid, `${spec.filename} manifest UUID drifted`);
+  }
+
+  assert.deepEqual(
+    Object.keys(manifest).sort(),
+    BATTLE_TERRAIN_LAYERS.map((spec) => spec.filename).sort(),
+  );
+  assert.equal(new Set(Object.values(manifest)).size, BATTLE_TERRAIN_LAYERS.length);
 });

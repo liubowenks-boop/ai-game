@@ -1,7 +1,4 @@
-import {
-  BattleTerrainLayerId,
-  BattleTerrainLayerSpec,
-} from '../data/BattleTerrainConfig';
+import { BattleTerrainLayerId, BattleTerrainLayerSpec } from '../data/BattleTerrainConfig';
 
 export type BattleTerrainLayerStatus = 'pending' | 'ready' | 'failed';
 export type BattleTerrainMode = 'loading' | 'modular' | 'legacy';
