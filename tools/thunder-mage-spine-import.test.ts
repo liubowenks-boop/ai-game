@@ -1,5 +1,8 @@
 import { strict as assert } from 'node:assert';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 
@@ -7,6 +10,7 @@ const root = process.cwd();
 const assetDir = join(root, 'assets/resources/spine/hero_thunder_mage');
 const assetName = 'hero_thunder_mage';
 const requiredFiles = [`${assetName}.json`, `${assetName}.atlas`, `${assetName}.png`];
+const prepareScriptPath = join(root, 'tools/prepare-thunder-mage-alpha.mjs');
 
 type AttachmentKey = {
   time?: number;
@@ -41,15 +45,49 @@ type AtlasRegion = {
 type PngRgbaImage = {
   width: number;
   height: number;
+  rgba: Buffer;
   alphaAt(x: number, y: number): number;
+};
+
+type CocosMeta = {
+  importer?: string;
+  imported?: boolean;
+  uuid?: string;
+  files?: string[];
+  subMetas?: Record<string, CocosSubMeta>;
+  userData?: {
+    atlasUuid?: string;
+    type?: string;
+    hasAlpha?: boolean;
+    redirect?: string;
+  };
+};
+
+type CocosSubMeta = {
+  importer?: string;
+  imported?: boolean;
+  uuid?: string;
+  displayName?: string;
+  id?: string;
+  name?: string;
+  files?: string[];
+  userData?: {
+    wrapModeS?: string;
+    wrapModeT?: string;
+    minfilter?: string;
+    magfilter?: string;
+    mipfilter?: string;
+    isUuid?: boolean;
+    imageUuidOrDatabaseUri?: string;
+  };
 };
 
 function requireFile(path: string): void {
   assert.ok(existsSync(path), `missing file: ${path}`);
 }
 
-function readJson(path: string): SpineSkeletonJson {
-  return JSON.parse(readFileSync(path, 'utf8')) as SpineSkeletonJson;
+function readJson<T>(path: string): T {
+  return JSON.parse(readFileSync(path, 'utf8')) as T;
 }
 
 function atlasRegions(path: string): AtlasRegion[] {
@@ -104,7 +142,13 @@ function readPngRgba(path: string): PngRgbaImage {
     const type = bytes.toString('ascii', offset + 4, offset + 8);
     const dataStart = offset + 8;
     const dataEnd = dataStart + length;
+    assert.ok(dataEnd + 4 <= bytes.length, `truncated PNG chunk ${type}`);
     const data = bytes.subarray(dataStart, dataEnd);
+    assert.equal(
+      bytes.readUInt32BE(dataEnd),
+      crc32(bytes.subarray(offset + 4, dataEnd)),
+      `invalid CRC for PNG chunk ${type}`,
+    );
 
     if (type === 'IHDR') {
       width = data.readUInt32BE(0);
@@ -167,6 +211,7 @@ function readPngRgba(path: string): PngRgbaImage {
   return {
     width,
     height,
+    rgba: pixels,
     alphaAt(x: number, y: number): number {
       assert.ok(x >= 0 && x < width && y >= 0 && y < height, `pixel out of bounds: ${x},${y}`);
       return pixels[(y * width + x) * bytesPerPixel + 3];
@@ -174,11 +219,41 @@ function readPngRgba(path: string): PngRgbaImage {
   };
 }
 
+const crcTable = new Uint32Array(256);
+for (let index = 0; index < crcTable.length; index += 1) {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  }
+  crcTable[index] = value >>> 0;
+}
+
+function crc32(bytes: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function runPrepare(args: string[]) {
+  return spawnSync(process.execPath, [prepareScriptPath, ...args], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+}
+
+function assertUuid(uuid: string | undefined, label: string): asserts uuid is string {
+  assert.match(
+    uuid ?? '',
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    `${label} must use a unique UUID v4`,
+  );
+}
+
 for (const fileName of requiredFiles) {
   requireFile(join(assetDir, fileName));
 }
 
-const spineJson = readJson(join(assetDir, `${assetName}.json`));
+const spineJson = readJson<SpineSkeletonJson>(join(assetDir, `${assetName}.json`));
 assert.equal(spineJson.skeleton?.spine, '3.8.75');
 assert.equal(spineJson.skeleton?.images, './');
 
@@ -213,7 +288,40 @@ assert.deepEqual(regions.map((region) => region.name).sort(), expectedAttachment
 const png = readPngRgba(join(assetDir, `${assetName}.png`));
 assert.equal(png.width, 3492);
 assert.equal(png.height, 442);
+assert.equal(
+  createHash('sha256')
+    .update(readFileSync(join(assetDir, `${assetName}.png`)))
+    .digest('hex'),
+  'a72150d1aac31ac1653539110311e09519c8bb3e2500124cb8efa276efc35a18',
+);
+assert.equal(
+  createHash('sha256').update(png.rgba).digest('hex'),
+  '5a87a7b71504fc391087bfa20813ae202e3a419f72f543ff672386b212f92dbb',
+);
+
+const expectedRegionPixels: Record<string, { transparent: number; visible: number }> = {
+  frame_0: { transparent: 71227, visible: 60821 },
+  frame_1: { transparent: 78126, visible: 56033 },
+  frame_2: { transparent: 82755, visible: 58719 },
+  frame_3: { transparent: 89131, visible: 61814 },
+  frame_4: { transparent: 64120, visible: 47219 },
+  frame_5: { transparent: 72131, visible: 58194 },
+  frame_6: { transparent: 58022, visible: 43208 },
+  frame_7: { transparent: 59950, visible: 52719 },
+};
+
 for (const region of regions) {
+  let transparent = 0;
+  let visible = 0;
+  for (let y = region.y; y < region.y + region.height; y += 1) {
+    for (let x = region.x; x < region.x + region.width; x += 1) {
+      const alpha = png.alphaAt(x, y);
+      if (alpha === 0) transparent += 1;
+      else visible += 1;
+    }
+  }
+  assert.deepEqual({ transparent, visible }, expectedRegionPixels[region.name]);
+
   const centerX = region.x + Math.floor(region.width / 2);
   const centerY = region.y + Math.floor(region.height / 2);
   assert.ok(
@@ -235,10 +343,92 @@ for (const region of regions) {
   }
 }
 
-for (const fileName of requiredFiles) {
-  requireFile(join(assetDir, `${fileName}.meta`));
+const directoryMeta = readJson<CocosMeta>(`${assetDir}.meta`);
+const atlasMeta = readJson<CocosMeta>(join(assetDir, `${assetName}.atlas.meta`));
+const skeletonMeta = readJson<CocosMeta>(join(assetDir, `${assetName}.json.meta`));
+const imageMeta = readJson<CocosMeta>(join(assetDir, `${assetName}.png.meta`));
+
+assert.equal(directoryMeta.importer, 'directory');
+assert.equal(atlasMeta.importer, '*');
+assert.equal(skeletonMeta.importer, 'spine-data');
+assert.equal(imageMeta.importer, 'image');
+for (const [label, meta] of [
+  ['directory', directoryMeta],
+  ['atlas', atlasMeta],
+  ['skeleton', skeletonMeta],
+  ['image', imageMeta],
+] as const) {
+  assert.equal(meta.imported, true, `${label} meta must be imported`);
+  assertUuid(meta.uuid, label);
 }
-requireFile(`${assetDir}.meta`);
+
+const metaUuids = [directoryMeta.uuid, atlasMeta.uuid, skeletonMeta.uuid, imageMeta.uuid];
+assert.equal(new Set(metaUuids).size, metaUuids.length, 'asset meta UUIDs must be unique');
+assert.deepEqual(atlasMeta.files, ['.atlas', '.json']);
+assert.deepEqual(skeletonMeta.files, ['.json']);
+assert.equal(skeletonMeta.userData?.atlasUuid, atlasMeta.uuid);
+assert.deepEqual(imageMeta.files, ['.json', '.png']);
+assert.equal(imageMeta.userData?.type, 'texture');
+assert.equal(imageMeta.userData?.hasAlpha, true);
+
+const textureEntries = Object.entries(imageMeta.subMetas ?? {});
+assert.equal(textureEntries.length, 1, 'image meta must have one texture subMeta');
+const [textureId, textureMeta] = textureEntries[0];
+assert.equal(textureMeta.importer, 'texture');
+assert.equal(textureMeta.imported, true);
+assert.equal(textureMeta.id, textureId);
+assert.equal(textureMeta.name, 'texture');
+assert.equal(textureMeta.displayName, assetName);
+assert.equal(textureMeta.uuid, `${imageMeta.uuid}@${textureId}`);
+assert.deepEqual(textureMeta.files, ['.json']);
+assert.equal(textureMeta.userData?.isUuid, true);
+assert.equal(textureMeta.userData?.imageUuidOrDatabaseUri, imageMeta.uuid);
+assert.equal(textureMeta.userData?.wrapModeS, 'repeat');
+assert.equal(textureMeta.userData?.wrapModeT, 'repeat');
+assert.equal(textureMeta.userData?.minfilter, 'linear');
+assert.equal(textureMeta.userData?.magfilter, 'linear');
+assert.equal(textureMeta.userData?.mipfilter, 'none');
+assert.equal(imageMeta.userData?.redirect, textureMeta.uuid);
+
+const missingArgs = runPrepare([]);
+assert.notEqual(missingArgs.status, 0, 'prepare script must reject missing CLI arguments');
+assert.match(missingArgs.stderr, /Usage:/);
+
+const tempDir = mkdtempSync(join(tmpdir(), 'thunder-mage-alpha-'));
+try {
+  const pngBytes = readFileSync(join(assetDir, `${assetName}.png`));
+  const outputPath = join(tempDir, 'output.png');
+
+  const missingSource = runPrepare([join(tempDir, 'missing.png'), atlasPath, outputPath]);
+  assert.notEqual(missingSource.status, 0);
+  assert.match(missingSource.stderr, /source PNG.*not a file/);
+
+  const corruptCrc = Buffer.from(pngBytes);
+  corruptCrc[32] ^= 0xff;
+  const corruptPath = join(tempDir, 'corrupt-crc.png');
+  writeFileSync(corruptPath, corruptCrc);
+  const corruptResult = runPrepare([corruptPath, atlasPath, outputPath]);
+  assert.notEqual(corruptResult.status, 0);
+  assert.match(corruptResult.stderr, /CRC mismatch for IHDR/);
+
+  const oversized = Buffer.from(pngBytes);
+  oversized.writeUInt32BE(100_000, 16);
+  oversized.writeUInt32BE(crc32(oversized.subarray(12, 29)), 29);
+  const oversizedPath = join(tempDir, 'oversized.png');
+  writeFileSync(oversizedPath, oversized);
+  const oversizedResult = runPrepare([oversizedPath, atlasPath, outputPath]);
+  assert.notEqual(oversizedResult.status, 0);
+  assert.match(oversizedResult.stderr, /PNG dimensions exceed safety limit/);
+
+  const validResult = runPrepare([join(assetDir, `${assetName}.png`), atlasPath, outputPath]);
+  assert.equal(validResult.status, 0, validResult.stderr);
+  assert.equal(
+    createHash('sha256').update(readFileSync(outputPath)).digest('hex'),
+    'a72150d1aac31ac1653539110311e09519c8bb3e2500124cb8efa276efc35a18',
+  );
+} finally {
+  rmSync(tempDir, { recursive: true, force: true });
+}
 
 console.log(
   `pass: imported thunder mage Spine attack has ${regions.length} transparent atlas regions`,

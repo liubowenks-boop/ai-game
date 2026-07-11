@@ -1,16 +1,14 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { deflateSync, inflateSync } from 'node:zlib';
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const BYTES_PER_PIXEL = 4;
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const root = join(scriptDir, '..');
-const sourcePath = '/Users/hudaijin/Downloads/attack 2/attack 2.png';
-const assetDir = join(root, 'assets/resources/spine/hero_thunder_mage');
-const atlasPath = join(assetDir, 'hero_thunder_mage.atlas');
-const outputPath = join(assetDir, 'hero_thunder_mage.png');
+const MAX_PNG_FILE_BYTES = 64 * 1024 * 1024;
+const MAX_CHUNK_BYTES = 32 * 1024 * 1024;
+const MAX_COMPRESSED_BYTES = 32 * 1024 * 1024;
+const MAX_DIMENSION = 16_384;
+const MAX_PIXELS = 16_777_216;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,43 +23,135 @@ function paeth(a, b, c) {
   return pb <= pc ? b : c;
 }
 
-function decodePngRgba(path) {
-  const bytes = readFileSync(path);
-  assert(bytes.subarray(0, 8).equals(PNG_SIGNATURE), `expected PNG signature: ${path}`);
-
-  let offset = 8;
-  let ihdr;
-  const idatChunks = [];
-
-  while (offset < bytes.length) {
-    const length = bytes.readUInt32BE(offset);
-    const type = bytes.toString('ascii', offset + 4, offset + 8);
-    const dataStart = offset + 8;
-    const dataEnd = dataStart + length;
-    assert(dataEnd + 4 <= bytes.length, `truncated PNG chunk ${type}`);
-    const data = bytes.subarray(dataStart, dataEnd);
-
-    if (type === 'IHDR') ihdr = Buffer.from(data);
-    else if (type === 'IDAT') idatChunks.push(data);
-    else if (type === 'IEND') break;
-
-    offset = dataEnd + 4;
+const crcTable = new Uint32Array(256);
+for (let index = 0; index < crcTable.length; index += 1) {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
   }
+  crcTable[index] = value >>> 0;
+}
 
-  assert(ihdr?.length === 13, 'missing PNG IHDR');
-  assert(idatChunks.length > 0, 'missing PNG IDAT');
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
+function formatCrc(value) {
+  return value.toString(16).padStart(8, '0');
+}
+
+function validateIhdr(ihdr) {
+  assert(ihdr.length === 13, 'PNG IHDR must contain 13 bytes');
   const width = ihdr.readUInt32BE(0);
   const height = ihdr.readUInt32BE(4);
+  assert(width > 0 && height > 0, `PNG dimensions must be positive, got ${width}x${height}`);
+  assert(
+    width <= MAX_DIMENSION && height <= MAX_DIMENSION,
+    `PNG dimensions exceed safety limit: ${width}x${height} (max ${MAX_DIMENSION} per side)`,
+  );
+  assert(
+    width * height <= MAX_PIXELS,
+    `PNG pixel count exceeds safety limit: ${width * height} (max ${MAX_PIXELS})`,
+  );
   assert(ihdr.readUInt8(8) === 8, 'expected 8-bit PNG');
   assert(ihdr.readUInt8(9) === 6, 'expected RGBA PNG');
   assert(ihdr.readUInt8(10) === 0, 'unsupported PNG compression method');
   assert(ihdr.readUInt8(11) === 0, 'unsupported PNG filter method');
   assert(ihdr.readUInt8(12) === 0, 'expected non-interlaced PNG');
+  return { width, height };
+}
+
+function decodePngRgba(path) {
+  const fileSize = statSync(path).size;
+  assert(
+    fileSize <= MAX_PNG_FILE_BYTES,
+    `PNG file exceeds safety limit: ${fileSize} bytes (max ${MAX_PNG_FILE_BYTES})`,
+  );
+  const bytes = readFileSync(path);
+  assert(bytes.subarray(0, 8).equals(PNG_SIGNATURE), `expected PNG signature: ${path}`);
+
+  let offset = 8;
+  let ihdr;
+  let width = 0;
+  let height = 0;
+  let compressedBytes = 0;
+  let chunkIndex = 0;
+  let sawIend = false;
+  const idatChunks = [];
+
+  while (offset < bytes.length) {
+    assert(offset + 8 <= bytes.length, `truncated PNG chunk header at byte ${offset}`);
+    const length = bytes.readUInt32BE(offset);
+    assert(
+      length <= MAX_CHUNK_BYTES,
+      `PNG chunk exceeds safety limit: ${length} bytes (max ${MAX_CHUNK_BYTES})`,
+    );
+    const type = bytes.toString('ascii', offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    assert(dataEnd + 4 <= bytes.length, `truncated PNG chunk ${type}`);
+    const data = bytes.subarray(dataStart, dataEnd);
+    const storedCrc = bytes.readUInt32BE(dataEnd);
+    const actualCrc = crc32(bytes.subarray(offset + 4, dataEnd));
+    assert(
+      storedCrc === actualCrc,
+      `CRC mismatch for ${type}: stored ${formatCrc(storedCrc)}, calculated ${formatCrc(actualCrc)}`,
+    );
+
+    if (chunkIndex === 0) assert(type === 'IHDR', `first PNG chunk must be IHDR, got ${type}`);
+
+    if (type === 'IHDR') {
+      assert(!ihdr, 'PNG must contain exactly one IHDR chunk');
+      ihdr = Buffer.from(data);
+      ({ width, height } = validateIhdr(ihdr));
+    } else {
+      assert(ihdr, `PNG chunk ${type} appeared before IHDR`);
+    }
+
+    if (type === 'IDAT') {
+      compressedBytes += length;
+      assert(
+        compressedBytes <= MAX_COMPRESSED_BYTES,
+        `PNG compressed data exceeds safety limit: ${compressedBytes} bytes (max ${MAX_COMPRESSED_BYTES})`,
+      );
+      idatChunks.push(data);
+    } else if (type === 'IEND') {
+      assert(length === 0, 'PNG IEND chunk must be empty');
+      sawIend = true;
+    }
+
+    offset = dataEnd + 4;
+    chunkIndex += 1;
+    if (sawIend) break;
+  }
+
+  assert(ihdr, 'missing PNG IHDR');
+  assert(idatChunks.length > 0, 'missing PNG IDAT');
+  assert(sawIend, 'missing PNG IEND');
+  assert(
+    offset === bytes.length,
+    `unexpected trailing data after PNG IEND: ${bytes.length - offset} bytes`,
+  );
 
   const stride = width * BYTES_PER_PIXEL;
-  const inflated = inflateSync(Buffer.concat(idatChunks));
-  assert(inflated.length === height * (stride + 1), 'unexpected PNG scanline size');
+  const expectedScanlineBytes = height * (stride + 1);
+  let inflated;
+  try {
+    inflated = inflateSync(Buffer.concat(idatChunks), {
+      maxOutputLength: expectedScanlineBytes,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `PNG inflate failed or exceeded ${expectedScanlineBytes} output bytes: ${detail}`,
+    );
+  }
+  assert(
+    inflated.length === expectedScanlineBytes,
+    `unexpected PNG scanline size: ${inflated.length} bytes (expected ${expectedScanlineBytes})`,
+  );
 
   const pixels = Buffer.alloc(width * height * BYTES_PER_PIXEL);
   let sourceOffset = 0;
@@ -193,21 +283,6 @@ function clearBoundaryConnectedBackground(image, region, clearedMask) {
   return cleared;
 }
 
-const crcTable = new Uint32Array(256);
-for (let index = 0; index < crcTable.length; index += 1) {
-  let value = index;
-  for (let bit = 0; bit < 8; bit += 1) {
-    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-  }
-  crcTable[index] = value >>> 0;
-}
-
-function crc32(bytes) {
-  let crc = 0xffffffff;
-  for (const byte of bytes) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
 function pngChunk(type, data) {
   const typeBytes = Buffer.from(type, 'ascii');
   const chunk = Buffer.alloc(data.length + 12);
@@ -258,22 +333,81 @@ function verifyOnlyConnectedAlphaChanged(originalPixels, pixels, clearedMask) {
   }
 }
 
-const image = decodePngRgba(sourcePath);
-assert(image.width === 3492 && image.height === 442, 'unexpected source PNG dimensions');
-const originalPixels = Buffer.from(image.pixels);
-const regions = parseAtlasRegions(atlasPath);
-const clearedMask = new Uint8Array(image.width * image.height);
-const stats = regions.map((region) => ({
-  name: region.name,
-  cleared: clearBoundaryConnectedBackground(image, region, clearedMask),
-}));
+function requireInputFile(path, label) {
+  let stats;
+  try {
+    stats = statSync(path);
+  } catch {
+    throw new Error(`${label} is not a file: ${path}`);
+  }
+  assert(stats.isFile(), `${label} is not a file: ${path}`);
+  return stats;
+}
 
-verifyOnlyConnectedAlphaChanged(originalPixels, image.pixels, clearedMask);
-const output = encodePngRgba(image);
-const unchanged = existsSync(outputPath) && readFileSync(outputPath).equals(output);
-if (!unchanged) writeFileSync(outputPath, output);
+function parseCliArgs(args) {
+  assert(
+    args.length === 3,
+    'Usage: node tools/prepare-thunder-mage-alpha.mjs <source.png> <atlas> <output.png>',
+  );
+  const [sourceArgument, atlasArgument, outputArgument] = args;
+  const sourcePath = resolve(sourceArgument);
+  const atlasPath = resolve(atlasArgument);
+  const outputPath = resolve(outputArgument);
 
-const totalCleared = stats.reduce((sum, stat) => sum + stat.cleared, 0);
-console.log(`prepared ${outputPath}`);
-for (const stat of stats) console.log(`${stat.name}: cleared ${stat.cleared} background pixels`);
-console.log(`total: cleared ${totalCleared} pixels; output ${unchanged ? 'unchanged' : 'written'}`);
+  const sourceStats = requireInputFile(sourcePath, 'source PNG');
+  requireInputFile(atlasPath, 'atlas');
+  assert(sourcePath !== outputPath, 'source PNG and output PNG must use different paths');
+
+  const outputDirectory = dirname(outputPath);
+  let outputDirectoryStats;
+  try {
+    outputDirectoryStats = statSync(outputDirectory);
+  } catch {
+    throw new Error(`output directory is not a directory: ${outputDirectory}`);
+  }
+  assert(
+    outputDirectoryStats.isDirectory(),
+    `output directory is not a directory: ${outputDirectory}`,
+  );
+  if (existsSync(outputPath)) {
+    const outputStats = requireInputFile(outputPath, 'output PNG');
+    assert(
+      sourceStats.dev !== outputStats.dev || sourceStats.ino !== outputStats.ino,
+      'source PNG and output PNG must refer to different files',
+    );
+  }
+
+  return { sourcePath, atlasPath, outputPath };
+}
+
+function main() {
+  const { sourcePath, atlasPath, outputPath } = parseCliArgs(process.argv.slice(2));
+  const image = decodePngRgba(sourcePath);
+  const originalPixels = Buffer.from(image.pixels);
+  const regions = parseAtlasRegions(atlasPath);
+  const clearedMask = new Uint8Array(image.width * image.height);
+  const stats = regions.map((region) => ({
+    name: region.name,
+    cleared: clearBoundaryConnectedBackground(image, region, clearedMask),
+  }));
+
+  verifyOnlyConnectedAlphaChanged(originalPixels, image.pixels, clearedMask);
+  const output = encodePngRgba(image);
+  const unchanged = existsSync(outputPath) && readFileSync(outputPath).equals(output);
+  if (!unchanged) writeFileSync(outputPath, output);
+
+  const totalCleared = stats.reduce((sum, stat) => sum + stat.cleared, 0);
+  console.log(`prepared ${outputPath}`);
+  for (const stat of stats) console.log(`${stat.name}: cleared ${stat.cleared} background pixels`);
+  console.log(
+    `total: cleared ${totalCleared} pixels; output ${unchanged ? 'unchanged' : 'written'}`,
+  );
+}
+
+try {
+  main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`error: ${message}`);
+  process.exitCode = 1;
+}
