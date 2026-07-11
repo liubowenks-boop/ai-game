@@ -1211,8 +1211,12 @@ export class HeroAvatarSlotView {
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     transform.setContentSize(width, height);
     this.graphics = this.node.getComponent(Graphics) ?? this.node.addComponent(Graphics);
-    this.node.getChildByName('AvatarSkin')?.active = false;
-    this.node.getChildByName('AvatarLabel')?.active = false;
+    for (const legacyName of ['AvatarSkin', 'AvatarLabel']) {
+      const legacyNode = this.node.getChildByName(legacyName);
+      if (legacyNode) {
+        legacyNode.active = false;
+      }
+    }
     if (!this.node.parent) {
       parent.addChild(this.node);
     }

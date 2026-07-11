@@ -167,8 +167,11 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot5/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
   assert.match(heroAvatarSlotViewSource, /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s);
-  assert.match(heroAvatarSlotViewSource, /this\.node\.getChildByName\('AvatarSkin'\)\?\.active = false;/);
-  assert.match(heroAvatarSlotViewSource, /this\.node\.getChildByName\('AvatarLabel'\)\?\.active = false;/);
+  assert.match(
+    heroAvatarSlotViewSource,
+    /for \(const legacyName of \['AvatarSkin', 'AvatarLabel'\]\) \{\s*const legacyNode = this\.node\.getChildByName\(legacyName\);\s*if \(legacyNode\) \{\s*legacyNode\.active = false;\s*\}\s*\}/s,
+  );
+  assert.doesNotMatch(battleUiComponentsSource, /\?\.active\s*=/);
   assert.equal(heroAvatarSlotViewSource.includes("t('hud.empty')"), false);
   assert.equal(/Lv\$\{level\}/.test(heroAvatarSlotViewSource), false);
   assert.equal(/heroName\\n/.test(heroAvatarSlotViewSource), false);
