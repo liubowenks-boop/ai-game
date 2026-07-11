@@ -276,10 +276,6 @@ runTest('main hero applies current gameplay attack speed to each Spine cycle', (
     controllerSource.includes('this.playerAttackSpinePlaybackSpeed = timing.spinePlaybackSpeed'),
     true,
   );
-  assert.equal(
-    controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'),
-    true,
-  );
 });
 
 runTest('main hero does not restart Spine playback before the current attack completes', () => {
@@ -333,22 +329,15 @@ runTest('main hero renders a persistent Spine setup pose without placeholder UI'
   assert.equal(controllerSource.includes('this.playerAttackSpine.setAttachment'), true);
 });
 
-runTest('main hero attack keeps its local glow without rectangular head strokes', () => {
+runTest('main hero attack leaves round accents to the shared vfx layer', () => {
   const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 
-  assert.equal(controllerSource.includes('MainHeroAttackEffects'), true);
-  assert.equal(controllerSource.includes('drawPlayerAttackAccent'), true);
-  assert.equal(controllerSource.includes('playerAttackEffectsGraphics'), true);
+  assert.equal(controllerSource.includes("new Node('MainHeroAttackEffects')"), false);
+  assert.equal(controllerSource.includes('drawPlayerAttackAccent'), false);
+  assert.equal(controllerSource.includes('playerAttackEffectsGraphics'), false);
   assert.equal(controllerSource.includes('PLAYER_ATTACK_SPINE_DURATION'), false);
-  assert.equal(
-    controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'),
-    true,
-  );
-  assert.equal(controllerSource.includes('255, 154, 54'), true);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.circle('), true);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineTo('), false);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineWidth = 12'), false);
-  assert.equal(controllerSource.includes('new Color(255, 106, 38'), false);
+  assert.equal(controllerSource.includes('this.playerAuraGraphics.circle('), false);
+  assert.equal(controllerSource.includes('this.playerAuraGraphics.ellipse('), false);
 });
 
 runTest('battle layer remains scale-stable during focus readability events', () => {

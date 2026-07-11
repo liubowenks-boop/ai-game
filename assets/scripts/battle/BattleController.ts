@@ -99,8 +99,6 @@ export class BattleController extends Component {
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
   private thunderMagePresentation!: ThunderMagePresentation;
   private terrainPresentation!: BattleTerrainPresentation;
-  private playerAuraGraphics!: Graphics;
-  private playerAttackEffectsGraphics!: Graphics;
   private startButtonLabel!: Label;
   private battleLayer!: Node;
   private feedbackLayer!: Node;
@@ -108,7 +106,6 @@ export class BattleController extends Component {
   private midStatusLayer!: Node;
   private upgradePanelLayer!: Node;
   private bottomHudLayer!: Node;
-  private cityLineGraphics!: Graphics;
   private remainingEnemiesLabel!: Label;
   private buildHintLabel!: Label;
   private bossHealthBarView!: BossHealthBarView;
@@ -214,9 +211,7 @@ export class BattleController extends Component {
     if (existingFeedbackLayer !== this.feedbackLayer && existingFeedbackLayer.parent) {
       existingFeedbackLayer.destroy();
     }
-    if (existingCityLine) {
-      this.terrainPresentation.layers.enemies.addChild(existingCityLine);
-    }
+    existingCityLine?.destroy();
     if (enemyTemplate) {
       this.terrainPresentation.layers.enemies.addChild(enemyTemplate);
       enemyTemplate.active = false;
@@ -226,8 +221,6 @@ export class BattleController extends Component {
     }
     this.terrainPresentation.preload();
 
-    this.drawCityLine(this.terrainPresentation.layers.enemies);
-    this.terrainPresentation.layers.enemies.getChildByName('CityBottomLine')?.setSiblingIndex(0);
     this.playerNode = this.createPlayerNode(this.terrainPresentation.layers.units);
 
     const hudViews = this.createTopHudLayer();
@@ -560,66 +553,6 @@ export class BattleController extends Component {
     return ensureSceneLayer(parent, name, this.stageWidth, this.stageHeight);
   }
 
-  private drawCityLine(parent: Node): void {
-    const line = parent.getChildByName('CityBottomLine') ?? new Node('CityBottomLine');
-    this.setUiLayer(line);
-
-    this.cityLineGraphics = line.getComponent(Graphics) ?? line.addComponent(Graphics);
-    ensureNamedUiChild(line, 'CityLineFill', 0, 0, this.stageWidth - 80, this.stageHeight);
-    ensureNamedUiChild(
-      line,
-      'CityLineStroke',
-      0,
-      this.model.options.cityLineY,
-      this.stageWidth - 80,
-      12,
-    );
-    this.redrawCityLine(false);
-
-    if (!line.parent) {
-      parent.addChild(line);
-    }
-  }
-
-  private redrawCityLine(focused: boolean): void {
-    if (!this.cityLineGraphics) {
-      return;
-    }
-
-    const visualCityLineY = this.model.options.cityLineY;
-    this.cityLineGraphics.clear();
-    this.cityLineGraphics.fillColor = focused
-      ? new Color(150, 72, 58, 108)
-      : new Color(132, 76, 58, 82);
-    this.cityLineGraphics.rect(
-      -this.stageWidth / 2 + 40,
-      -this.stageHeight / 2 + 12,
-      this.stageWidth - 80,
-      visualCityLineY + this.stageHeight / 2 - 12,
-    );
-    this.cityLineGraphics.fill();
-
-    if (!focused) {
-      return;
-    }
-
-    if (focused) {
-      this.cityLineGraphics.strokeColor = new Color(255, 244, 170, 130);
-      this.cityLineGraphics.lineWidth = 15;
-      this.cityLineGraphics.moveTo(-this.stageWidth / 2 + 40, visualCityLineY);
-      this.cityLineGraphics.lineTo(this.stageWidth / 2 - 40, visualCityLineY);
-      this.cityLineGraphics.stroke();
-    }
-
-    this.cityLineGraphics.strokeColor = focused
-      ? new Color(255, 245, 210, 255)
-      : new Color(255, 98, 98, 255);
-    this.cityLineGraphics.lineWidth = focused ? 8 : 6;
-    this.cityLineGraphics.moveTo(-this.stageWidth / 2 + 40, visualCityLineY);
-    this.cityLineGraphics.lineTo(this.stageWidth / 2 - 40, visualCityLineY);
-    this.cityLineGraphics.stroke();
-  }
-
   private createReadabilityUi(parent: Node): void {
     const feedbackPool =
       parent.getChildByName('BattleFeedbackPool') ?? new Node('BattleFeedbackPool');
@@ -813,7 +746,6 @@ export class BattleController extends Component {
     );
     this.gridPlacementSystem.updateAnimations(deltaTime);
     this.drawPlayerVisual(outputFocus.kind === 'player', activeFocus);
-    this.redrawCityLine(activeFocus === 'city');
   }
 
   private requestPlayerAnimationFromResult(result: BattleTickResult): void {
@@ -994,46 +926,6 @@ export class BattleController extends Component {
     );
     this.playerNode.setScale(scale * pose.scaleX, scale * pose.scaleY, 1);
     this.playerNode.angle = pose.rotation;
-    this.playerAuraGraphics.clear();
-    this.playerAttackEffectsGraphics.clear();
-
-    this.playerAuraGraphics.fillColor = new Color(0, 0, 0, 88);
-    this.playerAuraGraphics.ellipse(0, -40, 31, 9);
-    this.playerAuraGraphics.fill();
-
-    if (highlightStrength > 0) {
-      this.playerAuraGraphics.strokeColor = new Color(
-        108,
-        198,
-        255,
-        Math.floor(145 * highlightStrength),
-      );
-      this.playerAuraGraphics.lineWidth = 9;
-      this.playerAuraGraphics.circle(0, 0, 48 + highlightStrength * 4);
-      this.playerAuraGraphics.stroke();
-      this.playerAuraGraphics.strokeColor = new Color(
-        255,
-        244,
-        140,
-        Math.floor(90 * highlightStrength),
-      );
-      this.playerAuraGraphics.lineWidth = 3;
-      this.playerAuraGraphics.circle(0, 0, 58);
-      this.playerAuraGraphics.stroke();
-    }
-
-    if (useSpineAttack) {
-      this.drawPlayerAttackAccent();
-    }
-  }
-
-  private drawPlayerAttackAccent(): void {
-    const progress = Math.min(1, this.playerAnimation.elapsed / this.playerAnimation.duration);
-    const windup = Math.max(0, Math.min(1, progress / 0.3));
-
-    this.playerAttackEffectsGraphics.fillColor = new Color(255, 154, 54, Math.floor(48 * windup));
-    this.playerAttackEffectsGraphics.circle(8, 20, 18 + windup * 14);
-    this.playerAttackEffectsGraphics.fill();
   }
 
   private createPlayerAttackSpineNode(player: Node): void {
@@ -1392,30 +1284,19 @@ export class BattleController extends Component {
     player.active = true;
     this.playerNode = player;
 
-    for (const nodeName of ['MainHeroBody', 'MainHeroPortrait', 'MainHeroLabel']) {
+    for (const nodeName of [
+      'MainHeroBody',
+      'MainHeroPortrait',
+      'MainHeroLabel',
+      'MainHeroAura',
+      'MainHeroAttackEffects',
+    ]) {
       const legacyNode = player.getChildByName(nodeName);
       if (legacyNode) {
         legacyNode.active = false;
         legacyNode.destroy();
       }
     }
-
-    const auraNode = player.getChildByName('MainHeroAura') ?? new Node('MainHeroAura');
-    this.setUiLayer(auraNode);
-    if (!auraNode.parent) {
-      player.addChild(auraNode);
-    }
-    this.playerAuraGraphics = auraNode.getComponent(Graphics) ?? auraNode.addComponent(Graphics);
-
-    const attackEffectsNode =
-      player.getChildByName('MainHeroAttackEffects') ?? new Node('MainHeroAttackEffects');
-    this.setUiLayer(attackEffectsNode);
-    if (!attackEffectsNode.parent) {
-      player.addChild(attackEffectsNode);
-    }
-    this.playerAttackEffectsGraphics =
-      attackEffectsNode.getComponent(Graphics) ?? attackEffectsNode.addComponent(Graphics);
-    attackEffectsNode.setSiblingIndex(Math.max(0, player.children.length - 1));
 
     this.createPlayerAttackSpineNode(player);
     this.preloadPlayerAttackSpine();

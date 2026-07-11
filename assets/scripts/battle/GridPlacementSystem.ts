@@ -8,7 +8,7 @@ import {
 } from '../ui/BattleUiComponents';
 import { BattleUiV4Layout, RectSpec } from '../ui/BattleUiLayout';
 import { t } from '../ui/BattleTextResources';
-import { BattleMvpModel, GridSlotState } from './BattleMvpModel';
+import { BattleMvpModel, BattlePoint, GridSlotState } from './BattleMvpModel';
 import { getHeroAnimationProfile } from '../data/AnimationConfig';
 import {
   UnitAnimationRuntime,
@@ -114,9 +114,23 @@ export class GridPlacementSystem {
           : slot.hero
             ? Color.WHITE
             : new Color(210, 218, 226, 180);
-      this.drawSlotButton(view, slot, highlighted);
+      view.graphics.clear();
       this.refreshSlotPortrait(view, slot);
     }
+  }
+
+  public getAvailablePlacementPoints(): readonly BattlePoint[] {
+    if (!this.pendingHeroName) {
+      return [];
+    }
+
+    return this.model.slots
+      .filter((slot) => !slot.reservedBy && !slot.hero)
+      .map((slot) => ({ ...slot.position }));
+  }
+
+  public isPlacementModeActive(): boolean {
+    return Boolean(this.pendingHeroName);
   }
 
   public setMainOutputHero(heroId: number): void {
@@ -249,27 +263,6 @@ export class GridPlacementSystem {
     );
   }
 
-  private drawSlotButton(view: ButtonView, slot: GridSlotState, highlighted: boolean): void {
-    const radius = view.width / 2;
-
-    view.graphics.clear();
-    view.graphics.fillColor = view.baseColor;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.fill();
-
-    if (highlighted) {
-      view.graphics.strokeColor = new Color(255, 226, 151, 255);
-      view.graphics.lineWidth = 6;
-      view.graphics.circle(0, 0, radius);
-      view.graphics.stroke();
-    }
-
-    view.graphics.strokeColor = new Color(190, 116, 70, 255);
-    view.graphics.lineWidth = 2;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.stroke();
-  }
-
   private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
     if (this.isFixedCompanionSlot(slot) && !slot.hero) {
       if (view.portraitNode) {
@@ -351,23 +344,7 @@ export class GridPlacementSystem {
     labelNode.setPosition(0, 0, 0);
     node.addChild(labelNode);
 
-    const view = { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
-    this.drawPlainButton(view);
-
-    return view;
-  }
-
-  private drawPlainButton(view: ButtonView): void {
-    const radius = view.width / 2;
-
-    view.graphics.fillColor = view.baseColor;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.fill();
-
-    view.graphics.strokeColor = new Color(190, 116, 70, 255);
-    view.graphics.lineWidth = 2;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.stroke();
+    return { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
   }
 
   private createLabel(

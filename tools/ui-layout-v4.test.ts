@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   BattleUiDesign,
   BattleUiV4Layout,
@@ -36,6 +38,17 @@ function assertRect(layout: Record<string, RectSpec>, key: string): RectSpec {
 }
 
 function main(): void {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+  const gridSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
+
+  assert(!controllerSource.includes('CityLineFill'), 'city line fill must not be created');
+  assert(!controllerSource.includes('CityLineStroke'), 'city line stroke must not be created');
+  assert(!controllerSource.includes('redrawCityLine'), 'city line must never be redrawn');
+  assert(!controllerSource.includes('drawPlayerAttackAccent'), 'round player accent must be removed');
+  assert(!gridSource.includes('drawSlotButton('), 'slot circle renderer must be removed');
+  assert(!gridSource.includes('drawPlainButton('), 'plain circle renderer must be removed');
+  assert(!gridSource.includes('view.graphics.circle('), 'placement graphics must not draw circles');
+
   const layout = BattleUiV4Layout;
   const layoutMap = layout as Record<string, RectSpec>;
 
