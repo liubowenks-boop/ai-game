@@ -185,10 +185,15 @@ export class ThunderMagePresentation {
     if (this.loadState === 'loaded') {
       this.applyIdlePose();
     }
+
+    if (this.loadState === 'warned') {
+      this.loadState = 'idle';
+      this.ensureSkeletonLoaded();
+    }
   }
 
   private ensureSkeletonLoaded(): void {
-    if (this.loadState === 'loaded' || this.loadState === 'warned') {
+    if (this.loadState === 'loading' || this.loadState === 'loaded') {
       return;
     }
 

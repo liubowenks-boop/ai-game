@@ -457,6 +457,10 @@ runTest('thunder mage presentation owns its companion spine and electric effects
 runTest('thunder mage presentation reuses nodes and shares one skeleton load', () => {
   const presentationSource = readFileSync('assets/scripts/battle/ThunderMagePresentation.ts', 'utf8');
   const resourceLoadCalls = presentationSource.match(/resources\.load\(/g) ?? [];
+  const clearSource = presentationSource.slice(
+    presentationSource.indexOf('public clear(): void'),
+    presentationSource.indexOf('private ensureSkeletonLoaded(): void'),
+  );
 
   assert.equal(presentationSource.includes('new Vec3(-210, -370, 0)'), true);
   assert.equal(presentationSource.includes('THUNDER_MAGE_STAFF_OFFSET'), false);
@@ -470,6 +474,13 @@ runTest('thunder mage presentation reuses nodes and shares one skeleton load', (
   assert.equal(presentationSource.includes('thunderMagePresentationOwners'), true);
   assert.equal(presentationSource.includes('removeDuplicateNamedChildren'), true);
   assert.equal(presentationSource.includes('if (!this.attackSpineNode.parent)'), true);
+  assert.equal(clearSource.includes("if (this.loadState === 'warned')"), true);
+  assert.equal(clearSource.includes("this.loadState = 'idle'"), true);
+  assert.equal(clearSource.includes('this.ensureSkeletonLoaded()'), true);
+  assert.equal(
+    presentationSource.includes("this.loadState === 'loading' || this.loadState === 'loaded'"),
+    true,
+  );
   assert.equal(resourceLoadCalls.length, 1);
 });
 
