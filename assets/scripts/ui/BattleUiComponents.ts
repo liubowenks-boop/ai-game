@@ -915,12 +915,12 @@ export class CityHealthBarView {
     bindOrCreateLabel(
       this.node,
       'CityHpEmblemLabel',
-      '城',
-      -width / 2 + 26,
+      '城池',
+      -width / 2 + 28,
       0,
       BattleUiTokens.font.tiny,
       BattleUiTokens.colors.textPrimary,
-      34,
+      44,
       34,
       {
         fontRole: 'uiHud',
@@ -931,11 +931,11 @@ export class CityHealthBarView {
       this.node,
       'CityHpLabel',
       '100/100',
-      width / 2 - 42,
+      width / 2 - 45,
       0,
       BattleUiTokens.font.caption,
       BattleUiTokens.colors.textPrimary,
-      76,
+      80,
       28,
       {
         fontRole: 'damageNumber',
@@ -955,7 +955,15 @@ export class CityHealthBarView {
     }
   }
 
-  public refresh(current: number, max: number, focused: boolean): void {
+  public update(deltaTime: number): void {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0 || this.flashTimeLeft <= 0) {
+      return;
+    }
+
+    this.flashTimeLeft = Math.max(0, this.flashTimeLeft - deltaTime);
+  }
+
+  public refresh(current: number, max: number, _focused: boolean): void {
     if (!Number.isNaN(this.lastHealth) && current < this.lastHealth) {
       this.flashTimeLeft = 0.22;
     }
@@ -968,10 +976,10 @@ export class CityHealthBarView {
 
     const frameLeft = -this.width / 2;
     const frameBottom = -24;
-    const emblemX = frameLeft + 26;
-    const valueWidth = 76;
-    const trackLeft = frameLeft + 52;
-    const trackWidth = this.width - 52 - valueWidth - 10;
+    const emblemX = frameLeft + 28;
+    const valueWidth = 80;
+    const trackLeft = frameLeft + 58;
+    const trackWidth = this.width - 58 - valueWidth - 10;
     const trackBottom = -10;
     const trackHeight = 20;
     const fillWidth = trackWidth * ratio;
@@ -983,19 +991,6 @@ export class CityHealthBarView {
           : BattleUiTokens.colors.danger;
 
     this.graphics.clear();
-
-    if (focused) {
-      this.graphics.strokeColor = uiColor(BattleUiTokens.colors.highlight, 120);
-      this.graphics.lineWidth = 4;
-      this.graphics.roundRect(
-        frameLeft - 3,
-        frameBottom - 3,
-        this.width + 6,
-        54,
-        BattleUiTokens.radius.lg + 2,
-      );
-      this.graphics.stroke();
-    }
 
     if (this.flashTimeLeft > 0) {
       this.graphics.strokeColor = uiColor(Color.WHITE, 180);
@@ -1020,12 +1015,12 @@ export class CityHealthBarView {
     this.graphics.stroke();
 
     this.graphics.fillColor = uiColor(BattleUiTokens.colors.panelBrown, 224);
-    this.graphics.circle(emblemX, 0, 15);
+    this.graphics.circle(emblemX, 0, 20);
     this.graphics.fill();
 
     this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeGold, 200);
     this.graphics.lineWidth = 2;
-    this.graphics.circle(emblemX, 0, 15);
+    this.graphics.circle(emblemX, 0, 20);
     this.graphics.stroke();
 
     this.graphics.fillColor = uiColor(Color.BLACK, 188);
@@ -1055,10 +1050,6 @@ export class CityHealthBarView {
         );
         this.graphics.fill();
       }
-    }
-
-    if (this.flashTimeLeft > 0) {
-      this.flashTimeLeft = Math.max(0, this.flashTimeLeft - 1 / 60);
     }
   }
 }

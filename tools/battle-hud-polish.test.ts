@@ -73,7 +73,13 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
   );
   assert.equal(backRects[1].x - backRects[0].x, backRects[2].x - backRects[1].x);
   assert.equal(new Set(backRects.map((rect) => rect.y)).size, 1);
-  assert.ok(backRects.every((rect) => rect.width === 82 && rect.height === 82));
+  assert.ok(
+    [backRects[0], backRects[2]].every((rect) => rect.width === 82 && rect.height === 82),
+  );
+  assert.deepEqual(
+    { width: backRects[1].width, height: backRects[1].height },
+    { width: 120, height: 120 },
+  );
 
   const model = new BattleMvpModel();
   assert.deepEqual(
@@ -85,6 +91,9 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
     [-300, -300, -300, -410, -410],
   );
   assert.deepEqual(model.playerPosition, { x: 0, y: -410 });
+  assert.equal(BattleUiV4Layout.placementTitle.y, -487);
+  assert.equal(BattleUiV4Layout.placementPending.y, -487);
+  assert.equal(BattleUiV4Layout.heroBar.y, -552);
 });
 
 runTest('six fixed portrait slots fit the hero rail without overlap', () => {
@@ -309,7 +318,8 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
   );
 
   assert.match(cityHealthBarViewSource, /CityHpEmblemLabel/);
-  assert.match(cityHealthBarViewSource, /graphics\.circle\(emblemX,\s*0,\s*15\);/);
+  assert.match(cityHealthBarViewSource, /'城池'/);
+  assert.match(cityHealthBarViewSource, /graphics\.circle\(emblemX,\s*0,\s*20\);/);
   assert.match(cityHealthBarViewSource, /ratio > 0\.55/);
   assert.match(cityHealthBarViewSource, /ratio > 0\.28/);
   assert.match(cityHealthBarViewSource, /transform\.setContentSize\(width,\s*48\);/);
@@ -322,7 +332,10 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
     cityHealthBarViewSource,
     /const visibleCurrent = Math\.max\(0,\s*Math\.min\(safeMax,\s*current\)\);/,
   );
-  assert.match(cityHealthBarViewSource, /const ratio = Math\.max\(0,\s*Math\.min\(1,\s*visibleCurrent \/ safeMax\)\);/);
+  assert.match(
+    cityHealthBarViewSource,
+    /const ratio = Math\.max\(0,\s*Math\.min\(1,\s*visibleCurrent \/ safeMax\)\);/,
+  );
   assert.match(
     cityHealthBarViewSource,
     /this\.valueLabel\.string = `\$\{Math\.ceil\(visibleCurrent\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
@@ -340,10 +353,8 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
     cityHealthBarViewSource,
     /if \(sheenWidth > 0\) \{\s*this\.graphics\.fillColor = uiColor\(Color\.WHITE,\s*42\);\s*this\.graphics\.roundRect\([\s\S]*Math\.min\(2,\s*sheenWidth \/ 2\)/s,
   );
-  assert.match(
-    cityHealthBarViewSource,
-    /if \(focused\) \{\s*this\.graphics\.strokeColor = uiColor\(BattleUiTokens\.colors\.highlight, 120\);\s*this\.graphics\.lineWidth = 4;/s,
-  );
+  assert.equal(/if \(focused\)/.test(cityHealthBarViewSource), false);
+  assert.equal(/BattleUiTokens\.colors\.highlight/.test(cityHealthBarViewSource), false);
   assert.match(
     cityHealthBarViewSource,
     /if \(this\.flashTimeLeft > 0\) \{\s*this\.graphics\.strokeColor = uiColor\(Color\.WHITE, 180\);\s*this\.graphics\.lineWidth = 3;/s,
@@ -355,6 +366,21 @@ runTest('city health bar is fixed, immediate, and independently readable', () =>
   assert.equal(/delayed|trailing|secondary health layer/i.test(cityHealthBarViewSource), false);
   assert.equal(/second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource), false);
   assert.equal(/Color\.WHITE,\s*70/.test(cityHealthBarViewSource), false);
+  assert.match(
+    cityHealthBarViewSource,
+    /public update\(deltaTime: number\): void \{[\s\S]*this\.flashTimeLeft = Math\.max\(0, this\.flashTimeLeft - deltaTime\);/,
+  );
+  assert.equal(/this\.flashTimeLeft - 1 \/ 60/.test(cityHealthBarViewSource), false);
+  assert.match(
+    battleControllerSource,
+    /public update\(deltaTime: number\): void \{[\s\S]*this\.cityHealthBarView\.update\(deltaTime\);/,
+  );
+  assert.match(
+    battleControllerSource,
+    /if \(result\.cityDamage > 0\) \{\s*this\.setVisualFocus\('city', 0\.72\);\s*\}/,
+  );
+  assert.match(battleControllerSource, /this\.redrawCityLine\(activeFocus === 'city'\);/);
+  assert.match(battleControllerSource, /this\.cityHealthSystem\.refresh\(this\.model, false\);/);
   assert.equal(
     /fillColor = uiColor\(Color\.WHITE[\s\S]*roundRect\(frameLeft,\s*frameBottom,\s*this\.width,\s*48[\s\S]*fill\(\);/i.test(
       cityHealthBarViewSource,

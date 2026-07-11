@@ -147,6 +147,8 @@ export class BattleController extends Component {
       return;
     }
 
+    this.cityHealthBarView.update(deltaTime);
+
     if (this.upgradeCardSystem.isShowing()) {
       this.updateReadability(deltaTime);
       this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
@@ -227,8 +229,7 @@ export class BattleController extends Component {
   }
 
   private refreshUi(): void {
-    const activeFocus = this.getActiveVisualFocus();
-    this.cityHealthSystem.refresh(this.model, activeFocus === 'city');
+    this.cityHealthSystem.refresh(this.model, false);
     this.waveSystem.refresh(this.model);
     this.remainingEnemiesLabel.string = t('hud.remaining', { count: this.model.enemies.length });
     this.goldChipView.refresh(0);
