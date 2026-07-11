@@ -45,20 +45,64 @@ const THUNDER_MAGE_PROJECTILE_COLOR = new Color(118, 224, 255, 255);
 const THUNDER_MAGE_PROJECTILE_CORE = new Color(247, 252, 255, 255);
 const THUNDER_MAGE_BURST_COLOR = new Color(118, 224, 255, 255);
 const THUNDER_MAGE_BURST_CORE = new Color(247, 252, 255, 255);
-const THUNDER_MAGE_RING_COLOR = new Color(161, 117, 58, 210);
-const THUNDER_MAGE_RING_GLOW = new Color(231, 194, 109, 72);
-const THUNDER_MAGE_STAFF_OFFSET = new Vec3(15, 40, 0);
 const THUNDER_MAGE_PROJECTILE_MIN_DURATION = 0.16;
 const THUNDER_MAGE_PROJECTILE_MAX_DURATION = 0.22;
 const THUNDER_MAGE_BURST_DURATION = 0.2;
-const THUNDER_MAGE_RING_RADIUS = 58;
-const THUNDER_MAGE_RING_GLOW_RADIUS = 68;
+
+let thunderMageSkeletonLoadState: SkeletonLoadState = 'idle';
+let thunderMageSkeletonData: sp.SkeletonData | undefined;
+const thunderMageSkeletonConsumers = new Set<(skeletonData: sp.SkeletonData) => void>();
+const thunderMagePresentationOwners = new WeakMap<Node, ThunderMagePresentation>();
+
+function publishThunderMageSkeletonData(skeletonData: sp.SkeletonData): void {
+  thunderMageSkeletonData = skeletonData;
+  thunderMageSkeletonLoadState = 'loaded';
+
+  const consumers = Array.from(thunderMageSkeletonConsumers);
+  thunderMageSkeletonConsumers.clear();
+  for (const consumer of consumers) {
+    consumer(skeletonData);
+  }
+}
+
+function requestThunderMageSkeletonData(
+  attackClip: ReturnType<typeof getAnimationClipSpec>,
+  consumer: (skeletonData: sp.SkeletonData) => void,
+): SkeletonLoadState {
+  if (thunderMageSkeletonData) {
+    consumer(thunderMageSkeletonData);
+    return 'loaded';
+  }
+
+  if (thunderMageSkeletonLoadState === 'warned') {
+    return 'warned';
+  }
+
+  thunderMageSkeletonConsumers.add(consumer);
+  if (thunderMageSkeletonLoadState === 'loading') {
+    return 'loading';
+  }
+
+  thunderMageSkeletonLoadState = 'loading';
+  resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
+    if (error || !skeletonData) {
+      thunderMageSkeletonConsumers.clear();
+      if (thunderMageSkeletonLoadState !== 'warned') {
+        thunderMageSkeletonLoadState = 'warned';
+        console.warn(`Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`, error);
+      }
+      return;
+    }
+
+    publishThunderMageSkeletonData(skeletonData);
+  });
+
+  return 'loading';
+}
 
 export class ThunderMagePresentation {
   private readonly attackClip = getAnimationClipSpec(THUNDER_MAGE_ANIMATION_PROFILE, 'attack');
   private readonly rootNode: Node;
-  private readonly ringNode: Node;
-  private readonly ringGraphics: Graphics;
   private readonly attackSpineNode: Node;
   private readonly attackSpine: sp.Skeleton;
   private readonly effectsNode: Node;
@@ -74,21 +118,18 @@ export class ThunderMagePresentation {
   public constructor(parent: Node, setUiLayer: (node: Node) => void) {
     this.setUiLayer = setUiLayer;
 
-    this.rootNode = new Node('ThunderMageCompanion');
+    this.rootNode = parent.getChildByName('ThunderMageCompanion') ?? new Node('ThunderMageCompanion');
+    this.removeDuplicateNamedChildren(parent, this.rootNode);
     this.setUiLayer(this.rootNode);
     this.rootNode.setPosition(THUNDER_MAGE_COMPANION.position.x, THUNDER_MAGE_COMPANION.position.y, 0);
     if (!this.rootNode.parent) {
       parent.addChild(this.rootNode);
     }
 
-    this.ringNode = new Node('ThunderMageBronzeRing');
-    this.setUiLayer(this.ringNode);
-    this.ringNode.setPosition(0, 0, 0);
-    this.rootNode.addChild(this.ringNode);
-    this.ringGraphics = this.ringNode.addComponent(Graphics);
-    this.drawBronzeRing();
-
-    this.attackSpineNode = new Node('ThunderMageAttackSpine');
+    this.attackSpineNode =
+      this.rootNode.getChildByName('ThunderMageAttackSpine') ?? new Node('ThunderMageAttackSpine');
+    this.removeDuplicateNamedChildren(this.rootNode, this.attackSpineNode);
+    this.removeChildrenExcept(this.rootNode, this.attackSpineNode);
     this.setUiLayer(this.attackSpineNode);
     this.attackSpineNode.setPosition(0, 0, 0);
     this.attackSpineNode.setScale(
@@ -97,24 +138,35 @@ export class ThunderMagePresentation {
       1,
     );
     this.attackSpineNode.active = false;
-    this.rootNode.addChild(this.attackSpineNode);
+    if (!this.attackSpineNode.parent) {
+      this.rootNode.addChild(this.attackSpineNode);
+    }
     this.attackSpine = this.attackSpineNode.getComponent(sp.Skeleton) ?? this.attackSpineNode.addComponent(sp.Skeleton);
     this.attackSpine.premultipliedAlpha = false;
 
-    this.effectsNode = new Node('ThunderMageEffects');
+    this.effectsNode = parent.getChildByName('ThunderMageEffects') ?? new Node('ThunderMageEffects');
+    this.removeDuplicateNamedChildren(parent, this.effectsNode);
+    this.removeChildrenExcept(this.effectsNode);
     this.setUiLayer(this.effectsNode);
     const effectsTransform = this.effectsNode.getComponent(UITransform) ?? this.effectsNode.addComponent(UITransform);
     effectsTransform.setContentSize(720, 1280);
     this.effectsNode.setPosition(0, 0, 0);
-    this.effectsGraphics = this.effectsNode.addComponent(Graphics);
-    parent.addChild(this.effectsNode);
+    this.effectsGraphics = this.effectsNode.getComponent(Graphics) ?? this.effectsNode.addComponent(Graphics);
+    this.effectsGraphics.clear();
+    if (!this.effectsNode.parent) {
+      parent.addChild(this.effectsNode);
+    }
     this.effectsNode.setSiblingIndex(parent.children.length - 1);
 
+    thunderMagePresentationOwners.set(this.rootNode, this);
     this.ensureSkeletonLoaded();
-    this.applyIdlePose();
   }
 
   public handleTickResult(result: BattleTickResult, actualAttackInterval: number): void {
+    if (!this.isLive()) {
+      return;
+    }
+
     const companionEvents = result.attackEvents.filter((event) => event.source === 'companion');
 
     if (companionEvents.length === 0) {
@@ -130,7 +182,7 @@ export class ThunderMagePresentation {
         sourceDuration: THUNDER_MAGE_SPINE_SOURCE_DURATION,
       };
 
-      const from = this.getStaffOrigin();
+      const from = new Vec3(-210, -370, 0);
       const to = new Vec3(event.enemyPosition.x, event.enemyPosition.y, 0);
       this.projectiles.push({
         from,
@@ -151,7 +203,7 @@ export class ThunderMagePresentation {
   }
 
   public update(deltaTime: number): void {
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+    if (!this.isLive() || !Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
 
@@ -166,8 +218,13 @@ export class ThunderMagePresentation {
   public clear(): void {
     this.projectiles.length = 0;
     this.bursts.length = 0;
-    this.effectsGraphics.clear();
     this.activeAttack = undefined;
+
+    if (!this.isLive()) {
+      return;
+    }
+
+    this.effectsGraphics.clear();
 
     if (this.loadState === 'loaded') {
       this.applyIdlePose();
@@ -175,7 +232,7 @@ export class ThunderMagePresentation {
   }
 
   private ensureSkeletonLoaded(): void {
-    if (this.loadState !== 'idle') {
+    if (this.loadState === 'loaded' || this.loadState === 'warned') {
       return;
     }
 
@@ -184,17 +241,16 @@ export class ThunderMagePresentation {
       return;
     }
 
-    this.loadState = 'loading';
-    resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
-      if (!this.isLive()) {
-        return;
-      }
+    const existingSkeletonData = this.attackSpine.skeletonData;
+    if (existingSkeletonData) {
+      publishThunderMageSkeletonData(existingSkeletonData);
+      this.loadState = 'loaded';
+      this.applyIdlePose();
+      return;
+    }
 
-      if (error || !skeletonData) {
-        if (this.loadState !== 'warned') {
-          this.loadState = 'warned';
-          console.warn(`Failed to load thunder mage Spine asset: ${attackClip.spineAssetBase}`, error);
-        }
+    const sharedState = requestThunderMageSkeletonData(attackClip, (skeletonData) => {
+      if (!this.isLive()) {
         return;
       }
 
@@ -208,6 +264,10 @@ export class ThunderMagePresentation {
         this.applyIdlePose();
       }
     });
+
+    if (this.loadState !== 'loaded') {
+      this.loadState = sharedState;
+    }
   }
 
   private tickAttack(deltaTime: number): void {
@@ -430,31 +490,12 @@ export class ThunderMagePresentation {
     });
   }
 
-  private drawBronzeRing(): void {
-    this.ringGraphics.clear();
-    this.ringGraphics.strokeColor = THUNDER_MAGE_RING_COLOR;
-    this.ringGraphics.lineWidth = 5;
-    this.ringGraphics.circle(0, 0, THUNDER_MAGE_RING_RADIUS);
-    this.ringGraphics.stroke();
-    this.ringGraphics.strokeColor = THUNDER_MAGE_RING_GLOW;
-    this.ringGraphics.lineWidth = 2;
-    this.ringGraphics.circle(0, 0, THUNDER_MAGE_RING_GLOW_RADIUS);
-    this.ringGraphics.stroke();
-  }
-
   private resolveProjectileDuration(from: Vec3, to: Vec3): number {
     const distance = Math.hypot(to.x - from.x, to.y - from.y);
     return Math.max(
       THUNDER_MAGE_PROJECTILE_MIN_DURATION,
       Math.min(THUNDER_MAGE_PROJECTILE_MAX_DURATION, THUNDER_MAGE_PROJECTILE_MIN_DURATION + distance / 16000),
     );
-  }
-
-  private getStaffOrigin(): Vec3 {
-    const origin = this.rootNode.position.clone();
-    origin.x += THUNDER_MAGE_STAFF_OFFSET.x;
-    origin.y += THUNDER_MAGE_STAFF_OFFSET.y;
-    return origin;
   }
 
   private lerp(from: Vec3, to: Vec3, amount: number): Vec3 {
@@ -472,13 +513,31 @@ export class ThunderMagePresentation {
     return new Vec3(dx / length, dy / length, 0);
   }
 
+  private removeDuplicateNamedChildren(parent: Node, retainedNode: Node): void {
+    for (const child of [...parent.children]) {
+      if (child !== retainedNode && child.name === retainedNode.name) {
+        child.removeFromParent();
+        child.destroy();
+      }
+    }
+  }
+
+  private removeChildrenExcept(parent: Node, retainedNode?: Node): void {
+    for (const child of [...parent.children]) {
+      if (child !== retainedNode) {
+        child.removeFromParent();
+        child.destroy();
+      }
+    }
+  }
+
   private isLive(): boolean {
     return (
       this.rootNode.isValid &&
-      this.ringNode.isValid &&
       this.attackSpineNode.isValid &&
       this.effectsNode.isValid &&
-      this.attackSpine.isValid
+      this.attackSpine.isValid &&
+      thunderMagePresentationOwners.get(this.rootNode) === this
     );
   }
 }

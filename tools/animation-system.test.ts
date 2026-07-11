@@ -349,10 +349,11 @@ runTest('thunder mage presentation owns its companion spine and electric effects
   assert.equal(presentationSource.includes('THUNDER_MAGE_ANIMATION_PROFILE'), true);
   assert.equal(presentationSource.includes('getAnimationClipSpec'), true);
   assert.equal(presentationSource.includes('resolveThunderMageAttackAnimationTiming'), true);
-  assert.equal(presentationSource.includes("new Node('ThunderMageCompanion')"), true);
+  assert.equal(presentationSource.includes("parent.getChildByName('ThunderMageCompanion')"), true);
   assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.position.x'), true);
   assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.position.y'), true);
-  assert.equal(presentationSource.includes("new Node('ThunderMageAttackSpine')"), true);
+  assert.equal(presentationSource.includes("this.rootNode.getChildByName('ThunderMageAttackSpine')"), true);
+  assert.equal(presentationSource.includes("parent.getChildByName('ThunderMageEffects')"), true);
   assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.displayScale'), true);
   assert.equal(presentationSource.includes('0.22'), true);
   assert.equal(presentationSource.includes('premultipliedAlpha = false'), true);
@@ -370,6 +371,23 @@ runTest('thunder mage presentation owns its companion spine and electric effects
   assert.equal(presentationSource.includes('roundRect('), false);
   assert.equal(presentationSource.includes('fillRect('), false);
   assert.equal(presentationSource.includes('Sprite'), false);
+});
+
+runTest('thunder mage presentation reuses nodes and shares one skeleton load', () => {
+  const presentationSource = readFileSync('assets/scripts/battle/ThunderMagePresentation.ts', 'utf8');
+  const resourceLoadCalls = presentationSource.match(/resources\.load\(/g) ?? [];
+
+  assert.equal(presentationSource.includes('new Vec3(-210, -370, 0)'), true);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_STAFF_OFFSET'), false);
+  assert.equal(presentationSource.includes('ThunderMageBronzeRing'), false);
+  assert.equal(presentationSource.includes('drawBronzeRing'), false);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_RING_'), false);
+  assert.equal(presentationSource.includes('thunderMageSkeletonLoadState'), true);
+  assert.equal(presentationSource.includes('thunderMageSkeletonData'), true);
+  assert.equal(presentationSource.includes('thunderMagePresentationOwners'), true);
+  assert.equal(presentationSource.includes('removeDuplicateNamedChildren'), true);
+  assert.equal(presentationSource.includes('if (!this.attackSpineNode.parent)'), true);
+  assert.equal(resourceLoadCalls.length, 1);
 });
 
 runTest('battle controller delegates thunder mage presentation lifecycle', () => {
