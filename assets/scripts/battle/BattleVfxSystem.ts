@@ -85,6 +85,7 @@ export class BattleVfxSystem {
   private readonly fallbackGraphics: Graphics;
   private readonly fallbackSegments: FallbackSegment[] = [];
   private readonly fallbackBursts: FallbackBurst[] = [];
+  private readonly statusFeedbackBuckets = new Map<string, number>();
   private nowSeconds = 0;
   private preloadPromise?: Promise<void>;
   private disposed = false;
@@ -154,9 +155,17 @@ export class BattleVfxSystem {
   }
 
   public playStatusImpact(event: AttackEvent): void {
-    if (event.impactKind === 'status') {
-      this.playAttackEvent(event);
+    if (event.impactKind !== 'status') return;
+    const bucket = Math.floor(this.nowSeconds * 10);
+    const key = `${event.enemyId}:${event.source}`;
+    if (this.statusFeedbackBuckets.get(key) === bucket) return;
+    this.statusFeedbackBuckets.set(key, bucket);
+    if (this.statusFeedbackBuckets.size > 128) {
+      for (const [storedKey, storedBucket] of this.statusFeedbackBuckets) {
+        if (storedBucket < bucket - 2) this.statusFeedbackBuckets.delete(storedKey);
+      }
     }
+    this.playAttackEvent(event);
   }
 
   public playEnemyDeath(position: BattlePoint, kind: EnemyKind): void {
@@ -233,6 +242,7 @@ export class BattleVfxSystem {
     this.fallbackSegments.length = 0;
     this.fallbackBursts.length = 0;
     this.fallbackGraphics.clear();
+    this.statusFeedbackBuckets.clear();
     this.limiter.reset();
     this.nowSeconds = 0;
   }

@@ -226,3 +226,32 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
   assert.match(source, /dispose\(\)/);
   assert.equal(source.includes('autoRemoveOnFinish = true'), false);
 });
+
+runTest('controller routes main companion and ordinary heroes through one vfx owner', () => {
+  const controller = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+  const player = readFileSync('assets/scripts/battle/PlayerAutoAttackSystem.ts', 'utf8');
+  const thunder = readFileSync('assets/scripts/battle/ThunderMagePresentation.ts', 'utf8');
+  const grid = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
+  assert.ok(controller.includes('new BattleVfxSystem'));
+  assert.ok(controller.includes('this.battleVfx.update(presentationDelta)'));
+  assert.ok(controller.includes('this.battleVfx.clear()'));
+  assert.ok(controller.includes('this.battleVfx?.dispose()'));
+  assert.ok(player.includes('this.battleVfx.playAttackEvent(event)'));
+  assert.ok(thunder.includes('this.battleVfx.playAttackEvent(event)'));
+  assert.ok(grid.includes('this.battleVfx.playAttackEvent(event)'));
+  assert.equal(player.includes('ParticleSystem2D'), false);
+  assert.equal(thunder.includes('ParticleSystem2D'), false);
+});
+
+runTest('status death and fortress feedback avoid persistent enemy rings', () => {
+  const controller = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+  const system = readFileSync('assets/scripts/battle/BattleVfxSystem.ts', 'utf8');
+  const enemies = readFileSync('assets/scripts/battle/EnemySystem.ts', 'utf8');
+  assert.ok(controller.includes('this.battleVfx.playStatusImpact(event)'));
+  assert.ok(controller.includes('this.battleVfx.playEnemyDeath(event.enemyPosition, event.targetKind)'));
+  assert.ok(controller.includes('this.battleVfx.playWallImpact({'));
+  assert.ok(system.includes('Math.floor(this.nowSeconds * 10)'));
+  assert.ok(system.includes('this.statusFeedbackBuckets.get(key) === bucket'));
+  assert.equal(enemies.includes('size / 2 + 5'), false);
+  assert.equal(enemies.includes('size / 2 + 9'), false);
+});

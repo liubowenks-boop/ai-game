@@ -46,6 +46,7 @@ import { EnemySystem, VisualFocusTarget } from './EnemySystem';
 import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
 import { BattleTerrainPresentation } from './BattleTerrainPresentation';
+import { BattleVfxSystem } from './BattleVfxSystem';
 import { ThunderMagePresentation } from './ThunderMagePresentation';
 import {
   UnitAnimationRuntime,
@@ -99,6 +100,7 @@ export class BattleController extends Component {
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
   private thunderMagePresentation!: ThunderMagePresentation;
   private terrainPresentation!: BattleTerrainPresentation;
+  private battleVfx!: BattleVfxSystem;
   private startButtonLabel!: Label;
   private battleLayer!: Node;
   private feedbackLayer!: Node;
@@ -144,6 +146,7 @@ export class BattleController extends Component {
   }
 
   public onDestroy(): void {
+    this.battleVfx?.dispose();
     this.terrainPresentation?.dispose();
   }
 
@@ -160,6 +163,7 @@ export class BattleController extends Component {
       this.updateReadability(deltaTime);
       this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
       this.autoAttackSystem.update(deltaTime, this.model);
+      this.battleVfx.update(presentationDelta);
       this.refreshUi();
       return;
     }
@@ -167,12 +171,14 @@ export class BattleController extends Component {
     const result = this.model.tick(deltaTime);
 
     this.thunderMagePresentation.handleTickResult(result, this.model.getCompanionAttackInterval());
+    this.gridPlacementSystem.handleTickResult(result);
     this.requestPlayerAnimationFromResult(result);
     this.processReadabilityResult(result);
     this.updateReadability(deltaTime);
     this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
     this.autoAttackSystem.refresh(result, this.model);
     this.autoAttackSystem.update(deltaTime, this.model);
+    this.battleVfx.update(presentationDelta);
 
     if (result.upgradeOffered) {
       this.upgradeCardSystem.show();
@@ -222,6 +228,11 @@ export class BattleController extends Component {
     this.terrainPresentation.preload();
 
     this.playerNode = this.createPlayerNode(this.terrainPresentation.layers.units);
+    this.battleVfx = new BattleVfxSystem(
+      this.terrainPresentation.layers.projectiles,
+      this.terrainPresentation.layers.feedback,
+    );
+    void this.battleVfx.preload();
 
     const hudViews = this.createTopHudLayer();
     const midViews = this.createMidStatusLayer();
@@ -231,19 +242,17 @@ export class BattleController extends Component {
     this.enemySystem = new EnemySystem(this.terrainPresentation.layers.enemies, enemyTemplate);
     this.cityHealthSystem = new CityHealthSystem(this.cityHealthBarView, midViews.statusLabel);
     this.waveSystem = new WaveSystem(hudViews.waveLabel);
-    this.autoAttackSystem = new PlayerAutoAttackSystem(
-      this.terrainPresentation.layers.projectiles,
-      this.playerNode,
-    );
+    this.autoAttackSystem = new PlayerAutoAttackSystem(this.battleVfx);
     this.gridPlacementSystem = new GridPlacementSystem(
       this.terrainPresentation.layers.unitBacking,
       this.terrainPresentation.layers.units,
       this.model,
+      this.battleVfx,
     );
     this.thunderMagePresentation = new ThunderMagePresentation(
       this.terrainPresentation.layers.units,
-      this.terrainPresentation.layers.projectiles,
       (node) => this.setUiLayer(node),
+      this.battleVfx,
     );
     this.upgradeCardSystem = new UpgradeCardSystem(
       this.upgradePanelLayer,
@@ -272,6 +281,7 @@ export class BattleController extends Component {
     }
 
     this.thunderMagePresentation.clear();
+    this.battleVfx.clear();
     this.clearReadabilityFeedback();
   }
 
@@ -286,6 +296,7 @@ export class BattleController extends Component {
     this.buildHintLabel.string = this.getBuildHintText();
     this.refreshHeroAvatarBar();
     this.gridPlacementSystem.refresh();
+    this.battleVfx.setPlacementMarkers(this.gridPlacementSystem.getAvailablePlacementPoints());
   }
 
   private createTopHudLayer(): { waveLabel: Label } {
@@ -616,11 +627,26 @@ export class BattleController extends Component {
   }
 
   private processReadabilityResult(result: BattleTickResult): void {
+    for (const event of result.attackEvents) {
+      if (event.impactKind === 'status') {
+        this.battleVfx.playStatusImpact(event);
+      }
+      if (event.killed) {
+        this.battleVfx.playEnemyDeath(event.enemyPosition, event.targetKind);
+      }
+    }
     this.spawnDamageTexts(result.attackEvents);
     this.spawnKillTexts(result);
     this.showSpawnNotices(result);
 
     if (result.cityDamage > 0) {
+      const attacker = result.reachedEnemyIds
+        .map((enemyId) => this.model.findEnemy(enemyId))
+        .find(Boolean);
+      this.battleVfx.playWallImpact({
+        x: attacker?.position.x ?? 0,
+        y: -300,
+      });
       this.setVisualFocus('city', 0.72);
     }
   }

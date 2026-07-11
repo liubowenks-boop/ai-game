@@ -308,20 +308,6 @@ export class EnemySystem {
     view.graphics.roundRect(-size / 2, -size / 2, size, size, enemy.kind === 'boss' ? 12 : 8);
     view.graphics.stroke();
 
-    if (enemy.burnStacks > 0) {
-      view.graphics.strokeColor = new Color(255, 124, 42, muted ? 135 : 255);
-      view.graphics.lineWidth = important ? 4 : 3;
-      view.graphics.circle(0, 0, size / 2 + 5);
-      view.graphics.stroke();
-    }
-
-    if (enemy.poisonStacks > 0) {
-      view.graphics.strokeColor = new Color(108, 255, 112, muted ? 125 : 240);
-      view.graphics.lineWidth = important ? 4 : 3;
-      view.graphics.circle(0, 0, size / 2 + 9);
-      view.graphics.stroke();
-    }
-
     this.drawHealthBar(enemy, view, muted);
     this.refreshStatusIcons(enemy, view, muted);
 

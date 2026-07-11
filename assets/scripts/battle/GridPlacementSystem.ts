@@ -8,7 +8,8 @@ import {
 } from '../ui/BattleUiComponents';
 import { BattleUiV4Layout, RectSpec } from '../ui/BattleUiLayout';
 import { t } from '../ui/BattleTextResources';
-import { BattleMvpModel, BattlePoint, GridSlotState } from './BattleMvpModel';
+import { BattleMvpModel, BattlePoint, BattleTickResult, GridSlotState } from './BattleMvpModel';
+import { BattleVfxSystem } from './BattleVfxSystem';
 import { getHeroAnimationProfile } from '../data/AnimationConfig';
 import {
   UnitAnimationRuntime,
@@ -49,6 +50,7 @@ export class GridPlacementSystem {
     backingParent: Node,
     unitParent: Node,
     private readonly model: BattleMvpModel,
+    private readonly battleVfx: BattleVfxSystem,
   ) {
     this.root = new Node('GridPlacementBacking');
     this.setUiLayer(this.root);
@@ -171,7 +173,9 @@ export class GridPlacementSystem {
       }
 
       const highlighted = slot.hero.id === this.highlightedHeroId;
-      requestUnitAnimation(view.animation, highlighted ? 'cast' : 'idle');
+      if (view.animation.currentState !== 'attack') {
+        requestUnitAnimation(view.animation, highlighted ? 'cast' : 'idle');
+      }
       tickUnitAnimation(view.animation, deltaSeconds);
       if (isUnitAnimationComplete(view.animation)) {
         requestUnitAnimation(view.animation, 'idle');
@@ -187,6 +191,35 @@ export class GridPlacementSystem {
         view.portraitNode.setPosition(pose.offsetX * 0.35, pose.offsetY * 0.35, 0);
         view.portraitNode.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
         view.portraitNode.angle = pose.rotation * 0.35;
+      }
+    }
+  }
+
+  public handleTickResult(result: BattleTickResult): void {
+    const heroesWithPrimaryVfx = new Set<number>();
+    for (const event of result.attackEvents) {
+      if (event.source !== 'hero_dps' || !event.heroId) {
+        continue;
+      }
+      if (event.impactKind === 'primary') {
+        const played = this.battleVfx.playAttackEvent(event);
+        if (!played.played) {
+          continue;
+        }
+        heroesWithPrimaryVfx.add(event.heroId);
+        const slot = this.model.slots.find((candidate) => candidate.hero?.id === event.heroId);
+        const view = slot ? this.slotButtons[slot.index] : undefined;
+        if (slot?.hero && view) {
+          if (!view.animation || view.animationHeroName !== slot.hero.name) {
+            view.animation = createUnitAnimationRuntime(getHeroAnimationProfile(slot.hero.name));
+            view.animationHeroName = slot.hero.name;
+          }
+          requestUnitAnimation(view.animation, 'attack');
+        }
+        continue;
+      }
+      if (event.impactKind === 'splash' && heroesWithPrimaryVfx.has(event.heroId)) {
+        this.battleVfx.playAttackEvent(event);
       }
     }
   }

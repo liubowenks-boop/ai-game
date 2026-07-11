@@ -430,36 +430,19 @@ runTest('battle presentation systems call the shared animation driver', () => {
   assert.equal(gridSource.includes('computeProceduralAnimationPose'), true);
 });
 
-runTest('player attacks render golden projectiles with transparent 2d particle hit bursts', () => {
+runTest('player attack adapter routes main and thunder chain events to shared vfx', () => {
   const autoAttackSource = readFileSync('assets/scripts/battle/PlayerAutoAttackSystem.ts', 'utf8');
 
-  assert.equal(autoAttackSource.includes('ParticleSystem2D'), true);
-  assert.equal(autoAttackSource.includes('projectiles'), true);
-  assert.equal(autoAttackSource.includes('hitBursts'), true);
-  assert.equal(autoAttackSource.includes('spawnGoldenArrowProjectile'), true);
-  assert.equal(autoAttackSource.includes('drawGoldenArrowProjectile'), true);
-  assert.equal(autoAttackSource.includes('spawnHitParticleBurst'), true);
-  assert.equal(autoAttackSource.includes('configureHitParticleSystem'), true);
-  assert.equal(autoAttackSource.includes('getUiArtAsset'), true);
-  assert.equal(autoAttackSource.includes('assetManager.loadAny(spec.uuid'), true);
-  assert.equal(autoAttackSource.includes("assetManager.loadBundle('ui'"), false);
-  assert.equal(autoAttackSource.includes('fx_glow_gold_soft.png'), true);
-  assert.equal(autoAttackSource.includes('fx_fire_small.png'), true);
-  assert.equal(autoAttackSource.includes('builtinResMgr'), false);
-  assert.equal(autoAttackSource.includes('white-texture'), false);
-  assert.equal(autoAttackSource.includes('particle.custom = true'), true);
-  assert.equal(autoAttackSource.includes('particle.autoRemoveOnFinish = true'), true);
-  assert.equal(autoAttackSource.includes('particle.resetSystem()'), true);
-  assert.equal(autoAttackSource.includes('criticalFireBurst'), true);
-  assert.equal(autoAttackSource.includes('drawProjectileLightBloom'), true);
-  assert.equal(autoAttackSource.includes('drawImpactGlowHalo'), true);
-  assert.equal(autoAttackSource.includes('particle.totalParticles = critical ? 84 : 52'), true);
-  assert.equal(autoAttackSource.includes('particle.emissionRate = critical ? 440 : 280'), true);
-  assert.equal(autoAttackSource.includes('new Color(255, 96, 32'), true);
-  assert.equal(autoAttackSource.includes('distance / 1000'), true);
+  assert.equal(autoAttackSource.includes('BattleVfxSystem'), true);
+  assert.equal(autoAttackSource.includes("event.source === 'main'"), true);
+  assert.equal(autoAttackSource.includes("event.source === 'thunder_chain'"), true);
+  assert.equal(autoAttackSource.includes('this.battleVfx.playAttackEvent(event)'), true);
+  assert.equal(autoAttackSource.includes('ParticleSystem2D'), false);
+  assert.equal(autoAttackSource.includes('Graphics'), false);
+  assert.equal(autoAttackSource.includes('assetManager'), false);
 });
 
-runTest('thunder mage presentation owns its companion spine and electric effects', () => {
+runTest('thunder mage presentation owns its spine and delegates electric effects', () => {
   const presentationSource = readFileSync(
     'assets/scripts/battle/ThunderMagePresentation.ts',
     'utf8',
@@ -478,12 +461,9 @@ runTest('thunder mage presentation owns its companion spine and electric effects
     presentationSource.includes("this.rootNode.getChildByName('ThunderMageAttackSpine')"),
     true,
   );
-  assert.equal(
-    presentationSource.includes("effectParent.getChildByName('ThunderMageEffects')"),
-    true,
-  );
+  assert.equal(presentationSource.includes('BattleVfxSystem'), true);
+  assert.equal(presentationSource.includes('this.battleVfx.playAttackEvent(event)'), true);
   assert.equal(presentationSource.includes('THUNDER_MAGE_COMPANION.displayScale'), true);
-  assert.equal(presentationSource.includes('0.22'), true);
   assert.equal(presentationSource.includes('premultipliedAlpha = false'), true);
   assert.equal(
     presentationSource.includes('resources.load(attackClip.spineAssetBase, sp.SkeletonData'),
@@ -497,9 +477,9 @@ runTest('thunder mage presentation owns its companion spine and electric effects
   assert.equal(presentationSource.includes("setAttachment('frame', 'frame_0')"), true);
   assert.equal(presentationSource.includes("setAttachment('frame', `frame_${frameIndex}`)"), true);
   assert.equal(presentationSource.includes('resolveThunderMageAttackFrameIndex'), true);
-  assert.equal(presentationSource.includes('advanceThunderMageProjectile'), true);
-  assert.equal(presentationSource.includes('new Color(118, 224, 255'), true);
-  assert.equal(presentationSource.includes('new Color(247, 252, 255'), true);
+  assert.equal(presentationSource.includes('advanceThunderMageProjectile'), false);
+  assert.equal(presentationSource.includes('Graphics'), false);
+  assert.equal(presentationSource.includes('projectiles'), false);
   assert.equal(presentationSource.includes('roundRect('), false);
   assert.equal(presentationSource.includes('fillRect('), false);
   assert.equal(presentationSource.includes('Sprite'), false);
@@ -517,7 +497,7 @@ runTest('thunder mage presentation reuses nodes and shares one skeleton load', (
   );
 
   assert.equal(presentationSource.includes('new Vec3(-210, -370, 0)'), false);
-  assert.equal(presentationSource.includes('THUNDER_MAGE_STAFF_OFFSET'), true);
+  assert.equal(presentationSource.includes('THUNDER_MAGE_STAFF_OFFSET'), false);
   assert.equal(presentationSource.includes('ThunderMageBronzeRing'), false);
   assert.equal(presentationSource.includes('drawBronzeRing'), false);
   assert.equal(presentationSource.includes('THUNDER_MAGE_RING_'), false);
@@ -545,7 +525,7 @@ runTest('battle controller delegates thunder mage presentation lifecycle', () =>
   assert.equal(controllerSource.includes('thunderMagePresentation'), true);
   assert.match(
     controllerSource,
-    /new ThunderMagePresentation\(\s*this\.terrainPresentation\.layers\.units,\s*this\.terrainPresentation\.layers\.projectiles,\s*\(node\) => this\.setUiLayer\(node\),\s*\)/s,
+    /new ThunderMagePresentation\(\s*this\.terrainPresentation\.layers\.units,\s*\(node\) => this\.setUiLayer\(node\),\s*this\.battleVfx,\s*\)/s,
   );
   assert.equal(
     controllerSource.includes(
