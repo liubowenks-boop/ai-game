@@ -26,7 +26,7 @@ export const BATTLE_WALL_LAYOUT = {
   unitY: -270,
   unitVisualScale: 1.3,
   ordinaryHeroBaseSize: 66,
-  thunderMage: { x: -240, y: -205 },
+  thunderMage: { x: -215, y: -205 },
   ordinarySlots: [
     { x: -120, y: -270 },
     { x: 120, y: -270 },
