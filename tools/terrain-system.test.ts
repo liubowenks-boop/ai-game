@@ -355,8 +355,8 @@ runTest('battle controller routes combat visuals through terrain render layers',
     join(process.cwd(), 'assets', 'scripts', 'battle', 'BattleController.ts'),
     'utf8',
   );
-  const thunderMageSource = readFileSync(
-    join(process.cwd(), 'assets', 'scripts', 'battle', 'ThunderMagePresentation.ts'),
+  const fixedCompanionSource = readFileSync(
+    join(process.cwd(), 'assets', 'scripts', 'battle', 'FixedSpineCompanionPresentation.ts'),
     'utf8',
   );
 
@@ -395,11 +395,14 @@ runTest('battle controller routes combat visuals through terrain render layers',
     false,
   );
   assert.match(controllerSource, /this\.terrainPresentation\?\.dispose\(\);/);
+  assert.match(fixedCompanionSource, /export class FixedSpineCompanionPresentation/);
   assert.match(
-    thunderMageSource,
-    /public constructor\(\s*unitParent: Node,\s*setUiLayer: \(node: Node\) => void,\s*private readonly battleVfx: BattleVfxSystem,/s,
+    fixedCompanionSource,
+    /public constructor\(\s*unitParent: Node,\s*setUiLayer: \(node: Node\) => void,\s*private readonly battleVfx: BattleVfxSystem,\s*private readonly companion: FixedCompanionConfig,\s*animationProfile: UnitAnimationProfile,/s,
   );
-  assert.match(thunderMageSource, /unitParent\.addChild\(this\.rootNode\);/);
-  assert.equal(thunderMageSource.includes('effectParent.addChild'), false);
-  assert.match(thunderMageSource, /this\.battleVfx\.playAttackEvent\(event\);/);
+  assert.match(fixedCompanionSource, /unitParent\.addChild\(this\.rootNode\);/);
+  assert.equal(fixedCompanionSource.includes('effectParent.addChild'), false);
+  assert.match(fixedCompanionSource, /this\.battleVfx\.playAttackEvent\(event\);/);
+  assert.match(controllerSource, /FIXED_COMPANIONS\.map\(\s*\(companion\) =>/);
+  assert.equal(controllerSource.includes('private thunderMagePresentation'), false);
 });

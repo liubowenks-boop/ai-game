@@ -37,10 +37,14 @@ import {
   PLAYER_ANIMATION_PROFILE,
   PLAYER_ATTACK_SPINE_SPEED,
   PLAYER_ATTACK_SPINE_SOURCE_DURATION,
+  QINGLAN_ANIMATION_PROFILE,
+  THUNDER_MAGE_ANIMATION_PROFILE,
+  UnitAnimationProfile,
   getAnimationClipSpec,
   resolvePlayerAttackAnimationTiming,
 } from '../data/AnimationConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
+import { FIXED_COMPANIONS, FixedCompanionId } from '../data/CompanionConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
@@ -49,6 +53,7 @@ import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
 import { BattleTerrainPresentation } from './BattleTerrainPresentation';
 import { BattleVfxSystem } from './BattleVfxSystem';
 import { VideoCharacterPresentation } from './VideoCharacterPresentation';
+import { FixedSpineCompanionPresentation } from './FixedSpineCompanionPresentation';
 import {
   UnitAnimationRuntime,
   computeProceduralAnimationPose,
@@ -60,6 +65,11 @@ import {
 import { WaveSystem } from './WaveSystem';
 
 const { ccclass } = _decorator;
+
+const FIXED_COMPANION_ANIMATION_PROFILES: Record<FixedCompanionId, UnitAnimationProfile> = {
+  hero_thunder_mage: THUNDER_MAGE_ANIMATION_PROFILE,
+  hero_qinglan: QINGLAN_ANIMATION_PROFILE,
+};
 
 interface TextView {
   node: Node;
@@ -100,6 +110,7 @@ export class BattleController extends Component {
   private pendingPlayerAttackSpine = false;
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
   private videoCharacterPresentation!: VideoCharacterPresentation;
+  private readonly fixedCompanionPresentations: FixedSpineCompanionPresentation[] = [];
   private terrainPresentation!: BattleTerrainPresentation;
   private battleVfx!: BattleVfxSystem;
   private startButtonLabel!: Label;
@@ -158,6 +169,9 @@ export class BattleController extends Component {
 
     const presentationDelta = Math.min(deltaTime, 1 / 30);
     this.videoCharacterPresentation.update(presentationDelta);
+    for (const presentation of this.fixedCompanionPresentations) {
+      presentation.update(presentationDelta);
+    }
     this.cityHealthBarView.update(deltaTime);
 
     if (this.upgradeCardSystem.isShowing()) {
@@ -175,6 +189,12 @@ export class BattleController extends Component {
       result,
       this.model.getCompanionAttackInterval(),
     );
+    this.fixedCompanionPresentations.forEach((presentation) => {
+      presentation.handleTickResult(
+        result,
+        this.model.getFixedCompanionAttackInterval(presentation.companionId),
+      );
+    });
     this.gridPlacementSystem.handleTickResult(result);
     this.requestPlayerAnimationFromResult(result);
     this.processReadabilityResult(result);
@@ -258,6 +278,18 @@ export class BattleController extends Component {
       (node) => this.setUiLayer(node),
       this.battleVfx,
     );
+    this.fixedCompanionPresentations.push(
+      ...FIXED_COMPANIONS.filter((companion) => companion.id !== 'hero_thunder_mage').map(
+        (companion) =>
+          new FixedSpineCompanionPresentation(
+            this.terrainPresentation.layers.units,
+            (node) => this.setUiLayer(node),
+            this.battleVfx,
+            companion,
+            FIXED_COMPANION_ANIMATION_PROFILES[companion.id],
+          ),
+      ),
+    );
     this.upgradeCardSystem = new UpgradeCardSystem(
       this.upgradePanelLayer,
       this.model,
@@ -285,6 +317,9 @@ export class BattleController extends Component {
     }
 
     this.videoCharacterPresentation.clear();
+    for (const presentation of this.fixedCompanionPresentations) {
+      presentation.clear();
+    }
     this.battleVfx.clear();
     this.clearReadabilityFeedback();
   }
