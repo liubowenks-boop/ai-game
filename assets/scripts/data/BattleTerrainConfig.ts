@@ -26,13 +26,13 @@ export const BATTLE_WALL_LAYOUT = {
   unitY: -270,
   unitVisualScale: 1.3,
   ordinaryHeroBaseSize: 66,
-  thunderMage: { x: -240, y: -270 },
+  thunderMage: { x: -240, y: -205 },
   ordinarySlots: [
     { x: -120, y: -270 },
     { x: 120, y: -270 },
     { x: 240, y: -270 },
   ],
-  mainHero: { x: 0, y: -270 },
+  mainHero: { x: 0, y: -250 },
 } as const;
 
 export const BATTLE_TERRAIN_LAYERS: readonly BattleTerrainLayerSpec[] = [

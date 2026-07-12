@@ -17,6 +17,7 @@ import {
 
 import {
   BATTLE_VFX_BUDGET,
+  BATTLE_VFX_HIT_VISUAL_SCALE,
   BATTLE_VFX_PRESETS,
   BATTLE_VFX_TEXTURE_FALLBACKS,
   BATTLE_VFX_TEXTURES,
@@ -461,7 +462,8 @@ export class BattleVfxSystem {
     handle.node.active = true;
     handle.node.setPosition(position.x, position.y + 10, 0);
     handle.node.angle = 0;
-    handle.baseScale = preset.impactScale * (critical ? 1.24 : 1);
+    handle.baseScale =
+      preset.impactScale * BATTLE_VFX_HIT_VISUAL_SCALE * (critical ? 1.24 : 1);
     this.fitSpriteToFrame(handle.node, frame, 270);
     handle.node.setScale(handle.baseScale, handle.baseScale, 1);
     handle.sprite.spriteFrame = frame;
@@ -524,11 +526,15 @@ export class BattleVfxSystem {
     particle.speedVar = profile.speedVar * (critical ? 1.12 : 1);
     particle.angle = profile.angle;
     particle.angleVar = profile.angleVar;
-    particle.posVar = new Vec2(profile.spread[0], profile.spread[1]);
-    particle.startSize = profile.startSize * (critical ? 1.28 : 1);
-    particle.startSizeVar = profile.startSizeVar;
-    particle.endSize = profile.endSize;
-    particle.endSizeVar = 2;
+    particle.posVar = new Vec2(
+      profile.spread[0] * BATTLE_VFX_HIT_VISUAL_SCALE,
+      profile.spread[1] * BATTLE_VFX_HIT_VISUAL_SCALE,
+    );
+    particle.startSize =
+      profile.startSize * BATTLE_VFX_HIT_VISUAL_SCALE * (critical ? 1.28 : 1);
+    particle.startSizeVar = profile.startSizeVar * BATTLE_VFX_HIT_VISUAL_SCALE;
+    particle.endSize = profile.endSize * BATTLE_VFX_HIT_VISUAL_SCALE;
+    particle.endSizeVar = 2 * BATTLE_VFX_HIT_VISUAL_SCALE;
     particle.gravity = new Vec2(profile.gravity[0], profile.gravity[1]);
     particle.startSpin = 0;
     particle.startSpinVar = 180;
@@ -691,7 +697,8 @@ export class BattleVfxSystem {
     handle.active = true;
     handle.age = 0;
     handle.duration = critical ? 0.3 : 0.22;
-    handle.baseScale = preset.impactScale * (critical ? 0.7 : 0.56);
+    handle.baseScale =
+      preset.impactScale * BATTLE_VFX_HIT_VISUAL_SCALE * (critical ? 0.7 : 0.56);
     handle.growth = critical ? 1.15 : 0.92;
     handle.startAlpha = critical ? 225 : 190;
     handle.node.active = true;

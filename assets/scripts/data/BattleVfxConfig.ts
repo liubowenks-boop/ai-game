@@ -60,6 +60,8 @@ export interface BattleVfxBudget {
   readonly maxPlacementMarkers: number;
 }
 
+export const BATTLE_VFX_HIT_VISUAL_SCALE = 0.7;
+
 export const BATTLE_VFX_TEXTURES: Readonly<Record<BattleVfxTextureId, string>> = {
   goldProjectile: 'fx_v2_gold_projectile.png',
   fireSlash: 'fx_v2_fire_slash.png',

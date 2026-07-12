@@ -5,6 +5,7 @@ import { inflateSync } from 'node:zlib';
 
 import {
   BATTLE_VFX_BUDGET,
+  BATTLE_VFX_HIT_VISUAL_SCALE,
   BATTLE_VFX_PRESETS,
   BATTLE_VFX_TEXTURE_FALLBACKS,
   BATTLE_VFX_TEXTURES,
@@ -118,6 +119,7 @@ runTest('vfx presets map every battle role to a distinct readable element', () =
 });
 
 runTest('vfx textures and presets stay inside the approved production budget', () => {
+  assert.equal(BATTLE_VFX_HIT_VISUAL_SCALE, 0.7);
   assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 15);
   assert.equal(Object.keys(BATTLE_VFX_PRESETS).length, 10);
 
@@ -283,6 +285,15 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
   assert.match(source, /playLayeredImpact\(/);
   assert.match(source, /playShockRing\(/);
   assert.match(source, /this\.playShockRing\(preset, position, critical\)/);
+  assert.match(source, /preset\.impactScale \* BATTLE_VFX_HIT_VISUAL_SCALE/);
+  assert.match(source, /profile\.startSize \* BATTLE_VFX_HIT_VISUAL_SCALE/);
+  assert.match(source, /profile\.endSize \* BATTLE_VFX_HIT_VISUAL_SCALE/);
+  assert.match(source, /profile\.spread\[0\] \* BATTLE_VFX_HIT_VISUAL_SCALE/);
+  assert.match(
+    source,
+    /preset\.impactScale \* BATTLE_VFX_HIT_VISUAL_SCALE \* \(critical \? 0\.7 : 0\.56\)/,
+  );
+  assert.match(source, /preset\.impactScale \* 0\.72/);
   assert.match(source, /handle\.duration = critical \? 0\.3 : 0\.22/);
   assert.match(
     source,

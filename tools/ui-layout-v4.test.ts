@@ -107,8 +107,9 @@ function main(): void {
     'wall formation uses five evenly spaced x positions',
   );
   assert(
-    formation.every((rect) => rect.y === -270),
-    'wall formation shares one y coordinate',
+    JSON.stringify(formation.map((rect) => rect.y)) ===
+      JSON.stringify([-205, -270, -250, -270, -270]),
+    'thunder mage should stand slightly behind the aligned wall formation',
   );
   for (let index = 1; index < formation.length; index += 1) {
     assert(!rectsOverlap(formation[index - 1], formation[index]), 'adjacent wall units overlap');
