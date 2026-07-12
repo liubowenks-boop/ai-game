@@ -15,7 +15,8 @@ export type BattleVfxTextureId =
   | 'fireImpactV3'
   | 'thunderImpactV3'
   | 'poisonImpactV3'
-  | 'goldImpactV3';
+  | 'goldImpactV3'
+  | 'qinglanTalisman';
 
 export type BattleVfxImpactProfile = 'fire' | 'thunder' | 'poison' | 'gold' | 'heal';
 
@@ -29,7 +30,8 @@ export type BattleVfxPresetId =
   | 'shield_impact'
   | 'warm_support'
   | 'healing_spirit'
-  | 'curse_wisp';
+  | 'curse_wisp'
+  | 'qinglan_talisman';
 
 export interface BattleVfxPreset {
   readonly id: BattleVfxPresetId;
@@ -78,6 +80,7 @@ export const BATTLE_VFX_TEXTURES: Readonly<Record<BattleVfxTextureId, string>> =
   thunderImpactV3: 'fx_v3_hit_thunder_crater.png',
   poisonImpactV3: 'fx_v3_hit_poison_talisman.png',
   goldImpactV3: 'fx_v3_hit_gold_starburst.png',
+  qinglanTalisman: 'fx_v4_qinglan_talisman.png',
 };
 
 export const BATTLE_VFX_TEXTURE_FALLBACKS: Readonly<
@@ -301,6 +304,26 @@ export const BATTLE_VFX_PRESETS: Readonly<Record<BattleVfxPresetId, BattleVfxPre
       impactLife: 0.62,
       criticalLife: 0.88,
       presentationInterval: 0.82,
+    },
+  ),
+  qinglan_talisman: preset(
+    'qinglan_talisman',
+    'qinglanTalisman',
+    'poisonImpactV3',
+    [74, 238, 170, 255],
+    [238, 255, 198, 255],
+    {
+      impactProfile: 'poison',
+      travelSeconds: 0.42,
+      particleCount: 58,
+      criticalParticleCount: 118,
+      impactLife: 0.58,
+      criticalLife: 0.84,
+      presentationInterval: 1,
+      projectileScale: 0.74,
+      impactScale: 0.66,
+      glowScale: 1.55,
+      trailInterval: 0.026,
     },
   ),
 };

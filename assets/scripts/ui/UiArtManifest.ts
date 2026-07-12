@@ -127,6 +127,7 @@ export const UiArtAssets: Record<string, UiArtAssetSpec> = {
   "fx_v3_hit_thunder_crater.png": { atlas: "battle_fx_common", path: "battle_fx_common/fx_v3_hit_thunder_crater", uuid: "20914cff-8b86-4e3f-bd8b-49409dc17eab", textureUuid: "20914cff-8b86-4e3f-bd8b-49409dc17eab@6c48a", width: 512, height: 512, nineSlice: null },
   "fx_v3_hit_poison_talisman.png": { atlas: "battle_fx_common", path: "battle_fx_common/fx_v3_hit_poison_talisman", uuid: "54ecb164-a3e0-45ee-a812-f1112fff7974", textureUuid: "54ecb164-a3e0-45ee-a812-f1112fff7974@6c48a", width: 512, height: 512, nineSlice: null },
   "fx_v3_hit_gold_starburst.png": { atlas: "battle_fx_common", path: "battle_fx_common/fx_v3_hit_gold_starburst", uuid: "ff7eb043-4e0d-4961-9881-c748ac9c0554", textureUuid: "ff7eb043-4e0d-4961-9881-c748ac9c0554@6c48a", width: 512, height: 512, nineSlice: null },
+  "fx_v4_qinglan_talisman.png": { atlas: "battle_fx_common", path: "battle_fx_common/fx_v4_qinglan_talisman", uuid: "8f4c7f4a-8b7f-4dbf-91b0-1c4f4f6f9d42", textureUuid: "8f4c7f4a-8b7f-4dbf-91b0-1c4f4f6f9d42@6c48a", width: 128, height: 256, nineSlice: null },
 };
 
 export function getUiArtAsset(filename: string): UiArtAssetSpec | undefined {

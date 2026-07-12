@@ -8,7 +8,14 @@ import {
 } from '../data/BattleVfxConfig';
 
 export interface AttackVfxDescriptor {
-  readonly source: 'main' | 'companion' | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
+  readonly source:
+    | 'main'
+    | 'companion'
+    | 'qinglan_companion'
+    | 'hero_dps'
+    | 'burn'
+    | 'poison'
+    | 'thunder_chain';
   readonly heroName?: string;
   readonly heroRole?: HeroRole;
 }
@@ -41,6 +48,9 @@ export function resolveAttackVfxPreset(input: AttackVfxDescriptor): BattleVfxPre
   }
   if (input.source === 'companion' || input.source === 'thunder_chain') {
     return BATTLE_VFX_PRESETS.thunder;
+  }
+  if (input.source === 'qinglan_companion') {
+    return BATTLE_VFX_PRESETS.qinglan_talisman;
   }
   if (input.heroRole) {
     return resolveHeroVfxPreset(input.heroName ?? '', input.heroRole);

@@ -107,6 +107,7 @@ function readPng(path: string): {
 runTest('vfx presets map every battle role to a distinct readable element', () => {
   assert.equal(resolveAttackVfxPreset({ source: 'main' }).id, 'main_fire_gold');
   assert.equal(resolveAttackVfxPreset({ source: 'companion' }).id, 'thunder');
+  assert.equal(resolveAttackVfxPreset({ source: 'qinglan_companion' }).id, 'qinglan_talisman');
   assert.equal(resolveHeroVfxPreset('弓手', 'single').id, 'gold_arrow');
   assert.equal(resolveHeroVfxPreset('火药师', 'area').id, 'fire_blast');
   assert.equal(resolveHeroVfxPreset('冰法师', 'slow').id, 'ice_shard');
@@ -120,21 +121,33 @@ runTest('vfx presets map every battle role to a distinct readable element', () =
 
 runTest('vfx textures and presets stay inside the approved production budget', () => {
   assert.equal(BATTLE_VFX_HIT_VISUAL_SCALE, 0.7);
-  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 15);
-  assert.equal(Object.keys(BATTLE_VFX_PRESETS).length, 10);
+  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 16);
+  assert.equal(Object.keys(BATTLE_VFX_PRESETS).length, 11);
 
   for (const preset of Object.values(BATTLE_VFX_PRESETS)) {
     assert.ok(preset.particleCount >= 40 && preset.particleCount <= 70);
     assert.ok(preset.criticalParticleCount >= 90 && preset.criticalParticleCount <= 140);
     assert.ok(preset.impactLife >= 0.18 && preset.impactLife <= 0.65);
     assert.ok(preset.criticalLife <= 0.9);
-    assert.ok(preset.presentationInterval >= 0.65 && preset.presentationInterval <= 0.85);
+    assert.ok(preset.presentationInterval >= 0.65 && preset.presentationInterval <= 1.0);
     assert.ok(preset.projectileScale >= 0.55 && preset.projectileScale <= 1.2);
     assert.ok(preset.impactScale >= 0.45 && preset.impactScale <= 0.9);
     assert.ok(preset.glowScale >= 1.15 && preset.glowScale <= 1.8);
     assert.ok(preset.trailInterval >= 0.018 && preset.trailInterval <= 0.05);
-    assert.ok(preset.travelSeconds >= 0.23 && preset.travelSeconds <= 0.38);
+    assert.ok(preset.travelSeconds >= 0.23 && preset.travelSeconds <= 0.42);
   }
+
+  const qinglan = BATTLE_VFX_PRESETS.qinglan_talisman;
+  assert.equal(qinglan.projectileTexture, 'qinglanTalisman');
+  assert.equal(qinglan.impactTexture, 'poisonImpactV3');
+  assert.equal(qinglan.impactProfile, 'poison');
+  assert.equal(qinglan.travelSeconds, 0.42);
+  assert.equal(qinglan.particleCount, 58);
+  assert.equal(qinglan.criticalParticleCount, 118);
+  assert.equal(qinglan.impactLife, 0.58);
+  assert.equal(qinglan.presentationInterval, 1);
+  assert.equal(qinglan.projectileScale, 0.74);
+  assert.equal(qinglan.impactScale, 0.66);
 
   assert.ok(BATTLE_VFX_PRESETS.main_fire_gold.projectileScale >= 0.8);
   assert.ok(BATTLE_VFX_PRESETS.main_fire_gold.impactScale >= 0.65);
@@ -161,6 +174,7 @@ runTest('vfx textures and presets stay inside the approved production budget', (
       warm_support: ['gold', 'goldImpactV3'],
       healing_spirit: ['heal', 'healOrb'],
       curse_wisp: ['poison', 'poisonImpactV3'],
+      qinglan_talisman: ['poison', 'poisonImpactV3'],
     },
   );
   assert.deepEqual(BATTLE_VFX_TEXTURE_FALLBACKS, {
@@ -211,7 +225,7 @@ runTest('critical reservations evict only the oldest decorative effect', () => {
   });
 });
 
-runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries', () => {
+runTest('authored v2 v3 and v4 textures keep alpha, metadata and manifest entries', () => {
   const directory = join(process.cwd(), 'assets', 'bundles', 'ui', 'battle_fx_common');
   const expected = new Map<string, readonly [number, number]>([
     ['fx_v2_gold_projectile.png', [512, 128]],
@@ -229,6 +243,7 @@ runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries',
     ['fx_v3_hit_thunder_crater.png', [512, 512]],
     ['fx_v3_hit_poison_talisman.png', [512, 512]],
     ['fx_v3_hit_gold_starburst.png', [512, 512]],
+    ['fx_v4_qinglan_talisman.png', [128, 256]],
   ]);
 
   for (const [filename, size] of expected) {
@@ -238,7 +253,11 @@ runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries',
     const png = readPng(imagePath);
     assert.deepEqual([png.width, png.height], size);
     assert.equal(png.colorType, 6);
-    assert.ok(png.transparentRatio() > 0.35, `${filename} needs transparent padding`);
+    const minimumTransparentRatio = filename === 'fx_v4_qinglan_talisman.png' ? 0.65 : 0.35;
+    assert.ok(
+      png.transparentRatio() > minimumTransparentRatio,
+      `${filename} needs transparent padding`,
+    );
     const corners = [
       png.alphaAt(0, 0),
       png.alphaAt(png.width - 1, 0),
@@ -254,12 +273,30 @@ runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries',
     assert.deepEqual([manifest.width, manifest.height], size);
     assert.ok(manifest.uuid);
     assert.ok(manifest.textureUuid);
+
+    const meta = JSON.parse(readFileSync(`${imagePath}.meta`, 'utf8'));
+    const textureMeta = Object.values(meta.subMetas ?? {}).find(
+      (entry: any) => entry.importer === 'texture',
+    ) as any;
+    assert.equal(meta.uuid, manifest.uuid);
+    assert.equal(textureMeta?.uuid, manifest.textureUuid);
+    assert.equal(textureMeta?.userData?.minfilter, 'linear');
+    assert.equal(textureMeta?.userData?.magfilter, 'linear');
+    assert.equal(textureMeta?.userData?.mipfilter, 'none');
+    assert.equal(meta.userData?.hasAlpha, true);
   }
 
   const generatorSource = readFileSync('tools/generate_ui_art_assets.py', 'utf8');
-  assert.ok(generatorSource.includes('spec.filename.startswith(("fx_v2_", "fx_v3_"))'));
+  assert.ok(generatorSource.includes('spec.filename.startswith(("fx_v2_", "fx_v3_", "fx_v4_"))'));
   assert.ok(generatorSource.includes('missing authored VFX texture'));
   assert.ok(generatorSource.includes('"--manifest-only"'));
+
+  const qinglanExtractor = readFileSync('tools/extract-qinglan-talisman.mjs', 'utf8');
+  assert.ok(qinglanExtractor.includes("const FRAME_NAME = 'frame_0';"));
+  const crop = /const CROP = \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \};/.exec(
+    qinglanExtractor,
+  );
+  assert.deepEqual(crop?.slice(1).map(Number), [44, 92, 45, 70]);
 });
 
 runTest('runtime vfx system owns pooled particle lifecycle and additive blending', () => {

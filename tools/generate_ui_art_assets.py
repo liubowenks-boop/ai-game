@@ -49,6 +49,20 @@ class AssetSpec:
     notes: str
 
 
+AUTHORED_VFX_SPECS = (
+    AssetSpec(
+        atlas="battle_fx_common",
+        filename="fx_v4_qinglan_talisman.png",
+        width=128,
+        height=256,
+        display="Qinglan talisman projectile",
+        usage="Qinglan companion attack projectile",
+        nine_slice=None,
+        notes="Authored extraction from hero_qinglan frame_0",
+    ),
+)
+
+
 def parse_nine_slice(text: str) -> dict[str, int] | None:
     if "不做九宫格" in text:
         return None
@@ -94,6 +108,7 @@ def parse_checklist() -> list[AssetSpec]:
             )
         )
 
+    specs.extend(AUTHORED_VFX_SPECS)
     return specs
 
 
@@ -684,7 +699,7 @@ def main(manifest_only: bool = False) -> None:
             target_dir = RUNTIME_ROOT / spec.atlas
             target_dir.mkdir(parents=True, exist_ok=True)
             target_path = target_dir / spec.filename
-            if spec.filename.startswith(("fx_v2_", "fx_v3_")):
+            if spec.filename.startswith(("fx_v2_", "fx_v3_", "fx_v4_")):
                 if not target_path.exists():
                     raise FileNotFoundError(f"missing authored VFX texture: {target_path}")
                 continue
