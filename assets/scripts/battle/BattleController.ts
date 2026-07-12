@@ -454,37 +454,6 @@ export class BattleController extends Component {
     );
     this.buildHintLabel = buildHintView.label;
 
-    new UiButtonView(
-      t('hud.tower'),
-      BattleUiV4Layout.towerButton.x,
-      BattleUiV4Layout.towerButton.y,
-      BattleUiV4Layout.towerButton.width,
-      BattleUiV4Layout.towerButton.height,
-      BattleUiTokens.colors.panelBrown,
-      this.midStatusLayer,
-      {
-        skinFilename: 'hud_tower_button_final.png',
-        hostNode: this.midStatusLayer.getChildByName('TowerButtonPrefab'),
-        labelName: 'TowerLabel',
-        widgetAlignment: { left: 22, bottom: 380 },
-      },
-    );
-    new UiButtonView(
-      t('hud.oil'),
-      BattleUiV4Layout.oilButton.x,
-      BattleUiV4Layout.oilButton.y,
-      BattleUiV4Layout.oilButton.width,
-      BattleUiV4Layout.oilButton.height,
-      BattleUiTokens.colors.primaryRed,
-      this.midStatusLayer,
-      {
-        skinFilename: 'hud_oil_button_final.png',
-        hostNode: this.midStatusLayer.getChildByName('OilButtonPrefab'),
-        labelName: 'OilLabel',
-        widgetAlignment: { right: 22, bottom: 380 },
-      },
-    );
-
     return { statusLabel: statusView.label };
   }
 

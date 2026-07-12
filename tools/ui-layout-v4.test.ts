@@ -45,12 +45,16 @@ function main(): void {
   assert(!controllerSource.includes('CityLineStroke'), 'city line stroke must not be created');
   assert(!controllerSource.includes('redrawCityLine'), 'city line must never be redrawn');
   assert(!controllerSource.includes('drawPlayerAttackAccent'), 'round player accent must be removed');
+  assert(!controllerSource.includes("t('hud.tower')"), 'tower button must not be created');
+  assert(!controllerSource.includes("t('hud.oil')"), 'oil button must not be created');
   assert(!gridSource.includes('drawSlotButton('), 'slot circle renderer must be removed');
   assert(!gridSource.includes('drawPlainButton('), 'plain circle renderer must be removed');
   assert(!gridSource.includes('view.graphics.circle('), 'placement graphics must not draw circles');
 
   const layout = BattleUiV4Layout;
   const layoutMap = layout as Record<string, RectSpec>;
+  assert(!('towerButton' in layoutMap), 'tower button layout must not exist');
+  assert(!('oilButton' in layoutMap), 'oil button layout must not exist');
 
   assert(
     !rectsOverlap(layout.upgradePanel, layout.autoButton),
@@ -61,13 +65,6 @@ function main(): void {
     'ultimate button overlaps upgrade panel',
   );
   assert(!rectsOverlap(layout.heroBar, layout.ultimateButton), 'ultimate button overlaps hero bar');
-  assertNear(
-    layout.towerButton.y,
-    layout.cityHp.y,
-    'tower button center should align with city hp',
-  );
-  assertNear(layout.oilButton.y, layout.cityHp.y, 'oil button center should align with city hp');
-
   const cityHealthBar = assertRect(layoutMap, 'cityHealthBar');
   assertNear(cityHealthBar.x, 0, 'city health bar should stay centered');
   assertNear(cityHealthBar.y, -468, 'city health bar should sit above the hero rail');
@@ -121,10 +118,6 @@ function main(): void {
   assert(!rectsOverlap(comboBadge, statusLabel), 'combo badge overlaps status label');
   assert(!rectsOverlap(comboBadge, buildHintLabel), 'combo badge overlaps build hint');
   assert(!rectsOverlap(statusLabel, buildHintLabel), 'status label overlaps build hint');
-  assert(!rectsOverlap(statusLabel, layout.towerButton), 'status label overlaps tower button');
-  assert(!rectsOverlap(buildHintLabel, layout.oilButton), 'build hint overlaps oil button');
-  assert(!rectsOverlap(cityHealthBar, layout.towerButton), 'city health bar overlaps tower button');
-  assert(!rectsOverlap(cityHealthBar, layout.oilButton), 'city health bar overlaps oil button');
   assert(
     !rectsOverlap(placementTitle, placementPending),
     'placement title overlaps pending placement label',

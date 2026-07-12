@@ -33,6 +33,12 @@ function childByName(parentId: number, name: string): number {
   return childId as number;
 }
 
+function assertNoChildNamed(parentId: number, name: string): void {
+  const parent = entry(parentId);
+  const childId = parent._children?.find((child) => entry(child.__id__)._name === name)?.__id__;
+  assert.equal(childId, undefined, `${parent._name ?? parent.__type__} still has child ${name}`);
+}
+
 function hasComponent(nodeId: number, componentType: string): boolean {
   return Boolean(
     entry(nodeId)._components?.some((component) => entry(component.__id__).__type__ === componentType),
@@ -111,13 +117,8 @@ const comboViewId = childByName(midStatusLayerId, 'ComboView');
 childByName(comboViewId, 'ComboSkin');
 childByName(comboViewId, 'ComboLabel');
 
-const towerButtonPrefabId = childByName(midStatusLayerId, 'TowerButtonPrefab');
-childByName(towerButtonPrefabId, 'ButtonSkin');
-childByName(towerButtonPrefabId, 'TowerLabel');
-
-const oilButtonPrefabId = childByName(midStatusLayerId, 'OilButtonPrefab');
-childByName(oilButtonPrefabId, 'ButtonSkin');
-childByName(oilButtonPrefabId, 'OilLabel');
+assertNoChildNamed(midStatusLayerId, 'TowerButtonPrefab');
+assertNoChildNamed(midStatusLayerId, 'OilButtonPrefab');
 
 const upgradeCardSystemId = childByName(upgradePanelLayerId, 'UpgradeCardSystem');
 childByName(upgradeCardSystemId, 'UpgradePanelSkin');

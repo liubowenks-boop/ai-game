@@ -40,8 +40,6 @@ export const BattleUiV4Layout = {
   mainHeroUnit: fromCenter(0, -250, 125, 146),
   wallSlotOrdinary2: fromCenter(120, -270, 106, 106),
   wallSlotOrdinary3: fromCenter(240, -270, 106, 106),
-  towerButton: fromTopLeft(22, 810, 76, 90),
-  oilButton: fromTopLeft(622, 810, 76, 90),
   upgradeScrim: fromCenter(0, 0, BattleUiDesign.width, BattleUiDesign.height),
   upgradePanel: fromCenter(0, 0, 672, 380),
   rightActionRail: fromTopLeft(626, 922, 72, 326),
