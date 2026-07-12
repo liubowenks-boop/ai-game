@@ -10,7 +10,7 @@ const MAX_COMPRESSED_BYTES = 32 * 1024 * 1024;
 const MAX_DIMENSION = 16_384;
 const MAX_PIXELS = 16_777_216;
 const FRAME_NAME = 'frame_0';
-const CROP = { x: 44, y: 92, width: 45, height: 70 };
+const CROP = { x: 48, y: 75, width: 40, height: 70 };
 const OUTPUT_SIZE = { width: 128, height: 256 };
 const ALPHA_THRESHOLD = 16;
 

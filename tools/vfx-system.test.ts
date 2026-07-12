@@ -104,6 +104,62 @@ function readPng(path: string): {
   };
 }
 
+function parseAtlasFrame(path: string, frameName: string): { x: number; y: number; width: number; height: number } {
+  const lines = readFileSync(path, 'utf8').split(/\r?\n/);
+  const frameIndex = lines.findIndex((line) => line.trim() === frameName);
+  assert.ok(frameIndex >= 0, `missing atlas frame ${frameName}`);
+  const xy = /^xy:\s*(\d+),\s*(\d+)$/.exec(lines[frameIndex + 2]?.trim() ?? '');
+  const size = /^size:\s*(\d+),\s*(\d+)$/.exec(lines[frameIndex + 3]?.trim() ?? '');
+  assert.ok(xy && size, `invalid atlas geometry for ${frameName}`);
+  return { x: Number(xy[1]), y: Number(xy[2]), width: Number(size[1]), height: Number(size[2]) };
+}
+
+function alphaConnectedBounds(
+  image: ReturnType<typeof readPng>,
+  startX: number,
+  startY: number,
+  threshold: number,
+): { left: number; top: number; right: number; bottom: number } {
+  assert.ok(image.alphaAt(startX, startY) >= threshold, 'talisman component seed must be opaque');
+  const queued = new Set([`${startX},${startY}`]);
+  const visited = new Set<string>();
+  let left = startX;
+  let top = startY;
+  let right = startX;
+  let bottom = startY;
+  while (queued.size > 0) {
+    const key = queued.values().next().value as string;
+    queued.delete(key);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const [x, y] = key.split(',').map(Number);
+    if (image.alphaAt(x, y) < threshold) continue;
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x);
+    bottom = Math.max(bottom, y);
+    for (const [nextX, nextY] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      if (nextX >= 0 && nextX < image.width && nextY >= 0 && nextY < image.height) {
+        queued.add(`${nextX},${nextY}`);
+      }
+    }
+  }
+  return { left, top, right, bottom };
+}
+
+function findOpaquePixel(
+  image: ReturnType<typeof readPng>,
+  bounds: { left: number; top: number; right: number; bottom: number },
+  threshold: number,
+): { x: number; y: number } {
+  for (let y = bounds.top; y <= bounds.bottom; y += 1) {
+    for (let x = bounds.left; x <= bounds.right; x += 1) {
+      if (image.alphaAt(x, y) >= threshold) return { x, y };
+    }
+  }
+  assert.fail('talisman bounds must contain an opaque pixel');
+}
+
 runTest('vfx presets map every battle role to a distinct readable element', () => {
   assert.equal(resolveAttackVfxPreset({ source: 'main' }).id, 'main_fire_gold');
   assert.equal(resolveAttackVfxPreset({ source: 'companion' }).id, 'thunder');
@@ -296,7 +352,38 @@ runTest('authored v2 v3 and v4 textures keep alpha, metadata and manifest entrie
   const crop = /const CROP = \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \};/.exec(
     qinglanExtractor,
   );
-  assert.deepEqual(crop?.slice(1).map(Number), [44, 92, 45, 70]);
+  assert.ok(crop, 'Qinglan extractor must declare a crop');
+  const [cropX, cropY, cropWidth, cropHeight] = crop.slice(1).map(Number);
+  const source = readPng('assets/resources/spine/hero_qinglan/hero_qinglan.png');
+  const frame = parseAtlasFrame('assets/resources/spine/hero_qinglan/hero_qinglan.atlas', 'frame_0');
+  const alphaThreshold = 16;
+  const alphaAtCrop = (x: number, y: number): number => source.alphaAt(frame.x + cropX + x, frame.y + cropY + y);
+  for (let x = 0; x < cropWidth; x += 1) {
+    assert.ok(alphaAtCrop(x, 0) < alphaThreshold, 'talisman crop top edge must be transparent');
+    assert.ok(alphaAtCrop(x, cropHeight - 1) < alphaThreshold, 'talisman crop bottom edge must be transparent');
+  }
+  for (let y = 0; y < cropHeight; y += 1) {
+    assert.ok(alphaAtCrop(0, y) < alphaThreshold, 'talisman crop left edge must be transparent');
+    assert.ok(alphaAtCrop(cropWidth - 1, y) < alphaThreshold, 'talisman crop right edge must be transparent');
+  }
+  const talismanSeed = findOpaquePixel(
+    source,
+    { left: frame.x + 54, top: frame.y + 81, right: frame.x + 80, bottom: frame.y + 137 },
+    alphaThreshold,
+  );
+  const talismanBounds = alphaConnectedBounds(
+    source,
+    talismanSeed.x,
+    talismanSeed.y,
+    alphaThreshold,
+  );
+  assert.deepEqual(
+    talismanBounds,
+    { left: frame.x + 54, top: frame.y + 81, right: frame.x + 80, bottom: frame.y + 137 },
+  );
+  assert.ok(cropX < 54 && cropY < 81, 'talisman crop must include transparent top-left padding');
+  assert.ok(cropX + cropWidth - 1 > 80 && cropY + cropHeight - 1 > 137, 'talisman crop must include transparent bottom-right padding');
+  assert.deepEqual([cropX, cropY, cropWidth, cropHeight], [48, 75, 40, 70]);
 });
 
 runTest('runtime vfx system owns pooled particle lifecycle and additive blending', () => {
