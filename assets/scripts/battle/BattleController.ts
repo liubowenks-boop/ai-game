@@ -37,14 +37,12 @@ import {
   PLAYER_ANIMATION_PROFILE,
   PLAYER_ATTACK_SPINE_SPEED,
   PLAYER_ATTACK_SPINE_SOURCE_DURATION,
-  QINGLAN_ANIMATION_PROFILE,
-  THUNDER_MAGE_ANIMATION_PROFILE,
-  UnitAnimationProfile,
   getAnimationClipSpec,
+  getFixedCompanionAnimationProfile,
   resolvePlayerAttackAnimationTiming,
 } from '../data/AnimationConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
-import { FIXED_COMPANIONS, FixedCompanionId } from '../data/CompanionConfig';
+import { FIXED_COMPANIONS } from '../data/CompanionConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
@@ -65,11 +63,6 @@ import {
 import { WaveSystem } from './WaveSystem';
 
 const { ccclass } = _decorator;
-
-const FIXED_COMPANION_ANIMATION_PROFILES: Record<FixedCompanionId, UnitAnimationProfile> = {
-  hero_thunder_mage: THUNDER_MAGE_ANIMATION_PROFILE,
-  hero_qinglan: QINGLAN_ANIMATION_PROFILE,
-};
 
 interface TextView {
   node: Node;
@@ -286,7 +279,7 @@ export class BattleController extends Component {
             (node) => this.setUiLayer(node),
             this.battleVfx,
             companion,
-            FIXED_COMPANION_ANIMATION_PROFILES[companion.id],
+            getFixedCompanionAnimationProfile(companion.animationProfileId),
           ),
       ),
     );

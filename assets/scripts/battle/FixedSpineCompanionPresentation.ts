@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- The repository typecheck does not include Cocos Creator's generated cc declarations.
 import { Node, resources, sp } from 'cc';
 
 import {
@@ -153,7 +153,8 @@ export class FixedSpineCompanionPresentation {
       return;
     }
     const attackClip = this.attackClip;
-    if (attackClip.renderer !== 'spine' || !attackClip.spineAssetBase) {
+    const spineAssetBase = attackClip.spineAssetBase;
+    if (attackClip.renderer !== 'spine' || !spineAssetBase) {
       return;
     }
     const existingSkeletonData = this.attackSpine.skeletonData;
@@ -166,7 +167,7 @@ export class FixedSpineCompanionPresentation {
     this.loadState = 'loading';
     this.skeletonLoader.request(
       (complete) => {
-        resources.load(attackClip.spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
+        resources.load<sp.SkeletonData>(spineAssetBase, sp.SkeletonData, (error, skeletonData) => {
           complete(error, skeletonData);
         });
       },
@@ -186,10 +187,7 @@ export class FixedSpineCompanionPresentation {
         }
       },
       (error) => {
-        console.warn(
-          `Failed to load fixed companion Spine asset: ${attackClip.spineAssetBase}`,
-          error,
-        );
+        console.warn(`Failed to load fixed companion Spine asset: ${spineAssetBase}`, error);
       },
     );
   }

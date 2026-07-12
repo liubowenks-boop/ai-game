@@ -16,6 +16,7 @@ import {
   resolveHeroVfxPreset,
 } from '../assets/scripts/battle/BattleVfxLogic';
 import { UiArtAssets } from '../assets/scripts/ui/UiArtManifest';
+import { FIXED_COMPANIONS } from '../assets/scripts/data/CompanionConfig';
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
@@ -104,7 +105,10 @@ function readPng(path: string): {
   };
 }
 
-function parseAtlasFrame(path: string, frameName: string): { x: number; y: number; width: number; height: number } {
+function parseAtlasFrame(
+  path: string,
+  frameName: string,
+): { x: number; y: number; width: number; height: number } {
   const lines = readFileSync(path, 'utf8').split(/\r?\n/);
   const frameIndex = lines.findIndex((line) => line.trim() === frameName);
   assert.ok(frameIndex >= 0, `missing atlas frame ${frameName}`);
@@ -138,7 +142,12 @@ function alphaConnectedBounds(
     top = Math.min(top, y);
     right = Math.max(right, x);
     bottom = Math.max(bottom, y);
-    for (const [nextX, nextY] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+    for (const [nextX, nextY] of [
+      [x - 1, y],
+      [x + 1, y],
+      [x, y - 1],
+      [x, y + 1],
+    ]) {
       if (nextX >= 0 && nextX < image.width && nextY >= 0 && nextY < image.height) {
         queued.add(`${nextX},${nextY}`);
       }
@@ -173,6 +182,15 @@ runTest('vfx presets map every battle role to a distinct readable element', () =
   assert.equal(resolveHeroVfxPreset('治疗师', 'heal').id, 'healing_spirit');
   assert.equal(resolveHeroVfxPreset('咒术师', 'debuff').id, 'curse_wisp');
   assert.equal(resolveHeroVfxPreset('未知英雄', 'single').id, 'gold_arrow');
+  for (const companion of FIXED_COMPANIONS) {
+    assert.equal(
+      resolveAttackVfxPreset({ source: companion.attackSource }).id,
+      companion.vfxPresetId,
+    );
+  }
+  const resolverSource = readFileSync('assets/scripts/battle/BattleVfxLogic.ts', 'utf8');
+  assert.equal(resolverSource.includes('findFixedCompanionByAttackSource(input.source)'), true);
+  assert.equal(resolverSource.includes("input.source === 'qinglan_companion'"), false);
 });
 
 runTest('vfx textures and presets stay inside the approved production budget', () => {
@@ -355,16 +373,26 @@ runTest('authored v2 v3 and v4 textures keep alpha, metadata and manifest entrie
   assert.ok(crop, 'Qinglan extractor must declare a crop');
   const [cropX, cropY, cropWidth, cropHeight] = crop.slice(1).map(Number);
   const source = readPng('assets/resources/spine/hero_qinglan/hero_qinglan.png');
-  const frame = parseAtlasFrame('assets/resources/spine/hero_qinglan/hero_qinglan.atlas', 'frame_0');
+  const frame = parseAtlasFrame(
+    'assets/resources/spine/hero_qinglan/hero_qinglan.atlas',
+    'frame_0',
+  );
   const alphaThreshold = 16;
-  const alphaAtCrop = (x: number, y: number): number => source.alphaAt(frame.x + cropX + x, frame.y + cropY + y);
+  const alphaAtCrop = (x: number, y: number): number =>
+    source.alphaAt(frame.x + cropX + x, frame.y + cropY + y);
   for (let x = 0; x < cropWidth; x += 1) {
     assert.ok(alphaAtCrop(x, 0) < alphaThreshold, 'talisman crop top edge must be transparent');
-    assert.ok(alphaAtCrop(x, cropHeight - 1) < alphaThreshold, 'talisman crop bottom edge must be transparent');
+    assert.ok(
+      alphaAtCrop(x, cropHeight - 1) < alphaThreshold,
+      'talisman crop bottom edge must be transparent',
+    );
   }
   for (let y = 0; y < cropHeight; y += 1) {
     assert.ok(alphaAtCrop(0, y) < alphaThreshold, 'talisman crop left edge must be transparent');
-    assert.ok(alphaAtCrop(cropWidth - 1, y) < alphaThreshold, 'talisman crop right edge must be transparent');
+    assert.ok(
+      alphaAtCrop(cropWidth - 1, y) < alphaThreshold,
+      'talisman crop right edge must be transparent',
+    );
   }
   const talismanSeed = findOpaquePixel(
     source,
@@ -377,12 +405,17 @@ runTest('authored v2 v3 and v4 textures keep alpha, metadata and manifest entrie
     talismanSeed.y,
     alphaThreshold,
   );
-  assert.deepEqual(
-    talismanBounds,
-    { left: frame.x + 54, top: frame.y + 81, right: frame.x + 80, bottom: frame.y + 137 },
-  );
+  assert.deepEqual(talismanBounds, {
+    left: frame.x + 54,
+    top: frame.y + 81,
+    right: frame.x + 80,
+    bottom: frame.y + 137,
+  });
   assert.ok(cropX < 54 && cropY < 81, 'talisman crop must include transparent top-left padding');
-  assert.ok(cropX + cropWidth - 1 > 80 && cropY + cropHeight - 1 > 137, 'talisman crop must include transparent bottom-right padding');
+  assert.ok(
+    cropX + cropWidth - 1 > 80 && cropY + cropHeight - 1 > 137,
+    'talisman crop must include transparent bottom-right padding',
+  );
   assert.deepEqual([cropX, cropY, cropWidth, cropHeight], [48, 75, 40, 70]);
 });
 

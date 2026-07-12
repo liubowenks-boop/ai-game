@@ -142,15 +142,18 @@ runTest('fixed companion frame mapping clamps progress across frame 0 through 7'
   assert.equal(resolveThunderMageAttackFrameIndex(0.999, 1, 1), 7);
 });
 
-runTest('fixed companion attack consumes full low-frame-rate delta and reaches the final frame', () => {
-  let elapsed = 0;
-  for (let frame = 0; frame < 20; frame += 1) {
-    elapsed = advanceFixedCompanionAttackElapsed(elapsed, 1, 1 / 20);
-  }
+runTest(
+  'fixed companion attack consumes full low-frame-rate delta and reaches the final frame',
+  () => {
+    let elapsed = 0;
+    for (let frame = 0; frame < 20; frame += 1) {
+      elapsed = advanceFixedCompanionAttackElapsed(elapsed, 1, 1 / 20);
+    }
 
-  assert.equal(elapsed, 1);
-  assert.equal(resolveFixedCompanionFrameIndex(elapsed, 1, 1), 7);
-});
+    assert.equal(elapsed, 1);
+    assert.equal(resolveFixedCompanionFrameIndex(elapsed, 1, 1), 7);
+  },
+);
 
 runTest('thunder mage compatibility logic delegates frame mapping and skeleton loading', () => {
   const thunderLogicSource = readFileSync(
@@ -179,7 +182,7 @@ runTest('thunder mage projectile advances once per delta and reports completion'
   assert.deepEqual(finalStep, { age: 0.2, complete: true });
 });
 
-runTest('fixed companion shared skeleton loading broadcasts failure and retries later', () => {
+runTest('fixed companion shared skeleton loading warns once across failed retries', () => {
   const coordinator = new FixedCompanionSkeletonLoadCoordinator<{ id: string }>();
   const firstResults: string[] = [];
   let loadCalls = 0;
@@ -213,20 +216,36 @@ runTest('fixed companion shared skeleton loading broadcasts failure and retries 
   assert.equal(warningCalls, 1);
   assert.equal(coordinator.loadState, 'idle');
 
-  const retryResults: string[] = [];
+  const failedRetryResults: string[] = [];
   coordinator.request(
     (complete) => {
       loadCalls += 1;
-      complete(undefined, { id: 'loaded-on-retry' });
+      complete(new Error('retry also failed'));
     },
-    (result) => retryResults.push(result.state),
+    (result) => failedRetryResults.push(result.state),
     () => {
       warningCalls += 1;
     },
   );
 
   assert.equal(loadCalls, 2);
-  assert.deepEqual(retryResults, ['loaded']);
+  assert.deepEqual(failedRetryResults, ['warned']);
+  assert.equal(warningCalls, 1);
+
+  const successfulRetryResults: string[] = [];
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      complete(undefined, { id: 'loaded-on-retry' });
+    },
+    (result) => successfulRetryResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 3);
+  assert.deepEqual(successfulRetryResults, ['loaded']);
   assert.equal(coordinator.loadState, 'loaded');
   assert.equal(warningCalls, 1);
 });
@@ -524,7 +543,7 @@ runTest('fixed companion presentation owns configured spine nodes and delegates 
   assert.match(presentationSource, /public get companionId\(\): FixedCompanionId/);
   assert.equal(presentationSource.includes('premultipliedAlpha = false'), true);
   assert.equal(
-    presentationSource.includes('resources.load(attackClip.spineAssetBase, sp.SkeletonData'),
+    presentationSource.includes('resources.load<sp.SkeletonData>(spineAssetBase, sp.SkeletonData'),
     true,
   );
   assert.equal(presentationSource.includes('event.source === this.companion.attackSource'), true);
@@ -550,7 +569,7 @@ runTest(
       'assets/scripts/battle/FixedSpineCompanionPresentation.ts',
       'utf8',
     );
-    const resourceLoadCalls = presentationSource.match(/resources\.load\(/g) ?? [];
+    const resourceLoadCalls = presentationSource.match(/resources\.load(?:<[^>]+>)?\(/g) ?? [];
     const clearSource = presentationSource.slice(
       presentationSource.indexOf('public clear(): void'),
       presentationSource.indexOf('private ensureSkeletonLoaded(): void'),
@@ -608,6 +627,8 @@ runTest('battle controller delegates every fixed companion presentation lifecycl
   assert.equal(controllerSource.includes('FIXED_COMPANIONS'), true);
   assert.equal(controllerSource.includes('fixedCompanionPresentations'), true);
   assert.equal(controllerSource.includes('thunderMagePresentation'), false);
+  assert.equal(controllerSource.includes('const FIXED_COMPANION_ANIMATION_PROFILES'), false);
+  assert.equal(controllerSource.includes('getFixedCompanionAnimationProfile'), true);
   assert.match(controllerSource, /FIXED_COMPANIONS\.map\(\s*\(companion\) =>/);
   assert.match(controllerSource, /new FixedSpineCompanionPresentation\(/);
   assert.match(

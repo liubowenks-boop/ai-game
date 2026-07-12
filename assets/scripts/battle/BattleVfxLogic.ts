@@ -1,5 +1,9 @@
 import type { HeroRole } from '../data/BattleConfig';
 import {
+  findFixedCompanionByAttackSource,
+  type FixedCompanionAttackSource,
+} from '../data/CompanionConfig';
+import {
   BATTLE_VFX_PRESETS,
   BattleVfxBudget,
   BattleVfxPreset,
@@ -9,13 +13,7 @@ import {
 
 export interface AttackVfxDescriptor {
   readonly source:
-    | 'main'
-    | 'companion'
-    | 'qinglan_companion'
-    | 'hero_dps'
-    | 'burn'
-    | 'poison'
-    | 'thunder_chain';
+    'main' | FixedCompanionAttackSource | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
   readonly heroName?: string;
   readonly heroRole?: HeroRole;
 }
@@ -46,11 +44,16 @@ export function resolveAttackVfxPreset(input: AttackVfxDescriptor): BattleVfxPre
   if (input.source === 'main') {
     return BATTLE_VFX_PRESETS.main_fire_gold;
   }
-  if (input.source === 'companion' || input.source === 'thunder_chain') {
-    return BATTLE_VFX_PRESETS.thunder;
+  const companion = findFixedCompanionByAttackSource(input.source);
+  if (companion) {
+    const preset = BATTLE_VFX_PRESETS[companion.vfxPresetId];
+    if (!preset) {
+      throw new Error(`Missing fixed companion VFX preset: ${companion.vfxPresetId}`);
+    }
+    return preset;
   }
-  if (input.source === 'qinglan_companion') {
-    return BATTLE_VFX_PRESETS.qinglan_talisman;
+  if (input.source === 'thunder_chain') {
+    return BATTLE_VFX_PRESETS.thunder;
   }
   if (input.heroRole) {
     return resolveHeroVfxPreset(input.heroName ?? '', input.heroRole);
@@ -76,7 +79,8 @@ export class BattleVfxLimiter {
     if (!Number.isFinite(heroId) || heroId <= 0 || !Number.isFinite(nowSeconds)) {
       return false;
     }
-    const interval = Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds : 0.72;
+    const interval =
+      Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds : 0.72;
     const nextAllowed = this.nextHeroPresentationTime.get(heroId) ?? Number.NEGATIVE_INFINITY;
     if (nowSeconds + 0.000001 < nextAllowed) {
       return false;

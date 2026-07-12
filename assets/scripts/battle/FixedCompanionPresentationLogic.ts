@@ -47,6 +47,7 @@ export function resolveFixedCompanionFrameIndex(
 export class FixedCompanionSkeletonLoadCoordinator<T> {
   private state: FixedCompanionSkeletonLoadState = 'idle';
   private loadedValue: T | undefined;
+  private hasWarned = false;
   private readonly consumers = new Set<FixedCompanionSkeletonConsumer<T>>();
 
   public get loadState(): FixedCompanionSkeletonLoadState {
@@ -91,7 +92,10 @@ export class FixedCompanionSkeletonLoadCoordinator<T> {
         const consumers = Array.from(this.consumers);
         this.consumers.clear();
         this.state = 'warned';
-        reportFailure(error);
+        if (!this.hasWarned) {
+          this.hasWarned = true;
+          reportFailure(error);
+        }
         for (const pendingConsumer of consumers) {
           pendingConsumer({ state: 'warned' });
         }

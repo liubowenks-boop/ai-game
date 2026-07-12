@@ -1,10 +1,49 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
+import { BattleMvpModel, type BattleMvpOptions } from '../assets/scripts/battle/BattleMvpModel';
+import {
+  FIXED_COMPANIONS,
+  type FixedCompanionAttackSource,
+} from '../assets/scripts/data/CompanionConfig';
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
   console.log(`pass: ${name}`);
+}
+
+const FIXED_COMPANION_CASES = FIXED_COMPANIONS.map((companion) => ({
+  id: companion.id,
+  name: companion.name,
+  source: companion.attackSource,
+  damage: companion.attackDamage,
+  interval: companion.attackInterval,
+  damageOptionKey: companion.runtimeOptionKeys.damage,
+  intervalOptionKey: companion.runtimeOptionKeys.interval,
+}));
+
+function isolatedCompanionOptions(
+  companion: (typeof FIXED_COMPANION_CASES)[number],
+  overrides: Partial<BattleMvpOptions> = {},
+): Partial<BattleMvpOptions> {
+  return {
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
+    [companion.damageOptionKey]: companion.damage,
+    [companion.intervalOptionKey]: companion.interval,
+    ...overrides,
+  };
+}
+
+function companionEvents(
+  model: BattleMvpModel,
+  deltaSeconds: number,
+  source: FixedCompanionAttackSource,
+) {
+  return model.tick(deltaSeconds).attackEvents.filter((event) => event.source === source);
 }
 
 runTest('starts battle and spawned enemies wait at the wall before damaging the city', () => {
@@ -82,69 +121,71 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
   );
 });
 
-runTest(
-  'fixed companions reserve both outer wall slots outside the ordinary hero count',
-  () => {
-    const model = new BattleMvpModel();
-    const companion = model.getFixedCompanion();
+runTest('fixed companions reserve both outer wall slots outside the ordinary hero count', () => {
+  const model = new BattleMvpModel();
+  const companion = model.getFixedCompanion();
 
-    assert.deepEqual(companion, {
-      id: 'hero_thunder_mage',
-      name: '雷法师',
-      description: '雷电速攻支援',
-      slotIndex: 2,
-      position: { x: -215, y: -205 },
-      attackSource: 'companion',
-      attackDamage: 7,
-      attackInterval: 0.85,
-      displayScale: 0.286,
-      spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
-      rootNodeName: 'ThunderMageCompanion',
-      spineNodeName: 'ThunderMageAttackSpine',
-    });
-    companion.position.x = 999;
-    assert.deepEqual(model.getFixedCompanion().position, { x: -215, y: -205 });
+  assert.deepEqual(companion, {
+    id: 'hero_thunder_mage',
+    name: '雷法师',
+    description: '雷电速攻支援',
+    slotIndex: 2,
+    position: { x: -215, y: -205 },
+    attackSource: 'companion',
+    attackDamage: 7,
+    attackInterval: 0.85,
+    runtimeOptionKeys: {
+      damage: 'companionAttackDamage',
+      interval: 'companionAttackInterval',
+    },
+    animationProfileId: 'hero_thunder_mage',
+    vfxPresetId: 'thunder',
+    spineSourceDuration: 1,
+    displayScale: 0.286,
+    spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
+    rootNodeName: 'ThunderMageCompanion',
+    spineNodeName: 'ThunderMageAttackSpine',
+  });
+  companion.position.x = 999;
+  assert.deepEqual(model.getFixedCompanion().position, { x: -215, y: -205 });
 
-    assert.deepEqual(
-      model
-        .getFixedCompanions()
-        .map(({ id, name, slotIndex, attackDamage, attackInterval }) => ({
-          id,
-          name,
-          slotIndex,
-          attackDamage,
-          attackInterval,
-        })),
-      [
-        {
-          id: 'hero_thunder_mage',
-          name: '雷法师',
-          slotIndex: 2,
-          attackDamage: 7,
-          attackInterval: 0.85,
-        },
-        {
-          id: 'hero_qinglan',
-          name: '灵符道君·青岚',
-          slotIndex: 3,
-          attackDamage: 8,
-          attackInterval: 1,
-        },
-      ],
-    );
+  assert.deepEqual(
+    model.getFixedCompanions().map(({ id, name, slotIndex, attackDamage, attackInterval }) => ({
+      id,
+      name,
+      slotIndex,
+      attackDamage,
+      attackInterval,
+    })),
+    [
+      {
+        id: 'hero_thunder_mage',
+        name: '雷法师',
+        slotIndex: 2,
+        attackDamage: 7,
+        attackInterval: 0.85,
+      },
+      {
+        id: 'hero_qinglan',
+        name: '灵符道君·青岚',
+        slotIndex: 3,
+        attackDamage: 8,
+        attackInterval: 1,
+      },
+    ],
+  );
 
-    assert.equal(model.slots[2].reservedBy, 'fixed_companion');
-    assert.equal(model.slots[2].fixedCompanionId, 'hero_thunder_mage');
-    assert.equal(model.slots[3].reservedBy, 'fixed_companion');
-    assert.equal(model.slots[3].fixedCompanionId, 'hero_qinglan');
-    assert.equal(model.placeHero(2, '弓手'), undefined);
-    assert.equal(model.placeHero(3, '弓手'), undefined);
+  assert.equal(model.slots[2].reservedBy, 'fixed_companion');
+  assert.equal(model.slots[2].fixedCompanionId, 'hero_thunder_mage');
+  assert.equal(model.slots[3].reservedBy, 'fixed_companion');
+  assert.equal(model.slots[3].fixedCompanionId, 'hero_qinglan');
+  assert.equal(model.placeHero(2, '弓手'), undefined);
+  assert.equal(model.placeHero(3, '弓手'), undefined);
 
-    assert.ok(model.placeHero(0, '弓手'));
-    assert.ok(model.placeHero(1, '火药师'));
-    assert.equal(model.getHeroes().length, 2);
-  },
-);
+  assert.ok(model.placeHero(0, '弓手'));
+  assert.ok(model.placeHero(1, '火药师'));
+  assert.equal(model.getHeroes().length, 2);
+});
 
 runTest('five-person wall formation caps ordinary board heroes at two', () => {
   const model = new BattleMvpModel();
@@ -199,6 +240,16 @@ runTest('ordinary wall slots are adjacent and exclude both companion slots', () 
   assert.equal(model.getAdjacentSlotIndexes(0).includes(2), false);
 });
 
+runTest('fixed companion slots timers and options are derived from the shared registry', () => {
+  const source = readFileSync('assets/scripts/battle/BattleMvpModel.ts', 'utf8');
+  assert.equal(source.includes("companion.id === 'hero_thunder_mage'"), false);
+  assert.equal(source.includes("fixedCompanionId: 'hero_thunder_mage'"), false);
+  assert.equal(source.includes("fixedCompanionId: 'hero_qinglan'"), false);
+  assert.match(source, /FIXED_COMPANIONS\.map\(\(companion\) => \[companion\.id, 0\]\)/);
+  assert.match(source, /this\.options\[companion\.runtimeOptionKeys\.damage\]/);
+  assert.match(source, /this\.options\[companion\.runtimeOptionKeys\.interval\]/);
+});
+
 runTest('qinglan attacks independently once per configured interval', () => {
   const model = new BattleMvpModel({
     waveInterval: 99,
@@ -212,9 +263,9 @@ runTest('qinglan attacks independently once per configured interval', () => {
   model.startBattle();
   model.spawnEnemy({ hp: 100, speed: 0 });
 
-  const first = model.tick(0.01).attackEvents.filter(
-    (event) => event.source === 'qinglan_companion',
-  );
+  const first = model
+    .tick(0.01)
+    .attackEvents.filter((event) => event.source === 'qinglan_companion');
   assert.equal(first.length, 1);
   assert.equal(first[0].damage, 8);
   assert.deepEqual(first[0].originPosition, { x: 215, y: -205 });
@@ -230,41 +281,31 @@ runTest('qinglan attacks independently once per configured interval', () => {
   );
 });
 
-runTest('thunder mage attacks independently and resets its timer on restart', () => {
-  const model = new BattleMvpModel({
-    waveInterval: 99,
-    mainAttackDamage: 0,
-    heroBaseDps: 0,
-    companionAttackDamage: 7,
-    companionAttackInterval: 0.6,
-    qinglanAttackDamage: 0,
-  });
+runTest('fixed companions attack independently and reset their timers on restart', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(
+      isolatedCompanionOptions(companion, {
+        [companion.intervalOptionKey]: 0.6,
+      }),
+    );
 
-  model.spawnEnemy({ hp: 100, speed: 0 });
-  assert.equal(model.tick(1).attackEvents.length, 0);
+    model.spawnEnemy({ hp: 100, speed: 0 });
+    assert.equal(model.tick(1).attackEvents.length, 0, companion.id);
 
-  model.startBattle();
-  const target = model.spawnEnemy({ hp: 100, speed: 0 });
-  const first = model.tick(0.01);
+    model.startBattle();
+    const target = model.spawnEnemy({ hp: 100, speed: 0 });
+    const first = companionEvents(model, 0.01, companion.source);
 
-  assert.deepEqual(
-    first.attackEvents.map((event) => event.source),
-    ['companion'],
-  );
-  assert.equal(first.attackEvents[0].damage, 7);
-  assert.equal(model.findEnemy(target.id)?.hp, 93);
-  assert.equal(
-    model.tick(0.58).attackEvents.some((event) => event.source === 'companion'),
-    false,
-  );
-  assert.equal(
-    model.tick(0.02).attackEvents.some((event) => event.source === 'companion'),
-    true,
-  );
+    assert.equal(first.length, 1, companion.id);
+    assert.equal(first[0].damage, companion.damage, companion.id);
+    assert.equal(model.findEnemy(target.id)?.hp, 100 - companion.damage, companion.id);
+    assert.equal(companionEvents(model, 0.58, companion.source).length, 0, companion.id);
+    assert.equal(companionEvents(model, 0.02, companion.source).length, 1, companion.id);
 
-  model.startBattle();
-  model.spawnEnemy({ hp: 100, speed: 0 });
-  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
+    model.startBattle();
+    model.spawnEnemy({ hp: 100, speed: 0 });
+    assert.equal(companionEvents(model, 0.01, companion.source).length, 1, companion.id);
+  }
 });
 
 runTest('battle tick ignores non-finite and non-positive deltas without polluting state', () => {
@@ -291,21 +332,17 @@ runTest('battle tick ignores non-finite and non-positive deltas without pollutin
   }
 });
 
-runTest('thunder mage does not attack after game over even when running remains true', () => {
-  const model = new BattleMvpModel({
-    waveInterval: 99,
-    mainAttackDamage: 0,
-    heroBaseDps: 0,
-    qinglanAttackDamage: 0,
-  });
+runTest('fixed companions do not attack after game over even when running remains true', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(isolatedCompanionOptions(companion));
+    model.startBattle();
+    const target = model.spawnEnemy({ hp: 100, speed: 0 });
+    model.gameOver = true;
+    model.running = true;
 
-  model.startBattle();
-  const target = model.spawnEnemy({ hp: 100, speed: 0 });
-  model.gameOver = true;
-  model.running = true;
-
-  assert.equal(model.tick(1).attackEvents.length, 0);
-  assert.equal(target.hp, 100);
+    assert.equal(companionEvents(model, 1, companion.source).length, 0, companion.id);
+    assert.equal(target.hp, 100, companion.id);
+  }
 });
 
 runTest('thunder mage preserves large-frame overshoot without attacking twice in one tick', () => {
@@ -329,78 +366,104 @@ runTest('thunder mage preserves large-frame overshoot without attacking twice in
   assert.equal(target.hp, 79);
 });
 
-runTest('thunder mage stays ready while no living target exists', () => {
-  const model = new BattleMvpModel({
-    waveInterval: 99,
-    mainAttackDamage: 0,
-    heroBaseDps: 0,
-    qinglanAttackDamage: 0,
-  });
+runTest('fixed companions stay ready while no living target exists', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(isolatedCompanionOptions(companion));
+    model.startBattle();
+    assert.equal(companionEvents(model, 2, companion.source).length, 0, companion.id);
 
-  model.startBattle();
-  assert.equal(model.tick(2).attackEvents.length, 0);
-
-  model.spawnEnemy({ hp: 100, speed: 0 });
-  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
-  assert.equal(model.tick(0.01).attackEvents.length, 0);
-});
-
-runTest('thunder mage targets the living enemy closest to the city wall', () => {
-  const model = new BattleMvpModel({
-    waveInterval: 99,
-    mainAttackDamage: 0,
-    heroBaseDps: 0,
-    qinglanAttackDamage: 0,
-  });
-
-  model.startBattle();
-  const fartherFromWall = model.spawnEnemy({ x: 0, y: 0, hp: 100, speed: 0 });
-  const closerToWall = model.spawnEnemy({ x: 300, y: -190, hp: 100, speed: 0 });
-  const tick = model.tick(0.01);
-
-  assert.equal(tick.attackEvents[0].enemyId, closerToWall.id);
-  assert.equal(model.findEnemy(closerToWall.id)?.hp, 93);
-  assert.equal(model.findEnemy(fartherFromWall.id)?.hp, 100);
-});
-
-runTest('drummer aura shortens the thunder mage actual attack cadence', () => {
-  const model = new BattleMvpModel({
-    waveInterval: 99,
-    mainAttackDamage: 0,
-    heroBaseDps: 0,
-    companionAttackInterval: 0.6,
-    qinglanAttackDamage: 0,
-  });
-
-  model.placeHero(0, '鼓手');
-  assert.ok(model.getCompanionAttackInterval() < 0.6);
-
-  model.startBattle();
-  model.spawnEnemy({ hp: 100, speed: 0 });
-  assert.equal(model.tick(0.01).attackEvents[0].source, 'companion');
-  assert.equal(model.tick(0.52).attackEvents.length, 0);
-  assert.equal(model.tick(0.02).attackEvents[0].source, 'companion');
-});
-
-runTest('thunder mage interval falls back to one when drummer aura is invalid', () => {
-  const model = new BattleMvpModel({ companionAttackInterval: 0.6 });
-  const drummer = model.placeHero(0, '鼓手');
-
-  assert.ok(drummer);
-  drummer.level = Number.POSITIVE_INFINITY;
-  assert.equal(model.getCompanionAttackInterval(), 0.6);
-});
-
-runTest('thunder mage falls back to default base interval before applying valid aura', () => {
-  const invalidIntervals = [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.6];
-  const expectedInterval = 0.85 / 1.12;
-
-  for (const companionAttackInterval of invalidIntervals) {
-    const model = new BattleMvpModel({ companionAttackInterval });
-    model.placeHero(0, '鼓手');
-
-    assert.ok(Math.abs(model.getCompanionAttackInterval() - expectedInterval) < 0.000001);
+    model.spawnEnemy({ hp: 100, speed: 0 });
+    assert.equal(companionEvents(model, 0.01, companion.source).length, 1, companion.id);
+    assert.equal(companionEvents(model, 0.01, companion.source).length, 0, companion.id);
   }
+});
+
+runTest('fixed companions target the living enemy closest to the city wall', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(isolatedCompanionOptions(companion));
+    model.startBattle();
+    const fartherFromWall = model.spawnEnemy({ x: 0, y: 0, hp: 100, speed: 0 });
+    const closerToWall = model.spawnEnemy({ x: 300, y: -190, hp: 100, speed: 0 });
+    const events = companionEvents(model, 0.01, companion.source);
+
+    assert.equal(events[0].enemyId, closerToWall.id, companion.id);
+    assert.equal(model.findEnemy(closerToWall.id)?.hp, 100 - companion.damage, companion.id);
+    assert.equal(model.findEnemy(fartherFromWall.id)?.hp, 100, companion.id);
+  }
+});
+
+runTest('drummer aura shortens every fixed companion actual attack cadence', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(
+      isolatedCompanionOptions(companion, {
+        [companion.intervalOptionKey]: 0.6,
+      }),
+    );
+    model.placeHero(0, '鼓手');
+    assert.ok(model.getFixedCompanionAttackInterval(companion.id) < 0.6, companion.id);
+
+    model.startBattle();
+    model.spawnEnemy({ hp: 100, speed: 0 });
+    assert.equal(companionEvents(model, 0.01, companion.source).length, 1, companion.id);
+    assert.equal(companionEvents(model, 0.52, companion.source).length, 0, companion.id);
+    assert.equal(companionEvents(model, 0.02, companion.source).length, 1, companion.id);
+  }
+});
+
+runTest('fixed companion intervals ignore an invalid drummer aura', () => {
+  for (const companion of FIXED_COMPANION_CASES) {
+    const model = new BattleMvpModel(
+      isolatedCompanionOptions(companion, {
+        [companion.intervalOptionKey]: 0.6,
+      }),
+    );
+    const drummer = model.placeHero(0, '鼓手');
+    assert.ok(drummer, companion.id);
+    drummer.level = Number.POSITIVE_INFINITY;
+    assert.equal(model.getFixedCompanionAttackInterval(companion.id), 0.6, companion.id);
+  }
+});
+
+runTest('fixed companions fall back to their configured base interval before valid aura', () => {
+  const invalidIntervals = [Number.NaN, Number.POSITIVE_INFINITY, 0, -0.6];
+  for (const companion of FIXED_COMPANION_CASES) {
+    for (const invalidInterval of invalidIntervals) {
+      const model = new BattleMvpModel(
+        isolatedCompanionOptions(companion, {
+          [companion.intervalOptionKey]: invalidInterval,
+        }),
+      );
+      model.placeHero(0, '鼓手');
+      const expectedInterval = companion.interval / 1.12;
+      assert.ok(
+        Math.abs(model.getFixedCompanionAttackInterval(companion.id) - expectedInterval) < 0.000001,
+        companion.id,
+      );
+    }
+  }
+});
+
+runTest('qinglan attacks remain single-target and apply no status effects', () => {
+  const qinglan = FIXED_COMPANION_CASES.find((companion) => companion.id === 'hero_qinglan');
+  assert.ok(qinglan);
+  const model = new BattleMvpModel(isolatedCompanionOptions(qinglan, { random: () => 0 }));
+  model.startBattle();
+  model.applyUpgradeCard('fire_spread_plus_1');
+  model.applyUpgradeCard('thunder_chain_plus_1');
+  const primary = model.spawnEnemy({ x: 0, y: -190, hp: 100, speed: 0 });
+  const secondary = model.spawnEnemy({ x: 20, y: -180, hp: 100, speed: 0 });
+  const events = companionEvents(model, 0.01, qinglan.source);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].impactKind, 'primary');
+  assert.equal(
+    events.some((event) => event.impactKind === 'splash'),
+    false,
+  );
+  assert.equal(primary.burnStacks, 0);
+  assert.equal(primary.poisonStacks, 0);
+  assert.equal(primary.slowMultiplier, 1);
+  assert.equal(secondary.hp, 100);
 });
 
 runTest('thunder mage damage applies vulnerability before subtracting armor', () => {
@@ -769,7 +832,9 @@ runTest('attack events expose stable presentation metadata for every attacker', 
   heroModel.startBattle();
   heroModel.spawnEnemy({ x: -15, y: -180, hp: 100, speed: 0 });
   heroModel.spawnEnemy({ x: 5, y: -175, hp: 100, speed: 0 });
-  const heroEvents = heroModel.tick(0.1).attackEvents.filter((event) => event.source === 'hero_dps');
+  const heroEvents = heroModel
+    .tick(0.1)
+    .attackEvents.filter((event) => event.source === 'hero_dps');
   const primary = heroEvents.find((event) => event.impactKind === 'primary');
   const splash = heroEvents.find((event) => event.impactKind === 'splash');
   assert.equal(primary?.heroId, hero?.id);

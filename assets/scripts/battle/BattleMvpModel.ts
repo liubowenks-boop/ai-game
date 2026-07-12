@@ -12,9 +12,12 @@ import {
 import {
   FIXED_COMPANIONS,
   FixedCompanionConfig,
+  FixedCompanionAttackSource,
+  FixedCompanionDamageOptionKey,
   FixedCompanionId,
-  QINGLAN_COMPANION,
+  FixedCompanionIntervalOptionKey,
   THUNDER_MAGE_COMPANION,
+  getFixedCompanionConfig,
 } from '../data/CompanionConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 
@@ -71,14 +74,7 @@ export interface UpgradeCardState extends UpgradeCardConfig {}
 export interface AttackEvent {
   enemyId: number;
   damage: number;
-  source:
-    | 'main'
-    | 'companion'
-    | 'qinglan_companion'
-    | 'hero_dps'
-    | 'burn'
-    | 'poison'
-    | 'thunder_chain';
+  source: 'main' | FixedCompanionAttackSource | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
   enemyPosition: BattlePoint;
   critical?: boolean;
   originPosition?: BattlePoint;
@@ -164,6 +160,32 @@ interface SpawnEnemyParams {
   armor?: number;
 }
 
+type FixedCompanionRuntimeOptions = Pick<
+  BattleMvpOptions,
+  FixedCompanionDamageOptionKey | FixedCompanionIntervalOptionKey
+>;
+
+function createFixedCompanionRuntimeDefaults(): FixedCompanionRuntimeOptions {
+  const defaults: FixedCompanionRuntimeOptions = {
+    companionAttackDamage: 0,
+    companionAttackInterval: 0,
+    qinglanAttackDamage: 0,
+    qinglanAttackInterval: 0,
+  };
+  for (const companion of FIXED_COMPANIONS) {
+    defaults[companion.runtimeOptionKeys.damage] = companion.attackDamage;
+    defaults[companion.runtimeOptionKeys.interval] = companion.attackInterval;
+  }
+  return defaults;
+}
+
+function createFixedCompanionTimers(): Record<FixedCompanionId, number> {
+  return Object.fromEntries(FIXED_COMPANIONS.map((companion) => [companion.id, 0])) as Record<
+    FixedCompanionId,
+    number
+  >;
+}
+
 const DEFAULT_OPTIONS: BattleMvpOptions = {
   cityMaxHealth: 100,
   enemyDamage: 0.5,
@@ -176,10 +198,7 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   upgradeInterval: 10,
   mainAttackDamage: 11,
   mainAttackInterval: 0.7,
-  companionAttackDamage: THUNDER_MAGE_COMPANION.attackDamage,
-  companionAttackInterval: THUNDER_MAGE_COMPANION.attackInterval,
-  qinglanAttackDamage: QINGLAN_COMPANION.attackDamage,
-  qinglanAttackInterval: QINGLAN_COMPANION.attackInterval,
+  ...createFixedCompanionRuntimeDefaults(),
   heroBaseDps: 5,
   playerPosition: { ...BATTLE_WALL_LAYOUT.mainHero },
   random: Math.random,
@@ -216,10 +235,7 @@ export class BattleMvpModel {
   private waveTimer = 0;
   private upgradeTimer = 0;
   private attackTimer = 0;
-  private readonly fixedCompanionAttackTimers: Record<FixedCompanionId, number> = {
-    hero_thunder_mage: 0,
-    hero_qinglan: 0,
-  };
+  private readonly fixedCompanionAttackTimers = createFixedCompanionTimers();
   private enemyIdSequence = 1;
   private heroIdSequence = 1;
   private recruitCursor = 0;
@@ -462,15 +478,12 @@ export class BattleMvpModel {
   }
 
   public getFixedCompanionAttackInterval(id: FixedCompanionId): number {
-    const companion = FIXED_COMPANIONS.find((candidate) => candidate.id === id);
-    const configuredInterval =
-      id === 'hero_thunder_mage'
-        ? this.options.companionAttackInterval
-        : this.options.qinglanAttackInterval;
+    const companion = getFixedCompanionConfig(id);
+    const configuredInterval = this.options[companion.runtimeOptionKeys.interval];
     const baseInterval =
       Number.isFinite(configuredInterval) && configuredInterval > 0
         ? configuredInterval
-        : companion?.attackInterval ?? THUNDER_MAGE_COMPANION.attackInterval;
+        : companion.attackInterval;
     const auraMultiplier = this.getHeroAuraMultiplier();
     const safeAuraMultiplier =
       Number.isFinite(auraMultiplier) && auraMultiplier > 0 ? auraMultiplier : 1;
@@ -506,36 +519,21 @@ export class BattleMvpModel {
   }
 
   private createInitialSlots(): GridSlotState[] {
-    return [
-      {
-        index: 0,
-        label: '',
-        row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[0] },
-      },
-      {
-        index: 1,
-        label: '',
-        row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[1] },
-      },
-      {
-        index: 2,
-        label: '',
-        row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.thunderMage },
-        reservedBy: 'fixed_companion',
-        fixedCompanionId: 'hero_thunder_mage',
-      },
-      {
-        index: 3,
-        label: '',
-        row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.qinglan },
-        reservedBy: 'fixed_companion',
-        fixedCompanionId: 'hero_qinglan',
-      },
-    ];
+    const ordinarySlots = BATTLE_WALL_LAYOUT.ordinarySlots.map((position, index) => ({
+      index,
+      label: '',
+      row: 'wall' as const,
+      position: { ...position },
+    }));
+    const fixedSlots = FIXED_COMPANIONS.map((companion) => ({
+      index: companion.slotIndex,
+      label: '',
+      row: 'wall' as const,
+      position: { ...companion.position },
+      reservedBy: 'fixed_companion' as const,
+      fixedCompanionId: companion.id,
+    }));
+    return [...ordinarySlots, ...fixedSlots].sort((left, right) => left.index - right.index);
   }
 
   private getOrdinarySlotCapacity(): number {
@@ -559,7 +557,7 @@ export class BattleMvpModel {
         critMultiplier: 1.8,
       },
       summon: {
-        maxBoardHeroes: 2,
+        maxBoardHeroes: BATTLE_WALL_LAYOUT.ordinarySlots.length,
         heroDamageMultiplier: 1,
       },
     };
@@ -567,9 +565,7 @@ export class BattleMvpModel {
 
   private spawnWaveEnemy(kind: EnemyKind, x: number, power: number): EnemyState {
     const config = this.getEnemyConfig(kind);
-    const earlyWaveHpMultiplier = this.wave >= 1 && this.wave <= 3
-      ? EARLY_WAVE_HP_MULTIPLIER
-      : 1;
+    const earlyWaveHpMultiplier = this.wave >= 1 && this.wave <= 3 ? EARLY_WAVE_HP_MULTIPLIER : 1;
     const hp = this.options.enemyBaseHp * config.hpMultiplier * power * earlyWaveHpMultiplier;
     const speed =
       this.options.enemyBaseSpeed *
@@ -757,10 +753,7 @@ export class BattleMvpModel {
   private tickCompanionAttack(deltaSeconds: number, result: BattleTickResult): void {
     for (const companion of FIXED_COMPANIONS) {
       this.fixedCompanionAttackTimers[companion.id] -= deltaSeconds;
-      const damage =
-        companion.id === 'hero_thunder_mage'
-          ? this.options.companionAttackDamage
-          : this.options.qinglanAttackDamage;
+      const damage = this.options[companion.runtimeOptionKeys.damage];
 
       if (this.fixedCompanionAttackTimers[companion.id] > 0.0001 || damage <= 0) {
         continue;
@@ -778,8 +771,9 @@ export class BattleMvpModel {
         heroName: companion.name,
         impactKind: 'primary',
       });
-      this.fixedCompanionAttackTimers[companion.id] +=
-        this.getFixedCompanionAttackInterval(companion.id);
+      this.fixedCompanionAttackTimers[companion.id] += this.getFixedCompanionAttackInterval(
+        companion.id,
+      );
     }
   }
 
