@@ -91,14 +91,14 @@ runTest(
       name: '雷法师',
       description: '雷电速攻支援',
       slotIndex: 3,
-      position: { x: -240, y: -320 },
+      position: { x: -240, y: -270 },
       attackDamage: 7,
       attackInterval: 0.85,
-      displayScale: 0.22,
+      displayScale: 0.286,
       spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
     });
     companion.position.x = 999;
-    assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -320 });
+    assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -270 });
 
     assert.equal(model.slots[3].reservedBy, 'fixed_companion');
     assert.equal(model.placeHero(3, '弓手'), undefined);
@@ -121,19 +121,19 @@ runTest('five-unit wall formation caps ordinary board heroes at three', () => {
   assert.deepEqual(
     model.slots.slice(0, 3).map((slot) => slot.position),
     [
-      { x: -120, y: -320 },
-      { x: 120, y: -320 },
-      { x: 240, y: -320 },
+      { x: -120, y: -270 },
+      { x: 120, y: -270 },
+      { x: 240, y: -270 },
     ],
   );
   assert.deepEqual(model.slots[3], {
     index: 3,
     label: '',
     row: 'wall',
-    position: { x: -240, y: -320 },
+    position: { x: -240, y: -270 },
     reservedBy: 'fixed_companion',
   });
-  assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
+  assert.deepEqual(model.playerPosition, { x: 0, y: -270 });
   assert.equal(model.options.cityLineY, -235);
 
   assert.ok(model.placeHero(0, '弓手'));

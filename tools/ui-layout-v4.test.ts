@@ -107,7 +107,7 @@ function main(): void {
     'wall formation uses five evenly spaced x positions',
   );
   assert(
-    formation.every((rect) => rect.y === -320),
+    formation.every((rect) => rect.y === -270),
     'wall formation shares one y coordinate',
   );
   for (let index = 1; index < formation.length; index += 1) {

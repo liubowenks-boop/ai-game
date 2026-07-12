@@ -50,7 +50,7 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
   );
   assert.deepEqual(
     formation.map((rect) => rect.y),
-    [-320, -320, -320, -320, -320],
+    [-270, -270, -270, -270, -270],
   );
   assert.deepEqual(
     formation.map((rect) => [rect.width, rect.height]),
@@ -73,9 +73,9 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
   );
   assert.deepEqual(
     model.slots.map((slot) => slot.position.y),
-    [-320, -320, -320, -320],
+    [-270, -270, -270, -270],
   );
-  assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
+  assert.deepEqual(model.playerPosition, { x: 0, y: -270 });
   assert.match(battleControllerSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
   assert.match(gridPlacementSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
 

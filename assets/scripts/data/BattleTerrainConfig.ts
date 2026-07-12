@@ -23,15 +23,15 @@ export const BATTLE_WALL_LAYOUT = {
   cityLineY: -235,
   wallBackY: -400,
   wallFrontY: -470,
-  unitY: -320,
+  unitY: -270,
   unitVisualScale: 1.3,
-  thunderMage: { x: -240, y: -320 },
+  thunderMage: { x: -240, y: -270 },
   ordinarySlots: [
-    { x: -120, y: -320 },
-    { x: 120, y: -320 },
-    { x: 240, y: -320 },
+    { x: -120, y: -270 },
+    { x: 120, y: -270 },
+    { x: 240, y: -270 },
   ],
-  mainHero: { x: 0, y: -320 },
+  mainHero: { x: 0, y: -270 },
 } as const;
 
 export const BATTLE_TERRAIN_LAYERS: readonly BattleTerrainLayerSpec[] = [
