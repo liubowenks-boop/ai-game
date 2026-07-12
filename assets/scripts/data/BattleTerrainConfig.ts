@@ -24,6 +24,7 @@ export const BATTLE_WALL_LAYOUT = {
   wallBackY: -400,
   wallFrontY: -470,
   unitY: -320,
+  unitVisualScale: 1.3,
   thunderMage: { x: -240, y: -320 },
   ordinarySlots: [
     { x: -120, y: -320 },

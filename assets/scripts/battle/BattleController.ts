@@ -40,6 +40,7 @@ import {
   getAnimationClipSpec,
   resolvePlayerAttackAnimationTiming,
 } from '../data/AnimationConfig';
+import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
 import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
@@ -935,7 +936,8 @@ export class BattleController extends Component {
   private drawPlayerVisual(isMainOutput: boolean, activeFocus: VisualFocusTarget): void {
     const majorFocusActive = activeFocus === 'boss' || activeFocus === 'city';
     const highlightStrength = isMainOutput ? (majorFocusActive ? 0.55 : 1) : 0;
-    const scale = highlightStrength > 0 ? 1 + highlightStrength * 0.065 : 1;
+    const focusScale = highlightStrength > 0 ? 1 + highlightStrength * 0.065 : 1;
+    const scale = BATTLE_WALL_LAYOUT.unitVisualScale * focusScale;
     const useSpineAttack = this.isPlayerAttackSpineActive();
     const pose = useSpineAttack
       ? { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, rotation: 0 }

@@ -443,6 +443,7 @@ runTest('player attack adapter routes main and thunder chain events to shared vf
 });
 
 runTest('thunder mage presentation owns its spine and delegates electric effects', () => {
+  assert.equal(THUNDER_MAGE_COMPANION.displayScale, 0.286);
   const presentationSource = readFileSync(
     'assets/scripts/battle/ThunderMagePresentation.ts',
     'utf8',

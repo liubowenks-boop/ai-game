@@ -52,7 +52,16 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
     formation.map((rect) => rect.y),
     [-320, -320, -320, -320, -320],
   );
-  assert.ok(formation.every((rect) => rect.width <= 96 && rect.height <= 112));
+  assert.deepEqual(
+    formation.map((rect) => [rect.width, rect.height]),
+    [
+      [106, 106],
+      [106, 106],
+      [125, 146],
+      [106, 106],
+      [106, 106],
+    ],
+  );
   for (let index = 1; index < formation.length; index += 1) {
     assert.equal(rectsOverlap(formation[index - 1], formation[index]), false);
   }
@@ -67,6 +76,8 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
     [-320, -320, -320, -320],
   );
   assert.deepEqual(model.playerPosition, { x: 0, y: -320 });
+  assert.match(battleControllerSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
+  assert.match(gridPlacementSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;

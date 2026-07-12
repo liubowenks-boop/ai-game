@@ -20,6 +20,6 @@ export const THUNDER_MAGE_COMPANION: FixedCompanionConfig = {
   position: { ...BATTLE_WALL_LAYOUT.thunderMage },
   attackDamage: 7,
   attackInterval: 0.85,
-  displayScale: 0.22,
+  displayScale: 0.286,
   spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
 };

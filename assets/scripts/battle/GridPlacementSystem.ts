@@ -11,6 +11,7 @@ import { t } from '../ui/BattleTextResources';
 import { BattleMvpModel, BattlePoint, BattleTickResult, GridSlotState } from './BattleMvpModel';
 import { BattleVfxSystem } from './BattleVfxSystem';
 import { getHeroAnimationProfile } from '../data/AnimationConfig';
+import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 import {
   UnitAnimationRuntime,
   computeProceduralAnimationPose,
@@ -189,7 +190,8 @@ export class GridPlacementSystem {
       const focusScale = highlighted ? 1.04 : 1;
       if (view.portraitNode) {
         view.portraitNode.setPosition(pose.offsetX * 0.35, pose.offsetY * 0.35, 0);
-        view.portraitNode.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
+        const visualScale = BATTLE_WALL_LAYOUT.unitVisualScale * focusScale;
+        view.portraitNode.setScale(visualScale * pose.scaleX, visualScale * pose.scaleY, 1);
         view.portraitNode.angle = pose.rotation * 0.35;
       }
     }
