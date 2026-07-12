@@ -69,6 +69,20 @@ function main(): void {
   assertNear(layout.oilButton.y, layout.cityHp.y, 'oil button center should align with city hp');
 
   const cityHealthBar = assertRect(layoutMap, 'cityHealthBar');
+  assertNear(cityHealthBar.x, 0, 'city health bar should stay centered');
+  assertNear(cityHealthBar.y, -468, 'city health bar should sit above the hero rail');
+  const portraitSlotXs = [
+    assertRect(layoutMap, 'heroAvatarSlot1').x,
+    assertRect(layoutMap, 'heroAvatarSlot2').x,
+    assertRect(layoutMap, 'heroAvatarSlot3').x,
+    assertRect(layoutMap, 'heroAvatarSlot4').x,
+    assertRect(layoutMap, 'heroAvatarSlot5').x,
+  ];
+  assert(
+    JSON.stringify(portraitSlotXs) === JSON.stringify([-136, -68, 0, 68, 136]),
+    'hero rail should expose five centered portrait slots',
+  );
+  assert(!('heroAvatarSlot6' in layoutMap), 'sixth portrait slot should not exist');
   const comboBadge = assertRect(layoutMap, 'comboBadge');
   const statusLabel = assertRect(layoutMap, 'statusLabel');
   const buildHintLabel = assertRect(layoutMap, 'buildHintLabel');

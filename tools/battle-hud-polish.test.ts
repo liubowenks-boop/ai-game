@@ -81,7 +81,7 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;
-  const highlightedPlayerScale = 1 + 0.065;
+  const highlightedPlayerScale = 1.3 * (1 + 0.065);
   const heroBarStrokeWidth = 3;
   const heroBarStrokeOuterTop =
     BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2 + heroBarStrokeWidth / 2;
@@ -109,26 +109,26 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
     );
   }
 
-  assert.equal(BattleUiV4Layout.placementTitle.y, -489);
-  assert.equal(BattleUiV4Layout.placementPending.y, -489);
+  assert.equal(BattleUiV4Layout.placementTitle.y, -424);
+  assert.equal(BattleUiV4Layout.placementPending.y, -424);
   assert.equal(BattleUiV4Layout.heroBar.y, -552);
 });
 
-runTest('six fixed portrait slots fit the hero rail without overlap', () => {
+runTest('five fixed portrait slots fit the hero rail without overlap', () => {
   const portraitSlotKeys = [
     'heroAvatarSlot1',
     'heroAvatarSlot2',
     'heroAvatarSlot3',
     'heroAvatarSlot4',
     'heroAvatarSlot5',
-    'heroAvatarSlot6',
   ] as const;
   const portraitRects = portraitSlotKeys.map((key) => requireRect(key));
 
   assert.deepEqual(
     portraitRects.map((rect) => rect.x),
-    [-160, -96, -32, 32, 96, 160],
+    [-136, -68, 0, 68, 136],
   );
+  assert.equal('heroAvatarSlot6' in BattleUiV4Layout, false);
   assert.ok(portraitRects.every((rect) => rect.y === BattleUiV4Layout.heroBar.y));
   assert.ok(portraitRects.every((rect) => rect.width === 56 && rect.height === 72));
 
@@ -152,7 +152,7 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
     const currentRect = portraitRects[index];
     const gap = currentRect.x - currentRect.width / 2 - (previousRect.x + previousRect.width / 2);
 
-    assert.equal(gap, 8);
+    assert.equal(gap, 12);
     assert.equal(rectsOverlap(portraitRects[index - 1], portraitRects[index]), false);
   }
 
@@ -168,9 +168,13 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(cityHealthBar, wallSlotOrdinary1), false);
+  assert.deepEqual(cityHealthBar, { x: 0, y: -468, width: 430, height: 48 });
+  const healthBottom = cityHealthBar.y - cityHealthBar.height / 2;
+  const railTop = BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2;
+  assert.equal(healthBottom - railTop, 12);
 });
 
-runTest('bottom rail creates six text-free rectangular portrait slots', () => {
+runTest('bottom rail creates five text-free rectangular portrait slots', () => {
   const heroAvatarSlotViewSource = sourceSection(
     battleUiComponentsSource,
     'export class HeroAvatarSlotView {',
@@ -192,7 +196,8 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot3/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot4/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot5/);
-  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
+  assert.doesNotMatch(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
+  assert.match(createBottomHudLayerSource, /getChildByName\('HeroAvatarSlot6'\)\?\.destroy\(\)/);
   assert.match(
     heroAvatarSlotViewSource,
     /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s,

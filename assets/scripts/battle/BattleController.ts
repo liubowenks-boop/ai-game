@@ -489,6 +489,7 @@ export class BattleController extends Component {
   }
 
   private createBottomHudLayer(): void {
+    this.bottomHudLayer.getChildByName('HeroAvatarSlot6')?.destroy();
     createPanelNode(
       'BottomHudFrame',
       BattleUiV4Layout.heroBar.x,
@@ -505,7 +506,6 @@ export class BattleController extends Component {
       BattleUiV4Layout.heroAvatarSlot3,
       BattleUiV4Layout.heroAvatarSlot4,
       BattleUiV4Layout.heroAvatarSlot5,
-      BattleUiV4Layout.heroAvatarSlot6,
     ];
     avatarSlotRects.forEach((rect, index) => {
       this.heroAvatarViews.push(
