@@ -8,11 +8,11 @@
     ".png"
   ],
   "subMetas": {
-    "fc0e8": {
+    "6c48a": {
       "importer": "texture",
-      "uuid": "6b307b89-99c5-415a-92d3-2d978dac520e@fc0e8",
+      "uuid": "6b307b89-99c5-415a-92d3-2d978dac520e@6c48a",
       "displayName": "hero_qinglan",
-      "id": "fc0e8",
+      "id": "6c48a",
       "name": "texture",
       "userData": {
         "wrapModeS": "repeat",
@@ -37,6 +37,6 @@
     "type": "texture",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
-    "redirect": "6b307b89-99c5-415a-92d3-2d978dac520e@fc0e8"
+    "redirect": "6b307b89-99c5-415a-92d3-2d978dac520e@6c48a"
   }
 }
