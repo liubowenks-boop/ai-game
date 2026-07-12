@@ -89,26 +89,27 @@ function main(): void {
   const wallSlotThunderMage = assertRect(layoutMap, 'wallSlotThunderMage');
   const wallSlotOrdinary1 = assertRect(layoutMap, 'wallSlotOrdinary1');
   const wallSlotOrdinary2 = assertRect(layoutMap, 'wallSlotOrdinary2');
-  const wallSlotOrdinary3 = assertRect(layoutMap, 'wallSlotOrdinary3');
+  const wallSlotQinglan = assertRect(layoutMap, 'wallSlotQinglan');
+  assert(!('wallSlotOrdinary3' in layoutMap), 'third ordinary wall slot must not exist');
   const mainHeroUnit = assertRect(layoutMap, 'mainHeroUnit');
   const formation = [
     wallSlotThunderMage,
     wallSlotOrdinary1,
     mainHeroUnit,
     wallSlotOrdinary2,
-    wallSlotOrdinary3,
+    wallSlotQinglan,
   ];
 
   assert(
-    JSON.stringify(formation.map((rect) => rect.x)) === JSON.stringify([-240, -120, 0, 120, 240]),
-    'wall formation uses five evenly spaced x positions',
+    JSON.stringify(formation.map((rect) => rect.x)) === JSON.stringify([-215, -120, 0, 120, 215]),
+    'wall formation uses fixed companions at the outer positions',
   );
   assert(
     JSON.stringify(formation.map((rect) => rect.y)) ===
-      JSON.stringify([-205, -270, -250, -270, -270]),
-    'thunder mage should stand slightly behind the aligned wall formation',
+      JSON.stringify([-205, -270, -250, -270, -205]),
+    'fixed companions should stand slightly behind the ordinary wall formation',
   );
-  for (let index = 1; index < formation.length; index += 1) {
+  for (let index = 2; index < formation.length - 1; index += 1) {
     assert(!rectsOverlap(formation[index - 1], formation[index]), 'adjacent wall units overlap');
   }
 

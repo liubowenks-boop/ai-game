@@ -17,6 +17,7 @@ runTest('starts battle and spawned enemies wait at the wall before damaging the 
     waveInterval: 99,
     mainAttackDamage: 0,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -50,6 +51,7 @@ runTest('main hero attacks the nearest enemy first', () => {
     mainAttackDamage: 10,
     mainAttackInterval: 1,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 0,
     random: () => 1,
   });
@@ -81,7 +83,7 @@ runTest('v0.2 config exposes the requested hero and enemy archetypes', () => {
 });
 
 runTest(
-  'thunder mage permanently reserves the far-left wall slot outside the ordinary hero count',
+  'fixed companions reserve both outer wall slots outside the ordinary hero count',
   () => {
     const model = new BattleMvpModel();
     const companion = model.getFixedCompanion();
@@ -90,28 +92,61 @@ runTest(
       id: 'hero_thunder_mage',
       name: '雷法师',
       description: '雷电速攻支援',
-      slotIndex: 3,
-      position: { x: -240, y: -205 },
+      slotIndex: 2,
+      position: { x: -215, y: -205 },
+      attackSource: 'companion',
       attackDamage: 7,
       attackInterval: 0.85,
       displayScale: 0.286,
       spineAssetBase: 'spine/hero_thunder_mage/hero_thunder_mage',
+      rootNodeName: 'ThunderMageCompanion',
+      spineNodeName: 'ThunderMageAttackSpine',
     });
     companion.position.x = 999;
-    assert.deepEqual(model.getFixedCompanion().position, { x: -240, y: -205 });
+    assert.deepEqual(model.getFixedCompanion().position, { x: -215, y: -205 });
 
+    assert.deepEqual(
+      model
+        .getFixedCompanions()
+        .map(({ id, name, slotIndex, attackDamage, attackInterval }) => ({
+          id,
+          name,
+          slotIndex,
+          attackDamage,
+          attackInterval,
+        })),
+      [
+        {
+          id: 'hero_thunder_mage',
+          name: '雷法师',
+          slotIndex: 2,
+          attackDamage: 7,
+          attackInterval: 0.85,
+        },
+        {
+          id: 'hero_qinglan',
+          name: '灵符道君·青岚',
+          slotIndex: 3,
+          attackDamage: 8,
+          attackInterval: 1,
+        },
+      ],
+    );
+
+    assert.equal(model.slots[2].reservedBy, 'fixed_companion');
+    assert.equal(model.slots[2].fixedCompanionId, 'hero_thunder_mage');
     assert.equal(model.slots[3].reservedBy, 'fixed_companion');
+    assert.equal(model.slots[3].fixedCompanionId, 'hero_qinglan');
+    assert.equal(model.placeHero(2, '弓手'), undefined);
     assert.equal(model.placeHero(3, '弓手'), undefined);
-    assert.equal(model.slots[3].hero, undefined);
 
     assert.ok(model.placeHero(0, '弓手'));
     assert.ok(model.placeHero(1, '火药师'));
-    assert.ok(model.placeHero(2, '冰法师'));
-    assert.equal(model.getHeroes().length, 3);
+    assert.equal(model.getHeroes().length, 2);
   },
 );
 
-runTest('five-unit wall formation caps ordinary board heroes at three', () => {
+runTest('five-person wall formation caps ordinary board heroes at two', () => {
   const model = new BattleMvpModel();
 
   assert.deepEqual(
@@ -119,32 +154,25 @@ runTest('five-unit wall formation caps ordinary board heroes at three', () => {
     [0, 1, 2, 3],
   );
   assert.deepEqual(
-    model.slots.slice(0, 3).map((slot) => slot.position),
+    model.slots.slice(0, 2).map((slot) => slot.position),
     [
       { x: -120, y: -270 },
       { x: 120, y: -270 },
-      { x: 240, y: -270 },
     ],
   );
-  assert.deepEqual(model.slots[3], {
-    index: 3,
-    label: '',
-    row: 'wall',
-    position: { x: -240, y: -205 },
-    reservedBy: 'fixed_companion',
-  });
   assert.deepEqual(model.playerPosition, { x: 0, y: -250 });
   assert.equal(model.options.cityLineY, -235);
 
   assert.ok(model.placeHero(0, '弓手'));
   assert.ok(model.placeHero(1, '火药师'));
-  assert.ok(model.placeHero(2, '冰法师'));
-  assert.equal(model.getHeroes().length, 3);
-  assert.equal(model.build.summon.maxBoardHeroes, 3);
+  assert.equal(model.placeHero(2, '冰法师'), undefined);
+  assert.equal(model.placeHero(3, '冰法师'), undefined);
+  assert.equal(model.getHeroes().length, 2);
+  assert.equal(model.build.summon.maxBoardHeroes, 2);
   assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
   assert.equal(model.placeHero(3, '护卫'), undefined);
   assert.equal(model.placeHero(4, '护卫'), undefined);
-  assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.getHeroes().length, 2);
 });
 
 runTest('upgrade rotation never offers the retired slot expansion card', () => {
@@ -161,14 +189,45 @@ runTest('upgrade rotation never offers the retired slot expansion card', () => {
   assert.equal(new Set(secondOfferIds).size, 3);
 });
 
-runTest('ordinary wall slots use linear adjacency and exclude the companion slot', () => {
+runTest('ordinary wall slots are adjacent and exclude both companion slots', () => {
   const model = new BattleMvpModel();
 
   assert.deepEqual(model.getAdjacentSlotIndexes(0), [1]);
-  assert.deepEqual(model.getAdjacentSlotIndexes(1), [0, 2]);
-  assert.deepEqual(model.getAdjacentSlotIndexes(2), [1]);
+  assert.deepEqual(model.getAdjacentSlotIndexes(1), [0]);
+  assert.deepEqual(model.getAdjacentSlotIndexes(2), []);
   assert.deepEqual(model.getAdjacentSlotIndexes(3), []);
   assert.equal(model.getAdjacentSlotIndexes(0).includes(2), false);
+});
+
+runTest('qinglan attacks independently once per configured interval', () => {
+  const model = new BattleMvpModel({
+    waveInterval: 99,
+    mainAttackDamage: 0,
+    heroBaseDps: 0,
+    companionAttackDamage: 0,
+    qinglanAttackDamage: 8,
+    qinglanAttackInterval: 1,
+  });
+
+  model.startBattle();
+  model.spawnEnemy({ hp: 100, speed: 0 });
+
+  const first = model.tick(0.01).attackEvents.filter(
+    (event) => event.source === 'qinglan_companion',
+  );
+  assert.equal(first.length, 1);
+  assert.equal(first[0].damage, 8);
+  assert.deepEqual(first[0].originPosition, { x: 215, y: -205 });
+  assert.equal(first[0].heroName, '灵符道君·青岚');
+
+  assert.equal(
+    model.tick(0.98).attackEvents.some((event) => event.source === 'qinglan_companion'),
+    false,
+  );
+  assert.equal(
+    model.tick(0.02).attackEvents.some((event) => event.source === 'qinglan_companion'),
+    true,
+  );
 });
 
 runTest('thunder mage attacks independently and resets its timer on restart', () => {
@@ -178,6 +237,7 @@ runTest('thunder mage attacks independently and resets its timer on restart', ()
     heroBaseDps: 0,
     companionAttackDamage: 7,
     companionAttackInterval: 0.6,
+    qinglanAttackDamage: 0,
   });
 
   model.spawnEnemy({ hp: 100, speed: 0 });
@@ -215,6 +275,7 @@ runTest('battle tick ignores non-finite and non-positive deltas without pollutin
       waveInterval: 99,
       mainAttackDamage: 0,
       heroBaseDps: 0,
+      qinglanAttackDamage: 0,
     });
 
     model.startBattle();
@@ -235,6 +296,7 @@ runTest('thunder mage does not attack after game over even when running remains 
     waveInterval: 99,
     mainAttackDamage: 0,
     heroBaseDps: 0,
+    qinglanAttackDamage: 0,
   });
 
   model.startBattle();
@@ -253,6 +315,7 @@ runTest('thunder mage preserves large-frame overshoot without attacking twice in
     heroBaseDps: 0,
     companionAttackDamage: 7,
     companionAttackInterval: 0.6,
+    qinglanAttackDamage: 0,
   });
 
   model.startBattle();
@@ -271,6 +334,7 @@ runTest('thunder mage stays ready while no living target exists', () => {
     waveInterval: 99,
     mainAttackDamage: 0,
     heroBaseDps: 0,
+    qinglanAttackDamage: 0,
   });
 
   model.startBattle();
@@ -286,6 +350,7 @@ runTest('thunder mage targets the living enemy closest to the city wall', () => 
     waveInterval: 99,
     mainAttackDamage: 0,
     heroBaseDps: 0,
+    qinglanAttackDamage: 0,
   });
 
   model.startBattle();
@@ -304,6 +369,7 @@ runTest('drummer aura shortens the thunder mage actual attack cadence', () => {
     mainAttackDamage: 0,
     heroBaseDps: 0,
     companionAttackInterval: 0.6,
+    qinglanAttackDamage: 0,
   });
 
   model.placeHero(0, '鼓手');
@@ -343,6 +409,7 @@ runTest('thunder mage damage applies vulnerability before subtracting armor', ()
     mainAttackDamage: 0,
     heroBaseDps: 0,
     companionAttackDamage: 7,
+    qinglanAttackDamage: 0,
   });
 
   model.startBattle();
@@ -362,6 +429,7 @@ runTest('thunder mage attacks do not trigger main hero fire or thunder effects',
     waveInterval: 99,
     mainAttackDamage: 0,
     heroBaseDps: 0,
+    qinglanAttackDamage: 0,
     random: () => 0,
   });
 
@@ -401,6 +469,7 @@ runTest('default main attack softens the opening wave without making it toothles
     waveInterval: 99,
     heroBaseDps: 0,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     random: () => 1,
   });
 
@@ -458,6 +527,7 @@ runTest('fire build adds stackable burn and spread pressure', () => {
     mainAttackDamage: 1,
     mainAttackInterval: 0.5,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -485,6 +555,7 @@ runTest('thunder build can crit and chain to extra enemies', () => {
     mainAttackDamage: 10,
     mainAttackInterval: 1,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 0,
     random: () => 0,
   });
@@ -512,6 +583,7 @@ runTest('wave rhythm produces tutorial waves, elite wave, and a pressure boss on
     waveInterval: 99,
     mainAttackDamage: 0,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 0,
   });
 
@@ -584,21 +656,20 @@ runTest('recruited adjacent same-name heroes merge up to level 4', () => {
   );
 });
 
-runTest('summon build keeps three ordinary slots and turns its card into DPS gains', () => {
+runTest('summon build keeps two ordinary slots and turns its card into DPS gains', () => {
   const model = new BattleMvpModel({
     heroBaseDps: 5,
   });
 
   model.placeHero(0, '弓手');
   model.placeHero(1, '火药师');
-  model.placeHero(2, '冰法师');
 
-  assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.getHeroes().length, 2);
   assert.equal(model.placeHero(3, '毒师'), undefined);
 
   assert.equal(model.applyUpgradeCard('summon_slots_plus_1'), false);
   assert.equal(model.placeHero(4, '毒师'), undefined);
-  assert.equal(model.getHeroes().length, 3);
+  assert.equal(model.getHeroes().length, 2);
 
   const dpsBeforeDamageCard = model.getTotalHeroDps();
   model.applyUpgradeCard('summon_hero_damage_20');
@@ -634,6 +705,7 @@ runTest('attack events expose stable presentation metadata for every attacker', 
     waveInterval: 99,
     heroBaseDps: 0,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     random: () => 1,
   });
   mainModel.startBattle();
@@ -660,6 +732,7 @@ runTest('attack events expose stable presentation metadata for every attacker', 
     waveInterval: 99,
     mainAttackDamage: 0,
     companionAttackDamage: 0,
+    qinglanAttackDamage: 0,
     heroBaseDps: 20,
   });
   const hero = heroModel.placeHero(0, '火药师');

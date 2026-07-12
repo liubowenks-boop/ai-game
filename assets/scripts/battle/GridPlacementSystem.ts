@@ -296,8 +296,8 @@ export class GridPlacementSystem {
     const positions: Record<number, RectSpec> = {
       0: BattleUiV4Layout.wallSlotOrdinary1,
       1: BattleUiV4Layout.wallSlotOrdinary2,
-      2: BattleUiV4Layout.wallSlotOrdinary3,
-      3: BattleUiV4Layout.wallSlotThunderMage,
+      2: BattleUiV4Layout.wallSlotThunderMage,
+      3: BattleUiV4Layout.wallSlotQinglan,
     };
 
     return (

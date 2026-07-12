@@ -9,7 +9,13 @@ import {
   UpgradeCardConfig,
   UpgradeCardId,
 } from '../data/BattleConfig';
-import { FixedCompanionConfig, THUNDER_MAGE_COMPANION } from '../data/CompanionConfig';
+import {
+  FIXED_COMPANIONS,
+  FixedCompanionConfig,
+  FixedCompanionId,
+  QINGLAN_COMPANION,
+  THUNDER_MAGE_COMPANION,
+} from '../data/CompanionConfig';
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 
 export type { BuildSchool, EnemyKind, HeroRole, UpgradeCardId } from '../data/BattleConfig';
@@ -56,6 +62,7 @@ export interface GridSlotState {
   row: 'wall';
   position: BattlePoint;
   reservedBy?: 'fixed_companion';
+  fixedCompanionId?: FixedCompanionId;
   hero?: HeroState;
 }
 
@@ -64,7 +71,14 @@ export interface UpgradeCardState extends UpgradeCardConfig {}
 export interface AttackEvent {
   enemyId: number;
   damage: number;
-  source: 'main' | 'companion' | 'hero_dps' | 'burn' | 'poison' | 'thunder_chain';
+  source:
+    | 'main'
+    | 'companion'
+    | 'qinglan_companion'
+    | 'hero_dps'
+    | 'burn'
+    | 'poison'
+    | 'thunder_chain';
   enemyPosition: BattlePoint;
   critical?: boolean;
   originPosition?: BattlePoint;
@@ -120,6 +134,8 @@ export interface BattleMvpOptions {
   mainAttackInterval: number;
   companionAttackDamage: number;
   companionAttackInterval: number;
+  qinglanAttackDamage: number;
+  qinglanAttackInterval: number;
   heroBaseDps: number;
   playerPosition: BattlePoint;
   random: () => number;
@@ -162,6 +178,8 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   mainAttackInterval: 0.7,
   companionAttackDamage: THUNDER_MAGE_COMPANION.attackDamage,
   companionAttackInterval: THUNDER_MAGE_COMPANION.attackInterval,
+  qinglanAttackDamage: QINGLAN_COMPANION.attackDamage,
+  qinglanAttackInterval: QINGLAN_COMPANION.attackInterval,
   heroBaseDps: 5,
   playerPosition: { ...BATTLE_WALL_LAYOUT.mainHero },
   random: Math.random,
@@ -169,8 +187,8 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
 
 const GRID_ADJACENCY: Record<number, number[]> = {
   0: [1],
-  1: [0, 2],
-  2: [1],
+  1: [0],
+  2: [],
   3: [],
 };
 
@@ -196,7 +214,10 @@ export class BattleMvpModel {
   private waveTimer = 0;
   private upgradeTimer = 0;
   private attackTimer = 0;
-  private companionAttackTimer = 0;
+  private readonly fixedCompanionAttackTimers: Record<FixedCompanionId, number> = {
+    hero_thunder_mage: 0,
+    hero_qinglan: 0,
+  };
   private enemyIdSequence = 1;
   private heroIdSequence = 1;
   private recruitCursor = 0;
@@ -223,7 +244,9 @@ export class BattleMvpModel {
     this.waveTimer = 0;
     this.upgradeTimer = 0;
     this.attackTimer = 0;
-    this.companionAttackTimer = 0;
+    for (const companion of FIXED_COMPANIONS) {
+      this.fixedCompanionAttackTimers[companion.id] = 0;
+    }
     this.upgradeOfferCount = 0;
     this.running = true;
     this.gameOver = false;
@@ -425,18 +448,27 @@ export class BattleMvpModel {
   }
 
   public getFixedCompanion(): FixedCompanionConfig {
-    return {
-      ...THUNDER_MAGE_COMPANION,
-      position: { ...THUNDER_MAGE_COMPANION.position },
-    };
+    return this.cloneFixedCompanion(THUNDER_MAGE_COMPANION);
+  }
+
+  public getFixedCompanions(): FixedCompanionConfig[] {
+    return FIXED_COMPANIONS.map((companion) => this.cloneFixedCompanion(companion));
   }
 
   public getCompanionAttackInterval(): number {
-    const configuredInterval = this.options.companionAttackInterval;
+    return this.getFixedCompanionAttackInterval(THUNDER_MAGE_COMPANION.id);
+  }
+
+  public getFixedCompanionAttackInterval(id: FixedCompanionId): number {
+    const companion = FIXED_COMPANIONS.find((candidate) => candidate.id === id);
+    const configuredInterval =
+      id === 'hero_thunder_mage'
+        ? this.options.companionAttackInterval
+        : this.options.qinglanAttackInterval;
     const baseInterval =
       Number.isFinite(configuredInterval) && configuredInterval > 0
         ? configuredInterval
-        : THUNDER_MAGE_COMPANION.attackInterval;
+        : companion?.attackInterval ?? THUNDER_MAGE_COMPANION.attackInterval;
     const auraMultiplier = this.getHeroAuraMultiplier();
     const safeAuraMultiplier =
       Number.isFinite(auraMultiplier) && auraMultiplier > 0 ? auraMultiplier : 1;
@@ -489,14 +521,17 @@ export class BattleMvpModel {
         index: 2,
         label: '',
         row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.ordinarySlots[2] },
+        position: { ...BATTLE_WALL_LAYOUT.thunderMage },
+        reservedBy: 'fixed_companion',
+        fixedCompanionId: 'hero_thunder_mage',
       },
       {
         index: 3,
         label: '',
         row: 'wall',
-        position: { ...BATTLE_WALL_LAYOUT.thunderMage },
+        position: { ...BATTLE_WALL_LAYOUT.qinglan },
         reservedBy: 'fixed_companion',
+        fixedCompanionId: 'hero_qinglan',
       },
     ];
   }
@@ -522,7 +557,7 @@ export class BattleMvpModel {
         critMultiplier: 1.8,
       },
       summon: {
-        maxBoardHeroes: 3,
+        maxBoardHeroes: 2,
         heroDamageMultiplier: 1,
       },
     };
@@ -715,25 +750,39 @@ export class BattleMvpModel {
   }
 
   private tickCompanionAttack(deltaSeconds: number, result: BattleTickResult): void {
-    this.companionAttackTimer -= deltaSeconds;
+    for (const companion of FIXED_COMPANIONS) {
+      this.fixedCompanionAttackTimers[companion.id] -= deltaSeconds;
+      const damage =
+        companion.id === 'hero_thunder_mage'
+          ? this.options.companionAttackDamage
+          : this.options.qinglanAttackDamage;
 
-    if (this.companionAttackTimer > 0.0001 || this.options.companionAttackDamage <= 0) {
-      return;
+      if (this.fixedCompanionAttackTimers[companion.id] > 0.0001 || damage <= 0) {
+        continue;
+      }
+
+      const target = this.findEnemyClosestToCityWall();
+
+      if (!target) {
+        this.fixedCompanionAttackTimers[companion.id] = 0;
+        continue;
+      }
+
+      this.damageEnemy(target, damage, companion.attackSource, result, {
+        originPosition: companion.position,
+        heroName: companion.name,
+        impactKind: 'primary',
+      });
+      this.fixedCompanionAttackTimers[companion.id] +=
+        this.getFixedCompanionAttackInterval(companion.id);
     }
+  }
 
-    const target = this.findEnemyClosestToCityWall();
-
-    if (!target) {
-      this.companionAttackTimer = 0;
-      return;
-    }
-
-    this.damageEnemy(target, this.options.companionAttackDamage, 'companion', result, {
-      originPosition: THUNDER_MAGE_COMPANION.position,
-      heroName: THUNDER_MAGE_COMPANION.name,
-      impactKind: 'primary',
-    });
-    this.companionAttackTimer += this.getCompanionAttackInterval();
+  private cloneFixedCompanion(companion: FixedCompanionConfig): FixedCompanionConfig {
+    return {
+      ...companion,
+      position: { ...companion.position },
+    };
   }
 
   private tickHeroDps(deltaSeconds: number, result: BattleTickResult): void {

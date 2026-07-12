@@ -27,10 +27,10 @@ export const BATTLE_WALL_LAYOUT = {
   unitVisualScale: 1.3,
   ordinaryHeroBaseSize: 66,
   thunderMage: { x: -215, y: -205 },
+  qinglan: { x: 215, y: -205 },
   ordinarySlots: [
     { x: -120, y: -270 },
     { x: 120, y: -270 },
-    { x: 240, y: -270 },
   ],
   mainHero: { x: 0, y: -250 },
 } as const;

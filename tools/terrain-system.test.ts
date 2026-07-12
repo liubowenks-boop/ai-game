@@ -118,11 +118,11 @@ runTest('terrain config fixes the wall and five-unit formation coordinates', () 
   assert.equal(BATTLE_WALL_LAYOUT.unitY, -270);
   assert.equal(BATTLE_WALL_LAYOUT.unitVisualScale, 1.3);
   assert.equal(BATTLE_WALL_LAYOUT.cityLineY - BATTLE_WALL_LAYOUT.unitY, 35);
-  assert.deepEqual(BATTLE_WALL_LAYOUT.thunderMage, { x: -240, y: -205 });
+  assert.deepEqual(BATTLE_WALL_LAYOUT.thunderMage, { x: -215, y: -205 });
+  assert.deepEqual(BATTLE_WALL_LAYOUT.qinglan, { x: 215, y: -205 });
   assert.deepEqual(BATTLE_WALL_LAYOUT.ordinarySlots, [
     { x: -120, y: -270 },
     { x: 120, y: -270 },
-    { x: 240, y: -270 },
   ]);
   assert.deepEqual(BATTLE_WALL_LAYOUT.mainHero, { x: 0, y: -250 });
 });

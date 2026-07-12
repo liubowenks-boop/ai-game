@@ -49,16 +49,16 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
     requireRect('wallSlotOrdinary1'),
     requireRect('mainHeroUnit'),
     requireRect('wallSlotOrdinary2'),
-    requireRect('wallSlotOrdinary3'),
+    requireRect('wallSlotQinglan'),
   ];
 
   assert.deepEqual(
     formation.map((rect) => rect.x),
-    [-240, -120, 0, 120, 240],
+    [-215, -120, 0, 120, 215],
   );
   assert.deepEqual(
     formation.map((rect) => rect.y),
-    [-205, -270, -250, -270, -270],
+    [-205, -270, -250, -270, -205],
   );
   assert.deepEqual(
     formation.map((rect) => [rect.width, rect.height]),
@@ -70,18 +70,18 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
       [106, 106],
     ],
   );
-  for (let index = 1; index < formation.length; index += 1) {
+  for (let index = 2; index < formation.length - 1; index += 1) {
     assert.equal(rectsOverlap(formation[index - 1], formation[index]), false);
   }
 
   const model = new BattleMvpModel();
   assert.deepEqual(
     model.slots.map((slot) => slot.position.x),
-    [-120, 120, 240, -240],
+    [-120, 120, -215, 215],
   );
   assert.deepEqual(
     model.slots.map((slot) => slot.position.y),
-    [-270, -270, -270, -205],
+    [-270, -270, -205, -205],
   );
   assert.deepEqual(model.playerPosition, { x: 0, y: -250 });
   assert.match(battleControllerSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
@@ -306,7 +306,8 @@ runTest('deployable positions keep invisible hit targets without ground circles'
   assert.match(getVisualSlotRectSource, /wallSlotThunderMage/);
   assert.match(getVisualSlotRectSource, /wallSlotOrdinary1/);
   assert.match(getVisualSlotRectSource, /wallSlotOrdinary2/);
-  assert.match(getVisualSlotRectSource, /wallSlotOrdinary3/);
+  assert.match(getVisualSlotRectSource, /wallSlotQinglan/);
+  assert.equal(getVisualSlotRectSource.includes('wallSlotOrdinary3'), false);
   assert.equal(/gridSlotFront|gridSlotBack/.test(getVisualSlotRectSource), false);
   assert.match(
     getVisualSlotRectSource,
