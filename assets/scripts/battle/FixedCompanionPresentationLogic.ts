@@ -7,6 +7,21 @@ type FixedCompanionSkeletonLoadComplete<T> = (error?: unknown, value?: T) => voi
 type FixedCompanionSkeletonLoader<T> = (complete: FixedCompanionSkeletonLoadComplete<T>) => void;
 type FixedCompanionSkeletonConsumer<T> = (result: FixedCompanionSkeletonLoadResult<T>) => void;
 
+export function advanceFixedCompanionAttackElapsed(
+  elapsed: number,
+  duration: number,
+  deltaTime: number,
+): number {
+  const safeElapsed = Number.isFinite(elapsed) && elapsed > 0 ? elapsed : 0;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return safeElapsed;
+  }
+  if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+    return Math.min(duration, safeElapsed);
+  }
+  return Math.min(duration, safeElapsed + deltaTime);
+}
+
 export function resolveFixedCompanionFrameIndex(
   elapsed: number,
   speed: number,

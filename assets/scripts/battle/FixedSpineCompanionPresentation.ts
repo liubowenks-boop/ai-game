@@ -10,6 +10,7 @@ import { FixedCompanionConfig, FixedCompanionId } from '../data/CompanionConfig'
 import { BattleTickResult } from './BattleMvpModel';
 import { BattleVfxSystem } from './BattleVfxSystem';
 import {
+  advanceFixedCompanionAttackElapsed,
   FixedCompanionSkeletonLoadCoordinator,
   resolveFixedCompanionFrameIndex,
 } from './FixedCompanionPresentationLogic';
@@ -130,7 +131,7 @@ export class FixedSpineCompanionPresentation {
     if (!this.isLive() || !Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
-    this.tickAttack(Math.min(deltaTime, 1 / 30));
+    this.tickAttack(deltaTime);
   }
 
   public clear(): void {
@@ -198,9 +199,10 @@ export class FixedSpineCompanionPresentation {
       if (this.loadState === 'loaded') this.applyIdlePose();
       return;
     }
-    this.activeAttack.elapsed = Math.min(
+    this.activeAttack.elapsed = advanceFixedCompanionAttackElapsed(
+      this.activeAttack.elapsed,
       this.activeAttack.duration,
-      this.activeAttack.elapsed + deltaTime,
+      deltaTime,
     );
     if (this.loadState === 'loaded') this.applyCurrentAttackFrame();
     if (this.activeAttack.elapsed >= this.activeAttack.duration) {

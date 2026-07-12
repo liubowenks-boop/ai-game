@@ -326,16 +326,29 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
 runTest('controller routes main companion and ordinary heroes through one vfx owner', () => {
   const controller = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
   const player = readFileSync('assets/scripts/battle/PlayerAutoAttackSystem.ts', 'utf8');
+  const fixedCompanion = readFileSync(
+    'assets/scripts/battle/FixedSpineCompanionPresentation.ts',
+    'utf8',
+  );
   const thunder = readFileSync('assets/scripts/battle/ThunderMagePresentation.ts', 'utf8');
   const grid = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
-  assert.ok(controller.includes('new BattleVfxSystem'));
-  assert.ok(controller.includes('this.battleVfx.update(presentationDelta)'));
+  assert.equal((controller.match(/new BattleVfxSystem\(/g) ?? []).length, 1);
+  assert.ok(controller.includes('this.battleVfx.update(vfxDelta)'));
   assert.ok(controller.includes('this.battleVfx.clear()'));
   assert.ok(controller.includes('this.battleVfx?.dispose()'));
-  assert.ok(player.includes('this.battleVfx.playAttackEvent(event)'));
-  assert.ok(thunder.includes('this.battleVfx.playAttackEvent(event)'));
-  assert.ok(grid.includes('this.battleVfx.playAttackEvent(event)'));
+  assert.equal((player.match(/this\.battleVfx\.playAttackEvent\(event\)/g) ?? []).length, 1);
+  assert.equal(
+    (fixedCompanion.match(/this\.battleVfx\.playAttackEvent\(event\)/g) ?? []).length,
+    1,
+  );
+  assert.equal((grid.match(/this\.battleVfx\.playAttackEvent\(event\)/g) ?? []).length, 2);
+  assert.match(
+    grid,
+    /if \(event\.impactKind === 'primary'\)[\s\S]*continue;[\s\S]*if \(event\.impactKind === 'splash'/,
+  );
+  assert.equal((thunder.match(/this\.battleVfx\.playAttackEvent\(event\)/g) ?? []).length, 0);
   assert.equal(player.includes('ParticleSystem2D'), false);
+  assert.equal(fixedCompanion.includes('ParticleSystem2D'), false);
   assert.equal(thunder.includes('ParticleSystem2D'), false);
 });
 

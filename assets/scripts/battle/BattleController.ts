@@ -170,7 +170,7 @@ export class BattleController extends Component {
     const presentationDelta = Math.min(deltaTime, 1 / 30);
     this.videoCharacterPresentation.update(presentationDelta);
     for (const presentation of this.fixedCompanionPresentations) {
-      presentation.update(presentationDelta);
+      presentation.update(deltaTime);
     }
     this.cityHealthBarView.update(deltaTime);
 
@@ -178,7 +178,7 @@ export class BattleController extends Component {
       this.updateReadability(deltaTime);
       this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
       this.autoAttackSystem.update(deltaTime, this.model);
-      this.battleVfx.update(presentationDelta);
+      this.battleVfx.update(vfxDelta);
       this.refreshUi();
       return;
     }
@@ -202,7 +202,7 @@ export class BattleController extends Component {
     this.enemySystem.sync(this.model.enemies, this.getEnemyVisualContext());
     this.autoAttackSystem.refresh(result, this.model);
     this.autoAttackSystem.update(deltaTime, this.model);
-    this.battleVfx.update(presentationDelta);
+    this.battleVfx.update(vfxDelta);
 
     if (result.upgradeOffered) {
       this.upgradeCardSystem.show();

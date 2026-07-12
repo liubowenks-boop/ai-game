@@ -12,12 +12,14 @@ import {
   tickUnitAnimation,
 } from '../assets/scripts/battle/UnitAnimationSystem';
 import {
+  advanceFixedCompanionAttackElapsed,
   FixedCompanionSkeletonLoadCoordinator,
   resolveFixedCompanionFrameIndex,
 } from '../assets/scripts/battle/FixedCompanionPresentationLogic';
 import {
   advanceThunderMageProjectile,
   resolveThunderMageAttackFrameIndex,
+  ThunderMageSkeletonLoadCoordinator,
 } from '../assets/scripts/battle/ThunderMagePresentationLogic';
 
 const {
@@ -138,6 +140,35 @@ runTest('fixed companion frame mapping clamps progress across frame 0 through 7'
   assert.equal(resolveFixedCompanionFrameIndex(1, 1, 1), 7);
   assert.equal(resolveFixedCompanionFrameIndex(10, 1, 1), 7);
   assert.equal(resolveThunderMageAttackFrameIndex(0.999, 1, 1), 7);
+});
+
+runTest('fixed companion attack consumes full low-frame-rate delta and reaches the final frame', () => {
+  let elapsed = 0;
+  for (let frame = 0; frame < 20; frame += 1) {
+    elapsed = advanceFixedCompanionAttackElapsed(elapsed, 1, 1 / 20);
+  }
+
+  assert.equal(elapsed, 1);
+  assert.equal(resolveFixedCompanionFrameIndex(elapsed, 1, 1), 7);
+});
+
+runTest('thunder mage compatibility logic delegates frame mapping and skeleton loading', () => {
+  const thunderLogicSource = readFileSync(
+    'assets/scripts/battle/ThunderMagePresentationLogic.ts',
+    'utf8',
+  );
+
+  assert.equal(ThunderMageSkeletonLoadCoordinator, FixedCompanionSkeletonLoadCoordinator);
+  assert.match(
+    thunderLogicSource,
+    /return resolveFixedCompanionFrameIndex\(elapsed, speed, sourceDuration\);/,
+  );
+  assert.match(
+    thunderLogicSource,
+    /FixedCompanionSkeletonLoadCoordinator as ThunderMageSkeletonLoadCoordinator/,
+  );
+  assert.equal(thunderLogicSource.includes('class ThunderMageSkeletonLoadCoordinator'), false);
+  assert.equal(thunderLogicSource.includes('const sourceProgress ='), false);
 });
 
 runTest('thunder mage projectile advances once per delta and reports completion', () => {
@@ -584,7 +615,15 @@ runTest('battle controller delegates every fixed companion presentation lifecycl
     /this\.model\.getFixedCompanionAttackInterval\(presentation\.companionId\)/,
   );
   assert.equal(controllerSource.includes('FIXED_COMPANIONS[index]'), false);
-  assert.match(controllerSource, /presentation\.update\(presentationDelta\)/);
+  assert.match(controllerSource, /presentation\.update\(deltaTime\)/);
+  assert.match(controllerSource, /const vfxDelta = Math\.min\(deltaTime, 1 \/ 30\)/);
+  assert.equal(controllerSource.includes('presentation.update(vfxDelta)'), false);
+  assert.equal(
+    readFileSync('assets/scripts/battle/FixedSpineCompanionPresentation.ts', 'utf8').includes(
+      'this.tickAttack(Math.min(deltaTime, 1 / 30))',
+    ),
+    false,
+  );
   assert.match(controllerSource, /presentation\.clear\(\)/);
   assert.equal(controllerSource.includes("event.source === 'companion'"), false);
   assert.equal(controllerSource.includes('resolveThunderMageAttackAnimationTiming'), false);
