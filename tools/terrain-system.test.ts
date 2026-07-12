@@ -127,6 +127,8 @@ runTest('terrain config fixes the wall and five-unit formation coordinates', () 
 });
 
 runTest('terrain config defines the seven modular assets and stable render roots', () => {
+  assert.equal(BATTLE_TERRAIN_LAYERS.find((layer) => layer.id === 'ruinsLeft')?.x, -237.6);
+  assert.equal(BATTLE_TERRAIN_LAYERS.find((layer) => layer.id === 'ruinsRight')?.x, 237.6);
   assert.deepEqual(
     BATTLE_TERRAIN_LAYERS.map((layer) => ({
       id: layer.id,
@@ -182,7 +184,7 @@ runTest('terrain config defines the seven modular assets and stable render roots
         id: 'wallFront',
         filename: 'battle_wall_front.png',
         size: [720, 340],
-        required: false,
+        required: true,
         expectsAlpha: true,
       },
     ],
@@ -202,12 +204,24 @@ runTest('required terrain layers switch atomically while optional failures degra
   const pending = createBattleTerrainLoadState(BATTLE_TERRAIN_LAYERS);
   assert.equal(resolveBattleTerrainMode(pending, BATTLE_TERRAIN_LAYERS), 'loading');
 
+  const baseAndBackReady = { ...pending, base: 'ready' as const, wallBack: 'ready' as const };
+  assert.equal(
+    resolveBattleTerrainMode(baseAndBackReady, BATTLE_TERRAIN_LAYERS),
+    'loading',
+  );
   assert.equal(
     resolveBattleTerrainMode(
-      { ...pending, base: 'ready', wallBack: 'ready' },
+      { ...baseAndBackReady, wallFront: 'ready' },
       BATTLE_TERRAIN_LAYERS,
     ),
     'modular',
+  );
+  assert.equal(
+    resolveBattleTerrainMode(
+      { ...baseAndBackReady, wallFront: 'failed' },
+      BATTLE_TERRAIN_LAYERS,
+    ),
+    'legacy',
   );
   assert.equal(
     resolveBattleTerrainMode({ ...pending, base: 'failed' }, BATTLE_TERRAIN_LAYERS),
@@ -215,7 +229,7 @@ runTest('required terrain layers switch atomically while optional failures degra
   );
   assert.equal(
     resolveBattleTerrainMode(
-      { ...pending, base: 'ready', wallBack: 'ready', road: 'failed' },
+      { ...baseAndBackReady, wallFront: 'ready', road: 'failed' },
       BATTLE_TERRAIN_LAYERS,
     ),
     'modular',
@@ -247,10 +261,26 @@ runTest('terrain asset files, alpha, metadata and generated UUID manifest agree'
     ];
     if (spec.expectsAlpha) {
       assert.equal(png.colorType, 6, `${spec.filename} must contain RGBA pixels`);
-      assert.ok(
-        cornerAlphas.filter((alpha) => alpha < 16).length >= 3,
-        `${spec.filename} must not contain a solid rectangular background`,
-      );
+      if (spec.id === 'wallBack' || spec.id === 'wallFront') {
+        let transparentPixels = 0;
+        let opaquePixels = 0;
+        for (let y = 0; y < png.height; y += 1) {
+          for (let x = 0; x < png.width; x += 1) {
+            const alpha = png.alphaAt(x, y);
+            if (alpha < 16) transparentPixels += 1;
+            if (alpha > 240) opaquePixels += 1;
+          }
+        }
+        const visibleRatio = 1 - transparentPixels / (png.width * png.height);
+        assert.ok(visibleRatio > 0.08 && visibleRatio < 0.9, `${spec.filename} visible coverage drifted`);
+        assert.ok(transparentPixels > 0, `${spec.filename} needs transparent padding`);
+        assert.ok(opaquePixels > 0, `${spec.filename} needs opaque wall pixels`);
+      } else {
+        assert.ok(
+          cornerAlphas.filter((alpha) => alpha < 16).length >= 3,
+          `${spec.filename} must not contain a solid rectangular background`,
+        );
+      }
     } else {
       assert.ok(
         cornerAlphas.every((alpha) => alpha === 255),
