@@ -6,6 +6,7 @@ import { inflateSync } from 'node:zlib';
 import {
   BATTLE_VFX_BUDGET,
   BATTLE_VFX_PRESETS,
+  BATTLE_VFX_TEXTURE_FALLBACKS,
   BATTLE_VFX_TEXTURES,
 } from '../assets/scripts/data/BattleVfxConfig';
 import {
@@ -117,7 +118,7 @@ runTest('vfx presets map every battle role to a distinct readable element', () =
 });
 
 runTest('vfx textures and presets stay inside the approved production budget', () => {
-  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 11);
+  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 15);
   assert.equal(Object.keys(BATTLE_VFX_PRESETS).length, 10);
 
   for (const preset of Object.values(BATTLE_VFX_PRESETS)) {
@@ -140,6 +141,32 @@ runTest('vfx textures and presets stay inside the approved production budget', (
   assert.equal(BATTLE_VFX_PRESETS.gold_arrow.travelSeconds, 0.23);
   assert.equal(BATTLE_VFX_PRESETS.fire_blast.travelSeconds, 0.28);
   assert.equal(BATTLE_VFX_PRESETS.thunder.beam, true);
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.values(BATTLE_VFX_PRESETS).map((preset) => [
+        preset.id,
+        [preset.impactProfile, preset.impactTexture],
+      ]),
+    ),
+    {
+      main_fire_gold: ['fire', 'fireImpactV3'],
+      thunder: ['thunder', 'thunderImpactV3'],
+      gold_arrow: ['gold', 'goldImpactV3'],
+      fire_blast: ['fire', 'fireImpactV3'],
+      ice_shard: ['thunder', 'thunderImpactV3'],
+      poison_wisp: ['poison', 'poisonImpactV3'],
+      shield_impact: ['gold', 'goldImpactV3'],
+      warm_support: ['gold', 'goldImpactV3'],
+      healing_spirit: ['heal', 'healOrb'],
+      curse_wisp: ['poison', 'poisonImpactV3'],
+    },
+  );
+  assert.deepEqual(BATTLE_VFX_TEXTURE_FALLBACKS, {
+    fireImpactV3: 'hitStar',
+    thunderImpactV3: 'thunderImpact',
+    poisonImpactV3: 'poisonWisp',
+    goldImpactV3: 'hitStar',
+  });
 });
 
 runTest('hero attack presentation throttles per hero and resets cleanly', () => {
@@ -166,7 +193,10 @@ runTest('critical reservations evict only the oldest decorative effect', () => {
   assert.ok(critical);
   assert.equal(limiter.isActive(essential!), true);
   assert.equal(limiter.isActive(decorative!), false);
-  assert.deepEqual(limiter.drainEvictedReservations().map((item) => item.id), [decorative!.id]);
+  assert.deepEqual(
+    limiter.drainEvictedReservations().map((item) => item.id),
+    [decorative!.id],
+  );
 
   limiter.release(essential!);
   limiter.release(essential!);
@@ -247,13 +277,22 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
   assert.match(source, /spawnTrailEcho\(/);
   assert.match(source, /playSourceFlash\(/);
   assert.match(source, /playLayeredImpact\(/);
+  assert.match(source, /resolveFrame\(/);
+  assert.match(source, /BATTLE_VFX_TEXTURE_FALLBACKS/);
+  assert.match(source, /resolveParticleFrame\(/);
   assert.equal(source.includes('fallbackSegments'), false);
   assert.equal(source.includes('fallbackBursts'), false);
   assert.equal(source.includes('BattleVfxGraphicsFallback'), false);
   assert.equal(source.includes('addComponent(Graphics)'), false);
   assert.equal(source.includes('lineWidth = 5'), false);
-  assert.match(source, /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireSprite/);
-  assert.match(source, /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireParticle/);
+  assert.match(
+    source,
+    /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireSprite/,
+  );
+  assert.match(
+    source,
+    /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireParticle/,
+  );
   assert.match(source, /available\.node\.parent !== parent/);
   assert.match(source, /particle\.duration \+ particle\.life \+ particle\.lifeVar/);
   assert.match(source, /spriteFrame = null;\s*handle\.particle\.stopSystem\(\)/);
@@ -283,7 +322,9 @@ runTest('status death and fortress feedback avoid persistent enemy rings', () =>
   const system = readFileSync('assets/scripts/battle/BattleVfxSystem.ts', 'utf8');
   const enemies = readFileSync('assets/scripts/battle/EnemySystem.ts', 'utf8');
   assert.ok(controller.includes('this.battleVfx.playStatusImpact(event)'));
-  assert.ok(controller.includes('this.battleVfx.playEnemyDeath(event.enemyPosition, event.targetKind)'));
+  assert.ok(
+    controller.includes('this.battleVfx.playEnemyDeath(event.enemyPosition, event.targetKind)'),
+  );
   assert.ok(controller.includes('this.battleVfx.playWallImpact({'));
   assert.ok(system.includes('Math.floor(this.nowSeconds * 10)'));
   assert.ok(system.includes('this.statusFeedbackBuckets.get(key) === bucket'));
