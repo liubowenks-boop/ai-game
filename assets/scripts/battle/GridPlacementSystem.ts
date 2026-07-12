@@ -24,8 +24,8 @@ import {
 interface ButtonView {
   node: Node;
   unitNode?: Node;
-  graphics: Graphics;
-  label: Label;
+  graphics?: Graphics;
+  label?: Label;
   width: number;
   height: number;
   baseColor: Color;
@@ -117,14 +117,16 @@ export class GridPlacementSystem {
     for (const slot of this.model.slots) {
       const view = this.slotButtons[slot.index];
       const highlighted = Boolean(slot.hero && slot.hero.id === this.highlightedHeroId);
-      view.label.string = this.getSlotText(slot);
-      view.label.color =
-        slot.hero && highlighted
-          ? new Color(255, 238, 96, 255)
-          : slot.hero
-            ? Color.WHITE
-            : new Color(210, 218, 226, 180);
-      view.graphics.clear();
+      if (view.label) {
+        view.label.string = this.getSlotText(slot);
+        view.label.color =
+          slot.hero && highlighted
+            ? new Color(255, 238, 96, 255)
+            : slot.hero
+              ? Color.WHITE
+              : new Color(210, 218, 226, 180);
+      }
+      view.graphics?.clear();
       this.refreshSlotPortrait(view, slot);
     }
   }
@@ -240,6 +242,10 @@ export class GridPlacementSystem {
   }
 
   private createSlotButton(slot: GridSlotState): ButtonView {
+    if (this.isFixedCompanionSlot(slot)) {
+      return this.createFixedCompanionSlot(slot);
+    }
+
     const rect = this.getVisualSlotRect(slot);
     const view = this.createButton(
       '',
@@ -253,16 +259,7 @@ export class GridPlacementSystem {
     this.setUiLayer(unitNode);
     unitNode.setPosition(rect.x, rect.y, 0);
     view.unitNode = unitNode;
-    const button = view.node.getComponent(Button);
-    if (button) {
-      button.interactable = !slot.reservedBy;
-    }
-
     view.node.on(Button.EventType.CLICK, () => {
-      if (this.isFixedCompanionSlot(slot)) {
-        return;
-      }
-
       if (!this.pendingHeroName) {
         return;
       }
@@ -282,6 +279,26 @@ export class GridPlacementSystem {
     });
 
     return view;
+  }
+
+  private createFixedCompanionSlot(slot: GridSlotState): ButtonView {
+    const rect = this.getVisualSlotRect(slot);
+    const node = new Node(`FixedCompanionSlot${slot.index}`);
+    this.setUiLayer(node);
+
+    const unitNode = new Node(`WallSlotUnit${slot.index}`);
+    this.setUiLayer(unitNode);
+    unitNode.setPosition(rect.x, rect.y, 0);
+
+    return {
+      node,
+      unitNode,
+      width: rect.width,
+      height: rect.height,
+      baseColor: this.getSlotColor(slot),
+      baseX: rect.x,
+      baseY: rect.y,
+    };
   }
 
   private getSlotText(slot: GridSlotState): string {

@@ -265,6 +265,11 @@ runTest('deployable positions keep invisible hit targets without ground circles'
     'private createSlotButton(',
     'private getSlotText(',
   );
+  const createFixedCompanionSlotSource = sourceSection(
+    gridPlacementSource,
+    'private createFixedCompanionSlot(',
+    'private getSlotText(',
+  );
   const reservedSlotHelperSource = sourceSection(
     gridPlacementSource,
     'private isFixedCompanionSlot(',
@@ -313,13 +318,13 @@ runTest('deployable positions keep invisible hit targets without ground circles'
     getVisualSlotRectSource,
     /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
   );
+  assert.match(createSlotButtonSource, /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return this\.createFixedCompanionSlot\(slot\);\s*\}/s);
+  assert.doesNotMatch(createFixedCompanionSlotSource, /UITransform/);
+  assert.doesNotMatch(createFixedCompanionSlotSource, /addComponent\(Button\)/);
+  assert.doesNotMatch(createFixedCompanionSlotSource, /\.on\(Button\.EventType\.CLICK/);
   assert.match(
     createSlotButtonSource,
-    /const button = view\.node\.getComponent\(Button\);\s*if \(button\) \{\s*button\.interactable = !slot\.reservedBy;\s*\}/s,
-  );
-  assert.match(
-    createSlotButtonSource,
-    /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return;\s*\}\s*if \(!this\.pendingHeroName\) \{/s,
+    /view\.node\.on\(Button\.EventType\.CLICK, \(\) => \{\s*if \(!this\.pendingHeroName\) \{/s,
   );
   assert.match(reservedSlotHelperSource, /return slot\.reservedBy === 'fixed_companion';/);
   assert.match(
