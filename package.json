@@ -6,6 +6,7 @@
     "test:mvp": "tsx tools/mvp-model.test.ts",
     "test:spine-import": "tsx tools/spine-import.test.ts",
     "test:thunder-mage-import": "tsx tools/thunder-mage-spine-import.test.ts",
+    "test:qinglan-import": "tsx tools/qinglan-spine-import.test.ts",
     "test:terrain": "tsx tools/terrain-system.test.ts",
     "test:ui-layout": "tsx tools/ui-layout-v4.test.ts",
     "test:hud-polish": "tsx tools/battle-hud-polish.test.ts",
