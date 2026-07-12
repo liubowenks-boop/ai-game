@@ -117,7 +117,7 @@ runTest('vfx presets map every battle role to a distinct readable element', () =
 });
 
 runTest('vfx textures and presets stay inside the approved production budget', () => {
-  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 10);
+  assert.equal(Object.keys(BATTLE_VFX_TEXTURES).length, 11);
   assert.equal(Object.keys(BATTLE_VFX_PRESETS).length, 10);
 
   for (const preset of Object.values(BATTLE_VFX_PRESETS)) {
@@ -126,7 +126,20 @@ runTest('vfx textures and presets stay inside the approved production budget', (
     assert.ok(preset.impactLife >= 0.18 && preset.impactLife <= 0.65);
     assert.ok(preset.criticalLife <= 0.9);
     assert.ok(preset.presentationInterval >= 0.65 && preset.presentationInterval <= 0.85);
+    assert.ok(preset.projectileScale >= 0.55 && preset.projectileScale <= 1.2);
+    assert.ok(preset.impactScale >= 0.45 && preset.impactScale <= 0.9);
+    assert.ok(preset.glowScale >= 1.15 && preset.glowScale <= 1.8);
+    assert.ok(preset.trailInterval >= 0.018 && preset.trailInterval <= 0.05);
+    assert.ok(preset.travelSeconds >= 0.23 && preset.travelSeconds <= 0.38);
   }
+
+  assert.ok(BATTLE_VFX_PRESETS.main_fire_gold.projectileScale >= 0.8);
+  assert.ok(BATTLE_VFX_PRESETS.main_fire_gold.impactScale >= 0.65);
+  assert.equal(BATTLE_VFX_PRESETS.main_fire_gold.travelSeconds, 0.38);
+  assert.equal(BATTLE_VFX_PRESETS.thunder.travelSeconds, 0.31);
+  assert.equal(BATTLE_VFX_PRESETS.gold_arrow.travelSeconds, 0.23);
+  assert.equal(BATTLE_VFX_PRESETS.fire_blast.travelSeconds, 0.28);
+  assert.equal(BATTLE_VFX_PRESETS.thunder.beam, true);
 });
 
 runTest('hero attack presentation throttles per hero and resets cleanly', () => {
@@ -166,12 +179,13 @@ runTest('critical reservations evict only the oldest decorative effect', () => {
   });
 });
 
-runTest('authored v2 textures keep alpha, metadata and manifest entries', () => {
+runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries', () => {
   const directory = join(process.cwd(), 'assets', 'bundles', 'ui', 'battle_fx_common');
   const expected = new Map<string, readonly [number, number]>([
     ['fx_v2_gold_projectile.png', [512, 128]],
     ['fx_v2_fire_slash.png', [512, 256]],
     ['fx_v2_thunder_bolt.png', [512, 128]],
+    ['fx_v2_thunder_impact.png', [512, 512]],
     ['fx_v2_ice_shard.png', [256, 128]],
     ['fx_v2_poison_wisp.png', [256, 256]],
     ['fx_v2_heal_orb.png', [256, 256]],
@@ -179,6 +193,10 @@ runTest('authored v2 textures keep alpha, metadata and manifest entries', () => 
     ['fx_v2_hit_star.png', [256, 256]],
     ['fx_v2_smoke_debris.png', [256, 256]],
     ['fx_v2_rune_marker.png', [256, 128]],
+    ['fx_v3_hit_fire_eruption.png', [512, 512]],
+    ['fx_v3_hit_thunder_crater.png', [512, 512]],
+    ['fx_v3_hit_poison_talisman.png', [512, 512]],
+    ['fx_v3_hit_gold_starburst.png', [512, 512]],
   ]);
 
   for (const [filename, size] of expected) {
@@ -207,8 +225,9 @@ runTest('authored v2 textures keep alpha, metadata and manifest entries', () => 
   }
 
   const generatorSource = readFileSync('tools/generate_ui_art_assets.py', 'utf8');
-  assert.ok(generatorSource.includes('spec.filename.startswith("fx_v2_")'));
+  assert.ok(generatorSource.includes('spec.filename.startswith(("fx_v2_", "fx_v3_"))'));
   assert.ok(generatorSource.includes('missing authored VFX texture'));
+  assert.ok(generatorSource.includes('"--manifest-only"'));
 });
 
 runTest('runtime vfx system owns pooled particle lifecycle and additive blending', () => {
@@ -222,6 +241,22 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
   assert.match(source, /resetSystem\(\)/);
   assert.match(source, /stopSystem\(\)/);
   assert.match(source, /gfx\.BlendFactor\.ONE/);
+  assert.match(source, /assetManager\.loadAny\(spec\.textureUuid \?\? spec\.uuid/);
+  assert.equal(source.includes("assetManager.loadBundle('ui'"), false);
+  assert.match(source, /trailPool/);
+  assert.match(source, /spawnTrailEcho\(/);
+  assert.match(source, /playSourceFlash\(/);
+  assert.match(source, /playLayeredImpact\(/);
+  assert.equal(source.includes('fallbackSegments'), false);
+  assert.equal(source.includes('fallbackBursts'), false);
+  assert.equal(source.includes('BattleVfxGraphicsFallback'), false);
+  assert.equal(source.includes('addComponent(Graphics)'), false);
+  assert.equal(source.includes('lineWidth = 5'), false);
+  assert.match(source, /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireSprite/);
+  assert.match(source, /this\.reclaimEvictedReservations\(\);\s*const handle = this\.acquireParticle/);
+  assert.match(source, /available\.node\.parent !== parent/);
+  assert.match(source, /particle\.duration \+ particle\.life \+ particle\.lifeVar/);
+  assert.match(source, /spriteFrame = null;\s*handle\.particle\.stopSystem\(\)/);
   assert.match(source, /clear\(\)/);
   assert.match(source, /dispose\(\)/);
   assert.equal(source.includes('autoRemoveOnFinish = true'), false);

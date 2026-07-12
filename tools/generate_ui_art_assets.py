@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -673,23 +674,24 @@ def read_cocos_meta_ids(path: Path) -> tuple[str | None, str | None]:
     return meta.get("uuid"), texture_uuid
 
 
-def main() -> None:
+def main(manifest_only: bool = False) -> None:
     specs = parse_checklist()
     RUNTIME_ROOT.mkdir(parents=True, exist_ok=True)
     DOC_ROOT.mkdir(parents=True, exist_ok=True)
 
-    for spec in specs:
-        target_dir = RUNTIME_ROOT / spec.atlas
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_path = target_dir / spec.filename
-        if spec.filename.startswith("fx_v2_"):
-            if not target_path.exists():
-                raise FileNotFoundError(f"missing authored VFX texture: {target_path}")
-            continue
-        img = draw_asset(spec)
-        if img.size != (spec.width, spec.height):
-            img = img.resize((spec.width, spec.height), Image.Resampling.LANCZOS)
-        img.save(target_path, optimize=True)
+    if not manifest_only:
+        for spec in specs:
+            target_dir = RUNTIME_ROOT / spec.atlas
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_path = target_dir / spec.filename
+            if spec.filename.startswith(("fx_v2_", "fx_v3_")):
+                if not target_path.exists():
+                    raise FileNotFoundError(f"missing authored VFX texture: {target_path}")
+                continue
+            img = draw_asset(spec)
+            if img.size != (spec.width, spec.height):
+                img = img.resize((spec.width, spec.height), Image.Resampling.LANCZOS)
+            img.save(target_path, optimize=True)
 
     manifest = []
     for spec in specs:
@@ -708,7 +710,8 @@ def main() -> None:
         encoding="utf-8",
     )
     write_ts_manifest(manifest)
-    write_previews(specs)
+    if not manifest_only:
+        write_previews(specs)
     write_prompts(specs)
 
     print(
@@ -727,4 +730,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate UI art assets and manifests.")
+    parser.add_argument(
+        "--manifest-only",
+        action="store_true",
+        help="Refresh manifests without redrawing runtime textures or atlas previews.",
+    )
+    args = parser.parse_args()
+    main(manifest_only=args.manifest_only)
