@@ -48,7 +48,7 @@ import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
 import { BattleTerrainPresentation } from './BattleTerrainPresentation';
 import { BattleVfxSystem } from './BattleVfxSystem';
-import { ThunderMagePresentation } from './ThunderMagePresentation';
+import { VideoCharacterPresentation } from './VideoCharacterPresentation';
 import {
   UnitAnimationRuntime,
   computeProceduralAnimationPose,
@@ -99,7 +99,7 @@ export class BattleController extends Component {
   private playerAttackSpineLoaded = false;
   private pendingPlayerAttackSpine = false;
   private playerAttackSpinePlaybackSpeed = PLAYER_ATTACK_SPINE_SPEED;
-  private thunderMagePresentation!: ThunderMagePresentation;
+  private videoCharacterPresentation!: VideoCharacterPresentation;
   private terrainPresentation!: BattleTerrainPresentation;
   private battleVfx!: BattleVfxSystem;
   private startButtonLabel!: Label;
@@ -157,7 +157,7 @@ export class BattleController extends Component {
     }
 
     const presentationDelta = Math.min(deltaTime, 1 / 30);
-    this.thunderMagePresentation.update(presentationDelta);
+    this.videoCharacterPresentation.update(presentationDelta);
     this.cityHealthBarView.update(deltaTime);
 
     if (this.upgradeCardSystem.isShowing()) {
@@ -171,7 +171,10 @@ export class BattleController extends Component {
 
     const result = this.model.tick(deltaTime);
 
-    this.thunderMagePresentation.handleTickResult(result, this.model.getCompanionAttackInterval());
+    this.videoCharacterPresentation.handleTickResult(
+      result,
+      this.model.getCompanionAttackInterval(),
+    );
     this.gridPlacementSystem.handleTickResult(result);
     this.requestPlayerAnimationFromResult(result);
     this.processReadabilityResult(result);
@@ -250,7 +253,7 @@ export class BattleController extends Component {
       this.model,
       this.battleVfx,
     );
-    this.thunderMagePresentation = new ThunderMagePresentation(
+    this.videoCharacterPresentation = new VideoCharacterPresentation(
       this.terrainPresentation.layers.units,
       (node) => this.setUiLayer(node),
       this.battleVfx,
@@ -281,7 +284,7 @@ export class BattleController extends Component {
       return;
     }
 
-    this.thunderMagePresentation.clear();
+    this.videoCharacterPresentation.clear();
     this.battleVfx.clear();
     this.clearReadabilityFeedback();
   }

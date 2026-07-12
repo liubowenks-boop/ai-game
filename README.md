@@ -68,6 +68,13 @@
 - 实际攻击间隔会受鼓手等攻速增益影响；动画时长与该实际间隔同步，并限制在 `0.25` 至 `1.2` 秒之间。
 - 攻击使用蓝白雷击和透明命中爆发；主角原有 Spine 动画、金色飞弹与命中特效保持不变。
 
+## 视频雷法师
+
+- 原始 3.04 秒 MP4 已转换为 `assets/resources/video_character/thunder_mage_video_atlas.png` 透明序列帧图集；不使用 GIF，也不依赖 Cocos 的原生视频覆盖层。
+- `VideoCharacterPresentation.ts` 已替代原 Spine 雷法师的显示层，沿用原城墙站位、攻击事件、弹道和命中特效；完整 73 帧动作会动态压缩到当前实际攻击间隔内，攻速变化时同步加速，每次攻击事件从首帧重新播放。
+- 图集中的每一帧带有独立透明安全边距，避免双线性采样读取相邻帧而产生蓝色矩形边框。
+- 如需替换视频，运行 `python3 tools/prepare-video-character-atlas.py <input.mp4> assets/resources/video_character/thunder_mage_video_atlas.png`，然后在 Cocos Creator 中刷新资源。
+
 ## 写实沙关地形
 
 - 地形保持原有沙关、荒漠废墟主题，资源位于 `assets/bundles/battle_common/`。
