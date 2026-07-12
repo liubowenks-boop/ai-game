@@ -197,6 +197,8 @@ const UPGRADE_OFFER_ROTATION: UpgradeCardId[][] = [
   ['fire_spread_plus_1', 'thunder_crit_plus_10', 'summon_hero_damage_20'],
 ];
 
+const EARLY_WAVE_HP_MULTIPLIER = 1.15;
+
 export class BattleMvpModel {
   public readonly options: BattleMvpOptions;
   public readonly playerPosition: BattlePoint;
@@ -565,7 +567,10 @@ export class BattleMvpModel {
 
   private spawnWaveEnemy(kind: EnemyKind, x: number, power: number): EnemyState {
     const config = this.getEnemyConfig(kind);
-    const hp = this.options.enemyBaseHp * config.hpMultiplier * power;
+    const earlyWaveHpMultiplier = this.wave >= 1 && this.wave <= 3
+      ? EARLY_WAVE_HP_MULTIPLIER
+      : 1;
+    const hp = this.options.enemyBaseHp * config.hpMultiplier * power * earlyWaveHpMultiplier;
     const speed =
       this.options.enemyBaseSpeed *
       config.speedMultiplier *

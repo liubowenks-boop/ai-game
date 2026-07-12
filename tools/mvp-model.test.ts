@@ -606,6 +606,22 @@ runTest('wave rhythm produces tutorial waves, elite wave, and a pressure boss on
   assert.ok(wave5[0].damage > model.options.enemyDamage);
 });
 
+runTest('raises only waves 1-3 enemy health by fifteen percent', () => {
+  const waveModel = new BattleMvpModel({ enemyBaseHp: 100 });
+  const directSpawnModel = new BattleMvpModel({ enemyBaseHp: 100 });
+
+  const wave1 = waveModel.spawnWave();
+  const wave2 = waveModel.spawnWave();
+  const wave3 = waveModel.spawnWave();
+  const wave4 = waveModel.spawnWave();
+
+  assert.equal(wave1[0].maxHp, 100 * 0.9 * 0.65 * 1.15);
+  assert.equal(wave2[0].maxHp, 100 * 0.9 * 0.7 * 1.15);
+  assert.equal(wave3[0].maxHp, 100 * 0.9 * 0.75 * 1.15);
+  assert.equal(wave4[0].maxHp, 100 * 1.8 * 0.8);
+  assert.equal(directSpawnModel.spawnEnemy({ kind: 'normal' }).maxHp, 90);
+});
+
 runTest('recruited adjacent same-name heroes merge up to level 4', () => {
   const model = new BattleMvpModel({
     heroBaseDps: 5,
