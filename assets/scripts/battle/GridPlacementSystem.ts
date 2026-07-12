@@ -42,7 +42,9 @@ export class GridPlacementSystem {
   private pendingMessage = '';
   private readonly root: Node;
   private readonly unitRoot: Node;
+  private readonly titleNode: Node;
   private readonly titleLabel: Label;
+  private readonly pendingNode: Node;
   private readonly pendingLabel: Label;
   private readonly slotButtons: ButtonView[] = [];
   private highlightedHeroId = 0;
@@ -70,6 +72,7 @@ export class GridPlacementSystem {
       BattleUiV4Layout.placementTitle.width,
       BattleUiV4Layout.placementTitle.height,
     );
+    this.titleNode = title.node;
     this.titleLabel = title.label;
     this.root.addChild(title.node);
 
@@ -82,6 +85,7 @@ export class GridPlacementSystem {
       BattleUiV4Layout.placementPending.width,
       BattleUiV4Layout.placementPending.height,
     );
+    this.pendingNode = pending.node;
     this.pendingLabel = pending.label;
     this.root.addChild(pending.node);
 
@@ -98,6 +102,9 @@ export class GridPlacementSystem {
   }
 
   public refresh(): void {
+    const placementActive = Boolean(this.pendingHeroName);
+    this.titleNode.active = placementActive;
+    this.pendingNode.active = placementActive;
     this.titleLabel.string = t('grid.title', {
       heroes: this.model.getHeroes().length,
       maxHeroes: this.model.build.summon.maxBoardHeroes,
@@ -326,7 +333,7 @@ export class GridPlacementSystem {
       view.portraitNode.destroy();
     }
 
-    const portraitSize = view.width - 16;
+    const portraitSize = Math.min(view.width - 16, BATTLE_WALL_LAYOUT.ordinaryHeroBaseSize);
     const portraitNode = new Node('SlotHeroPortraitMask');
     this.setUiLayer(portraitNode);
     const portraitTransform = portraitNode.addComponent(UITransform);

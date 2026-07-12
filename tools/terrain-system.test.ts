@@ -130,6 +130,9 @@ runTest('terrain config fixes the wall and five-unit formation coordinates', () 
 runTest('terrain config defines the seven modular assets and stable render roots', () => {
   assert.equal(BATTLE_TERRAIN_LAYERS.find((layer) => layer.id === 'ruinsLeft')?.x, -237.6);
   assert.equal(BATTLE_TERRAIN_LAYERS.find((layer) => layer.id === 'ruinsRight')?.x, 237.6);
+  for (const layer of BATTLE_TERRAIN_LAYERS) {
+    assert.equal(layer.path, layer.filename.replace(/\.png$/, ''));
+  }
   assert.deepEqual(
     BATTLE_TERRAIN_LAYERS.map((layer) => ({
       id: layer.id,
@@ -191,7 +194,7 @@ runTest('terrain config defines the seven modular assets and stable render roots
     ],
   );
 
-  assert.ok(BATTLE_TERRAIN_LAYERS.every((layer) => layer.path.startsWith('battle_common/')));
+  assert.ok(BATTLE_TERRAIN_LAYERS.every((layer) => !layer.path.includes('/')));
   assert.deepEqual(BATTLE_TERRAIN_RENDER_ROOTS, {
     enemies: 'EnemiesLayer',
     unitBacking: 'WallUnitBackingRings',
@@ -206,22 +209,13 @@ runTest('required terrain layers switch atomically while optional failures degra
   assert.equal(resolveBattleTerrainMode(pending, BATTLE_TERRAIN_LAYERS), 'loading');
 
   const baseAndBackReady = { ...pending, base: 'ready' as const, wallBack: 'ready' as const };
+  assert.equal(resolveBattleTerrainMode(baseAndBackReady, BATTLE_TERRAIN_LAYERS), 'loading');
   assert.equal(
-    resolveBattleTerrainMode(baseAndBackReady, BATTLE_TERRAIN_LAYERS),
-    'loading',
-  );
-  assert.equal(
-    resolveBattleTerrainMode(
-      { ...baseAndBackReady, wallFront: 'ready' },
-      BATTLE_TERRAIN_LAYERS,
-    ),
+    resolveBattleTerrainMode({ ...baseAndBackReady, wallFront: 'ready' }, BATTLE_TERRAIN_LAYERS),
     'modular',
   );
   assert.equal(
-    resolveBattleTerrainMode(
-      { ...baseAndBackReady, wallFront: 'failed' },
-      BATTLE_TERRAIN_LAYERS,
-    ),
+    resolveBattleTerrainMode({ ...baseAndBackReady, wallFront: 'failed' }, BATTLE_TERRAIN_LAYERS),
     'legacy',
   );
   assert.equal(
@@ -273,7 +267,10 @@ runTest('terrain asset files, alpha, metadata and generated UUID manifest agree'
           }
         }
         const visibleRatio = 1 - transparentPixels / (png.width * png.height);
-        assert.ok(visibleRatio > 0.08 && visibleRatio < 0.9, `${spec.filename} visible coverage drifted`);
+        assert.ok(
+          visibleRatio > 0.08 && visibleRatio < 0.9,
+          `${spec.filename} visible coverage drifted`,
+        );
         assert.ok(transparentPixels > 0, `${spec.filename} needs transparent padding`);
         assert.ok(opaquePixels > 0, `${spec.filename} needs opaque wall pixels`);
       } else {
@@ -311,9 +308,16 @@ runTest('terrain presentation owns atomic fallback and stable render roots', () 
   );
   assert.ok(existsSync(presentationPath), 'BattleTerrainPresentation.ts must exist');
   const source = readFileSync(presentationPath, 'utf8');
+  const bundleMeta = JSON.parse(
+    readFileSync(join(process.cwd(), 'assets', 'bundles', 'battle_common.meta'), 'utf8'),
+  );
+  assert.equal(bundleMeta.userData?.isBundle, true);
+  assert.equal(bundleMeta.userData?.bundleName, 'battle_common');
 
   assert.match(source, /BATTLE_TERRAIN_ASSET_UUIDS/);
-  assert.match(source, /assetManager\.loadAny/);
+  assert.match(source, /assetManager\.loadBundle\('battle_common'/);
+  assert.match(source, /bundle\.load\(spec\.path/);
+  assert.equal(source.includes('assetManager.loadAny'), false);
   assert.match(source, /createBattleTerrainLoadState/);
   assert.match(source, /resolveBattleTerrainMode/);
   assert.match(source, /LegacyBattleBackground/);
@@ -378,10 +382,7 @@ runTest('battle controller routes combat visuals through terrain render layers',
     controllerSource,
     /this\.createPlayerNode\(this\.terrainPresentation\.layers\.units\)/,
   );
-  assert.match(
-    controllerSource,
-    /new PlayerAutoAttackSystem\(this\.battleVfx\)/,
-  );
+  assert.match(controllerSource, /new PlayerAutoAttackSystem\(this\.battleVfx\)/);
   assert.match(
     controllerSource,
     /new GridPlacementSystem\(\s*this\.terrainPresentation\.layers\.unitBacking,\s*this\.terrainPresentation\.layers\.units,\s*this\.model,\s*this\.battleVfx,\s*\)/s,

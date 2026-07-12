@@ -134,63 +134,38 @@ function loadUiSpriteFrame(filename: string, done: (frame: SpriteFrame | null) =
     return;
   }
 
-  if (!spec.uuid) {
-    assetManager.loadBundle('ui', (bundleError, bundle) => {
-      if (bundleError || !bundle) {
+  assetManager.loadBundle('ui', (bundleError, bundle) => {
+    if (bundleError || !bundle) {
+      done(null);
+      return;
+    }
+    bundle.load(spec.path, (spriteError, asset) => {
+      if (spriteError || !asset) {
         done(null);
         return;
       }
-
-      bundle.load(spec.path, SpriteFrame, (spriteError, frame) => {
-        if (spriteError || !frame) {
-          done(null);
-          return;
-        }
-
-        if (spec.nineSlice) {
-          frame.insetLeft = spec.nineSlice.left;
-          frame.insetTop = spec.nineSlice.top;
-          frame.insetRight = spec.nineSlice.right;
-          frame.insetBottom = spec.nineSlice.bottom;
-        }
-
-        spriteFrameCache.set(filename, frame);
-        done(frame);
-      });
+      let frame: SpriteFrame | null = null;
+      if (asset instanceof SpriteFrame) {
+        frame = asset;
+      } else if (asset instanceof ImageAsset) {
+        frame = SpriteFrame.createWithImage(asset);
+      } else if (asset instanceof Texture2D) {
+        frame = new SpriteFrame();
+        frame.texture = asset;
+      }
+      if (!frame) {
+        done(null);
+        return;
+      }
+      if (spec.nineSlice) {
+        frame.insetLeft = spec.nineSlice.left;
+        frame.insetTop = spec.nineSlice.top;
+        frame.insetRight = spec.nineSlice.right;
+        frame.insetBottom = spec.nineSlice.bottom;
+      }
+      spriteFrameCache.set(filename, frame);
+      done(frame);
     });
-    return;
-  }
-
-  assetManager.loadAny(spec.uuid, (error, asset) => {
-    if (error || !asset) {
-      done(null);
-      return;
-    }
-
-    let frame: SpriteFrame | null = null;
-    if (asset instanceof SpriteFrame) {
-      frame = asset;
-    } else if (asset instanceof ImageAsset) {
-      frame = SpriteFrame.createWithImage(asset);
-    } else if (asset instanceof Texture2D) {
-      frame = new SpriteFrame();
-      frame.texture = asset;
-    }
-
-    if (!frame) {
-      done(null);
-      return;
-    }
-
-    if (spec.nineSlice) {
-      frame.insetLeft = spec.nineSlice.left;
-      frame.insetTop = spec.nineSlice.top;
-      frame.insetRight = spec.nineSlice.right;
-      frame.insetBottom = spec.nineSlice.bottom;
-    }
-
-    spriteFrameCache.set(filename, frame);
-    done(frame);
   });
 }
 
@@ -1024,12 +999,24 @@ export class CityHealthBarView {
     this.graphics.stroke();
 
     this.graphics.fillColor = uiColor(Color.BLACK, 188);
-    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(
+      trackLeft,
+      trackBottom,
+      trackWidth,
+      trackHeight,
+      BattleUiTokens.radius.md,
+    );
     this.graphics.fill();
 
     this.graphics.strokeColor = uiColor(BattleUiTokens.colors.strokeDark, 220);
     this.graphics.lineWidth = 2;
-    this.graphics.roundRect(trackLeft, trackBottom, trackWidth, trackHeight, BattleUiTokens.radius.md);
+    this.graphics.roundRect(
+      trackLeft,
+      trackBottom,
+      trackWidth,
+      trackHeight,
+      BattleUiTokens.radius.md,
+    );
     this.graphics.stroke();
 
     if (fillWidth > 0) {

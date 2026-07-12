@@ -46,6 +46,8 @@ interface SpriteHandle {
   reservation?: VfxReservation;
   critical: boolean;
   baseScale: number;
+  growth: number;
+  startAlpha: number;
   trailTimer: number;
   beam: boolean;
 }
@@ -58,8 +60,6 @@ interface ParticleHandle {
   duration: number;
   reservation?: VfxReservation;
 }
-
-const textureFrameCache = new Map<string, Promise<SpriteFrame | null>>();
 
 interface ImpactParticleProfile {
   readonly texture: BattleVfxTextureId;
@@ -167,20 +167,20 @@ export class BattleVfxSystem {
     if (this.preloadPromise) {
       return this.preloadPromise;
     }
-    this.preloadPromise = Promise.all(
-      Object.entries(BATTLE_VFX_TEXTURES).map(async ([textureId, filename]) => {
-        const frame = await loadVfxSpriteFrame(filename);
-        if (this.disposed) {
-          return;
-        }
-        if (frame) {
-          this.frames.set(textureId as BattleVfxTextureId, frame);
-        } else {
-          this.failedTextures.add(textureId as BattleVfxTextureId);
-          this.warnMissingTexture(textureId as BattleVfxTextureId, filename);
-        }
-      }),
-    ).then(() => {
+    this.preloadPromise = loadBattleVfxBundle().then(async (bundle) => {
+      if (this.disposed) return;
+      await Promise.all(
+        Object.entries(BATTLE_VFX_TEXTURES).map(async ([textureId, filename]) => {
+          const frame = bundle ? await loadVfxSpriteFrame(bundle, filename) : null;
+          if (this.disposed) return;
+          if (frame) {
+            this.frames.set(textureId as BattleVfxTextureId, frame);
+          } else {
+            this.failedTextures.add(textureId as BattleVfxTextureId);
+            this.warnMissingTexture(textureId as BattleVfxTextureId, filename);
+          }
+        }),
+      );
       console.info(
         `[BattleVfx] loaded ${this.frames.size}/${Object.keys(BATTLE_VFX_TEXTURES).length}; failed=${Array.from(this.failedTextures).join(',') || 'none'}`,
       );
@@ -476,6 +476,7 @@ export class BattleVfxSystem {
       this.feedbackRoot,
       0.34,
     );
+    this.playShockRing(preset, position, critical);
     this.playParticleBurst(preset, position, critical, priority);
     return true;
   }
@@ -599,10 +600,15 @@ export class BattleVfxSystem {
       if (!handle.active) continue;
       handle.age += delta;
       const progress = Math.min(1, handle.age / Math.max(0.001, handle.duration));
-      const scale = handle.baseScale * (1 + progress * 0.28);
+      const scale = handle.baseScale * (1 + progress * handle.growth);
       handle.node.setScale(scale, scale, 1);
       const color = handle.sprite.color;
-      handle.sprite.color = new Color(color.r, color.g, color.b, Math.floor(145 * (1 - progress)));
+      handle.sprite.color = new Color(
+        color.r,
+        color.g,
+        color.b,
+        Math.floor(handle.startAlpha * (1 - progress)),
+      );
       if (progress >= 1) this.releaseSprite(handle);
     }
   }
@@ -643,7 +649,9 @@ export class BattleVfxSystem {
     handle.active = true;
     handle.age = 0;
     handle.duration = duration;
-    handle.baseScale = scale * (1 + growth * 0.12);
+    handle.baseScale = scale;
+    handle.growth = growth;
+    handle.startAlpha = 145;
     handle.node.active = true;
     handle.node.setPosition(position.x, position.y, 0);
     handle.node.angle = angle;
@@ -654,7 +662,9 @@ export class BattleVfxSystem {
   }
 
   private playSourceFlash(preset: BattleVfxPreset, position: BattlePoint): void {
-    const frame = this.resolveFrame(preset.impactTexture);
+    const sourceTextureId =
+      BATTLE_VFX_TEXTURE_FALLBACKS[preset.impactTexture] ?? preset.impactTexture;
+    const frame = this.resolveFrame(sourceTextureId);
     if (!frame) return;
     this.spawnTrailEcho(
       frame,
@@ -665,6 +675,36 @@ export class BattleVfxSystem {
       Math.min(0.28, preset.travelSeconds),
       this.feedbackRoot,
       0.26,
+    );
+  }
+
+  private playShockRing(preset: BattleVfxPreset, position: BattlePoint, critical: boolean): void {
+    const frame = this.resolveFrame('runeMarker');
+    if (!frame) return;
+    const handle = this.acquireSprite(
+      this.trailPool,
+      'VfxShockRing',
+      this.feedbackRoot,
+      BATTLE_VFX_BUDGET.maxActiveTrails,
+    );
+    if (!handle) return;
+    handle.active = true;
+    handle.age = 0;
+    handle.duration = critical ? 0.3 : 0.22;
+    handle.baseScale = preset.impactScale * (critical ? 0.7 : 0.56);
+    handle.growth = critical ? 1.15 : 0.92;
+    handle.startAlpha = critical ? 225 : 190;
+    handle.node.active = true;
+    handle.node.setPosition(position.x, position.y + 6, 0);
+    handle.node.angle = 0;
+    this.fitSpriteToFrame(handle.node, frame, 240);
+    handle.node.setScale(handle.baseScale, handle.baseScale, 1);
+    handle.sprite.spriteFrame = frame;
+    handle.sprite.color = new Color(
+      preset.hitColor[0],
+      preset.hitColor[1],
+      preset.hitColor[2],
+      handle.startAlpha,
     );
   }
 
@@ -724,6 +764,8 @@ export class BattleVfxSystem {
       to: new Vec3(),
       critical: false,
       baseScale: 1,
+      growth: 0.28,
+      startAlpha: 145,
       trailTimer: 0,
       beam: false,
     };
@@ -754,6 +796,8 @@ export class BattleVfxSystem {
     handle.reservation = undefined;
     handle.critical = false;
     handle.baseScale = 1;
+    handle.growth = 0.28;
+    handle.startAlpha = 145;
     handle.trailTimer = 0;
     handle.beam = false;
     handle.sprite.spriteFrame = null;
@@ -796,16 +840,20 @@ export class BattleVfxSystem {
   }
 }
 
-function loadVfxSpriteFrame(filename: string): Promise<SpriteFrame | null> {
-  const cached = textureFrameCache.get(filename);
-  if (cached) return cached;
-  const promise = new Promise<SpriteFrame | null>((resolve) => {
+function loadBattleVfxBundle(): Promise<unknown | null> {
+  return new Promise((resolve) => {
+    assetManager.loadBundle('ui', (error, bundle) => resolve(error ? null : bundle));
+  });
+}
+
+function loadVfxSpriteFrame(bundle: any, filename: string): Promise<SpriteFrame | null> {
+  return new Promise((resolve) => {
     const spec = getUiArtAsset(filename);
-    if (!spec?.uuid) {
+    if (!spec?.path) {
       resolve(null);
       return;
     }
-    assetManager.loadAny(spec.textureUuid ?? spec.uuid, (error, asset) => {
+    bundle.load(spec.path, (error, asset) => {
       if (error || !asset) {
         resolve(null);
         return;
@@ -827,6 +875,4 @@ function loadVfxSpriteFrame(filename: string): Promise<SpriteFrame | null> {
       resolve(null);
     });
   });
-  textureFrameCache.set(filename, promise);
-  return promise;
 }

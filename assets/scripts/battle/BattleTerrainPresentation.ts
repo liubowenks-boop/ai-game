@@ -110,9 +110,18 @@ export class BattleTerrainPresentation {
     this.loadState = createBattleTerrainLoadState(BATTLE_TERRAIN_LAYERS);
     this.applyMode();
 
-    for (const spec of BATTLE_TERRAIN_LAYERS) {
-      this.loadTerrainLayer(spec, generation);
-    }
+    assetManager.loadBundle('battle_common', (error, bundle) => {
+      if (generation !== this.loadGeneration || this.disposed) return;
+      if (error || !bundle) {
+        for (const spec of BATTLE_TERRAIN_LAYERS) {
+          this.failLayer(spec, error ?? new Error('battle_common bundle unavailable'));
+        }
+        return;
+      }
+      for (const spec of BATTLE_TERRAIN_LAYERS) {
+        this.loadTerrainLayer(bundle, spec, generation);
+      }
+    });
   }
 
   public dispose(): void {
@@ -124,14 +133,8 @@ export class BattleTerrainPresentation {
     this.loadGeneration += 1;
   }
 
-  private loadTerrainLayer(spec: BattleTerrainLayerSpec, generation: number): void {
-    const uuid = BATTLE_TERRAIN_ASSET_UUIDS[spec.filename];
-    if (!uuid) {
-      this.failLayer(spec, new Error(`Missing UUID for ${spec.filename}`));
-      return;
-    }
-
-    assetManager.loadAny(uuid, (error, asset) => {
+  private loadTerrainLayer(bundle: any, spec: BattleTerrainLayerSpec, generation: number): void {
+    bundle.load(spec.path, (error, asset) => {
       const node = this.terrainNodes.get(spec.id);
       if (
         generation !== this.loadGeneration ||

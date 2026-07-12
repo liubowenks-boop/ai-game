@@ -262,6 +262,9 @@ runTest('authored v2 and v3 textures keep alpha, metadata and manifest entries',
 
 runTest('runtime vfx system owns pooled particle lifecycle and additive blending', () => {
   const source = readFileSync('assets/scripts/battle/BattleVfxSystem.ts', 'utf8');
+  const bundleMeta = JSON.parse(readFileSync('assets/bundles/ui.meta', 'utf8'));
+  assert.equal(bundleMeta.userData?.isBundle, true);
+  assert.equal(bundleMeta.userData?.bundleName, 'ui');
   assert.match(source, /class BattleVfxSystem/);
   assert.match(source, /async preload\(\)/);
   assert.match(source, /playAttackEvent\(/);
@@ -271,12 +274,20 @@ runTest('runtime vfx system owns pooled particle lifecycle and additive blending
   assert.match(source, /resetSystem\(\)/);
   assert.match(source, /stopSystem\(\)/);
   assert.match(source, /gfx\.BlendFactor\.ONE/);
-  assert.match(source, /assetManager\.loadAny\(spec\.textureUuid \?\? spec\.uuid/);
-  assert.equal(source.includes("assetManager.loadBundle('ui'"), false);
+  assert.match(source, /assetManager\.loadBundle\('ui'/);
+  assert.match(source, /bundle\.load\(spec\.path/);
+  assert.equal(source.includes('assetManager.loadAny'), false);
   assert.match(source, /trailPool/);
   assert.match(source, /spawnTrailEcho\(/);
   assert.match(source, /playSourceFlash\(/);
   assert.match(source, /playLayeredImpact\(/);
+  assert.match(source, /playShockRing\(/);
+  assert.match(source, /this\.playShockRing\(preset, position, critical\)/);
+  assert.match(source, /handle\.duration = critical \? 0\.3 : 0\.22/);
+  assert.match(
+    source,
+    /BATTLE_VFX_TEXTURE_FALLBACKS\[preset\.impactTexture\] \?\? preset\.impactTexture/,
+  );
   assert.match(source, /resolveFrame\(/);
   assert.match(source, /BATTLE_VFX_TEXTURE_FALLBACKS/);
   assert.match(source, /resolveParticleFrame\(/);

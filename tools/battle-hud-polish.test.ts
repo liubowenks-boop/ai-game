@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
 import { computeProceduralAnimationPose } from '../assets/scripts/battle/UnitAnimationSystem';
+import { BATTLE_WALL_LAYOUT } from '../assets/scripts/data/BattleTerrainConfig';
 import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
 
 const gridPlacementSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
@@ -34,6 +35,13 @@ function requireRect(key: keyof typeof BattleUiV4Layout): RectSpec {
   assert.ok(rect, `${String(key)} should exist`);
   return rect;
 }
+
+runTest('ui bundle textures convert image and texture assets into sprite frames', () => {
+  assert.match(battleUiComponentsSource, /bundle\.load\(spec\.path, \(spriteError, asset\)/);
+  assert.match(battleUiComponentsSource, /asset instanceof ImageAsset/);
+  assert.match(battleUiComponentsSource, /asset instanceof Texture2D/);
+  assert.equal(battleUiComponentsSource.includes('bundle.load(spec.path, SpriteFrame'), false);
+});
 
 runTest('formation uses one aligned wall row with a protected main-hero center', () => {
   const formation = [
@@ -78,6 +86,16 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
   assert.deepEqual(model.playerPosition, { x: 0, y: -270 });
   assert.match(battleControllerSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
   assert.match(gridPlacementSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
+  const maximumOrdinaryHeroWidth =
+    BATTLE_WALL_LAYOUT.ordinaryHeroBaseSize * BATTLE_WALL_LAYOUT.unitVisualScale * 1.08;
+  assert.ok(
+    maximumOrdinaryHeroWidth < 120,
+    'animated ordinary heroes must stay inside slot spacing',
+  );
+  assert.match(
+    gridPlacementSource,
+    /Math\.min\(view\.width - 16, BATTLE_WALL_LAYOUT\.ordinaryHeroBaseSize\)/,
+  );
 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;
@@ -112,6 +130,12 @@ runTest('formation uses one aligned wall row with a protected main-hero center',
   assert.equal(BattleUiV4Layout.placementTitle.y, -424);
   assert.equal(BattleUiV4Layout.placementPending.y, -424);
   assert.equal(BattleUiV4Layout.heroBar.y, -552);
+});
+
+runTest('placement status labels only appear while a hero is awaiting placement', () => {
+  assert.match(gridPlacementSource, /const placementActive = Boolean\(this\.pendingHeroName\)/);
+  assert.match(gridPlacementSource, /this\.titleNode\.active = placementActive/);
+  assert.match(gridPlacementSource, /this\.pendingNode\.active = placementActive/);
 });
 
 runTest('five fixed portrait slots fit the hero rail without overlap', () => {
@@ -301,7 +325,10 @@ runTest('deployable positions keep invisible hit targets without ground circles'
     refreshSlotPortraitSource,
     /if \(this\.isFixedCompanionSlot\(slot\) && !slot\.hero\) \{\s*if \(view\.portraitNode\) \{\s*view\.portraitNode\.active = false;\s*\}\s*view\.portraitFilename = '';\s*return;\s*\}/s,
   );
-  assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
+  assert.match(
+    refreshSlotPortraitSource,
+    /const portraitSize = Math\.min\(view\.width - 16, BATTLE_WALL_LAYOUT\.ordinaryHeroBaseSize\);/,
+  );
   assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);
   assert.match(
     refreshSlotPortraitSource,
