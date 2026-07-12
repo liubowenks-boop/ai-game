@@ -614,11 +614,24 @@ runTest('raises only waves 1-3 enemy health by fifteen percent', () => {
   const wave2 = waveModel.spawnWave();
   const wave3 = waveModel.spawnWave();
   const wave4 = waveModel.spawnWave();
+  const wave5 = waveModel.spawnWave();
+  const wave6 = waveModel.spawnWave();
 
   assert.equal(wave1[0].maxHp, 100 * 0.9 * 0.65 * 1.15);
+  assert.equal(wave1[0].hp, wave1[0].maxHp);
   assert.equal(wave2[0].maxHp, 100 * 0.9 * 0.7 * 1.15);
+  assert.equal(wave2[1].maxHp, 100 * 0.6 * 0.7 * 1.15);
+  assert.equal(wave2[1].hp, wave2[1].maxHp);
   assert.equal(wave3[0].maxHp, 100 * 0.9 * 0.75 * 1.15);
+  assert.equal(wave3[1].maxHp, 100 * 0.6 * 0.75 * 1.15);
+  assert.equal(wave3[1].hp, wave3[1].maxHp);
+  assert.equal(wave3[2].maxHp, 100 * 1.8 * 0.75 * 1.15);
+  assert.equal(wave3[2].hp, wave3[2].maxHp);
   assert.equal(wave4[0].maxHp, 100 * 1.8 * 0.8);
+  assert.equal(wave5[0].maxHp, 100 * 7);
+  assert.equal(wave5[0].hp, wave5[0].maxHp);
+  assert.equal(wave6[0].maxHp, 100 * 0.9 * 0.81);
+  assert.equal(wave6[0].hp, wave6[0].maxHp);
   assert.equal(directSpawnModel.spawnEnemy({ kind: 'normal' }).maxHp, 90);
 });
 
