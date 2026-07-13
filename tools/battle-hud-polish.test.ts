@@ -8,6 +8,7 @@ import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/B
 
 const gridPlacementSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
 const battleUiComponentsSource = readFileSync('assets/scripts/ui/BattleUiComponents.ts', 'utf8');
+const battleHudViewSource = readFileSync('assets/scripts/ui/BattleHudView.ts', 'utf8');
 const battleControllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 const upgradeCardSystemSource = readFileSync(
   'assets/scripts/roguelike/UpgradeCardSystem.ts',
@@ -183,19 +184,12 @@ runTest('five fixed portrait slots fit the hero rail without overlap', () => {
   const mainHeroUnit = requireRect('mainHeroUnit');
   const placementTitle = requireRect('placementTitle');
   const placementPending = requireRect('placementPending');
-  const cityHealthBar = requireRect('cityHealthBar');
-  const wallSlotOrdinary1 = requireRect('wallSlotOrdinary1');
 
   assert.equal(rectsOverlap(mainHeroUnit, placementTitle), false);
   assert.equal(rectsOverlap(mainHeroUnit, placementPending), false);
   assert.equal(rectsOverlap(mainHeroUnit, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
-  assert.equal(rectsOverlap(cityHealthBar, wallSlotOrdinary1), false);
-  assert.deepEqual(cityHealthBar, { x: 0, y: -468, width: 430, height: 48 });
-  const healthBottom = cityHealthBar.y - cityHealthBar.height / 2;
-  const railTop = BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2;
-  assert.equal(healthBottom - railTop, 12);
 });
 
 runTest('bottom rail creates five text-free rectangular portrait slots', () => {
@@ -318,7 +312,10 @@ runTest('deployable positions keep invisible hit targets without ground circles'
     getVisualSlotRectSource,
     /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
   );
-  assert.match(createSlotButtonSource, /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return this\.createFixedCompanionSlot\(slot\);\s*\}/s);
+  assert.match(
+    createSlotButtonSource,
+    /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return this\.createFixedCompanionSlot\(slot\);\s*\}/s,
+  );
   assert.doesNotMatch(createFixedCompanionSlotSource, /UITransform/);
   assert.doesNotMatch(createFixedCompanionSlotSource, /addComponent\(Button\)/);
   assert.doesNotMatch(createFixedCompanionSlotSource, /\.on\(Button\.EventType\.CLICK/);
@@ -385,82 +382,44 @@ runTest('formation animation keeps ring centers fixed', () => {
   assert.equal(/view\.node\.angle/.test(updateAnimationsSource), false);
 });
 
-runTest('city health bar is fixed, immediate, and independently readable', () => {
-  const cityHealthBarViewSource = sourceSection(
+runTest('custom HUD owns every persistent battle readout', () => {
+  for (const rootName of [
+    'WaveHud',
+    'RemainingEnemiesHud',
+    'GoldHud',
+    'BossTitleHud',
+    'BossHealthHud',
+    'PauseResumeHud',
+    'AutoHud',
+    'StatisticsHud',
+    'CityDurabilityHud',
+    'BondHud',
+    'UltimateHud',
+  ]) {
+    assert.ok(battleHudViewSource.includes(rootName), rootName);
+  }
+
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.wave/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.remainingEnemies/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.gold/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.bossHealth/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.cityDurability/);
+  assert.match(battleHudViewSource, /ratio > 0\.55/);
+  assert.match(battleHudViewSource, /ratio > 0\.28/);
+  assert.match(battleHudViewSource, /private drawProgress\(/);
+  assert.match(battleHudViewSource, /state\.cityPercentText/);
+  assert.match(battleHudViewSource, /state\.boss\.percentText/);
+  assert.match(battleHudViewSource, /state\.ultimateText/);
+  assert.match(battleControllerSource, /private clearLegacyHudNodes\(\): void/);
+  assert.match(battleControllerSource, /new BattleHudView\(/);
+  assert.match(battleControllerSource, /new UpgradeCardSystem\(/);
+  assert.doesNotMatch(
+    battleControllerSource,
+    /TopHudFrame|Spirit|StoneChip|SpeedButton|ComboView|StatusLabel|BuildHintLabel/,
+  );
+  assert.doesNotMatch(
     battleUiComponentsSource,
-    'export class CityHealthBarView {',
-    'export class ComboView {',
-  );
-
-  assert.match(cityHealthBarViewSource, /CityHpEmblemLabel/);
-  assert.match(cityHealthBarViewSource, /'城池'/);
-  assert.match(cityHealthBarViewSource, /graphics\.circle\(emblemX,\s*0,\s*20\);/);
-  assert.match(cityHealthBarViewSource, /ratio > 0\.55/);
-  assert.match(cityHealthBarViewSource, /ratio > 0\.28/);
-  assert.match(cityHealthBarViewSource, /transform\.setContentSize\(width,\s*48\);/);
-  assert.match(cityHealthBarViewSource, /private readonly valueLabel: Label;/);
-  assert.match(
-    cityHealthBarViewSource,
-    /bindOrCreateUiArtSkinNode\(\s*this\.node,\s*'hud_city_hp_bg\.png',\s*width,\s*44,\s*'CityHpSkin',?\s*\)/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /const visibleCurrent = Math\.max\(0,\s*Math\.min\(safeMax,\s*current\)\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /const ratio = Math\.max\(0,\s*Math\.min\(1,\s*visibleCurrent \/ safeMax\)\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /this\.valueLabel\.string = `\$\{Math\.ceil\(visibleCurrent\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
-  );
-  assert.match(cityHealthBarViewSource, /const fillWidth = trackWidth \* ratio;/);
-  assert.match(
-    cityHealthBarViewSource,
-    /const fillRadius = Math\.min\(BattleUiTokens\.radius\.md,\s*fillWidth \/ 2,\s*trackHeight \/ 2\);/,
-  );
-  assert.match(cityHealthBarViewSource, /const sheenWidth = Math\.max\(0,\s*fillWidth - 4\);/);
-  assert.match(
-    cityHealthBarViewSource,
-    /if \(sheenWidth > 0\) \{\s*this\.graphics\.fillColor = uiColor\(Color\.WHITE,\s*42\);\s*this\.graphics\.roundRect\([\s\S]*Math\.min\(2,\s*sheenWidth \/ 2\)/s,
-  );
-  assert.equal(/if \(focused\)/.test(cityHealthBarViewSource), false);
-  assert.equal(/BattleUiTokens\.colors\.highlight/.test(cityHealthBarViewSource), false);
-  assert.match(
-    cityHealthBarViewSource,
-    /if \(this\.flashTimeLeft > 0\) \{\s*this\.graphics\.strokeColor = uiColor\(Color\.WHITE, 180\);\s*this\.graphics\.lineWidth = 3;/s,
-  );
-
-  assert.equal(cityHealthBarViewSource.includes('const scale ='), false);
-  assert.equal(cityHealthBarViewSource.includes('* scale'), false);
-  assert.equal(cityHealthBarViewSource.includes('node.setScale'), false);
-  assert.equal(/delayed|trailing|secondary health layer/i.test(cityHealthBarViewSource), false);
-  assert.equal(
-    /second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource),
-    false,
-  );
-  assert.equal(/Color\.WHITE,\s*70/.test(cityHealthBarViewSource), false);
-  assert.match(
-    cityHealthBarViewSource,
-    /public update\(deltaTime: number\): void \{[\s\S]*this\.flashTimeLeft = Math\.max\(0, this\.flashTimeLeft - deltaTime\);/,
-  );
-  assert.equal(/this\.flashTimeLeft - 1 \/ 60/.test(cityHealthBarViewSource), false);
-  assert.match(
-    battleControllerSource,
-    /public update\(deltaTime: number\): void \{[\s\S]*this\.cityHealthBarView\.update\(deltaTime\);/,
-  );
-  assert.match(
-    battleControllerSource,
-    /if \(result\.cityDamage > 0\) \{[\s\S]*this\.battleVfx\.playWallImpact\([\s\S]*this\.setVisualFocus\('city', 0\.72\);\s*\}/,
-  );
-  assert.equal(battleControllerSource.includes('redrawCityLine('), false);
-  assert.match(battleControllerSource, /this\.cityHealthSystem\.refresh\(this\.model, false\);/);
-  assert.equal(
-    /fillColor = uiColor\(Color\.WHITE[\s\S]*roundRect\(frameLeft,\s*frameBottom,\s*this\.width,\s*48[\s\S]*fill\(\);/i.test(
-      cityHealthBarViewSource,
-    ),
-    false,
+    /export class (?:UiButtonView|ResourceChipView|BossHealthBarView|CityHealthBarView|ComboView|UltimateButtonView)/,
   );
 });
 
