@@ -6,7 +6,7 @@
 
 ## 当前已实现
 
-- 点击“开始战斗”后进入战斗。
+- 点击右上角播放图标后进入战斗；战斗中可用同一位置的暂停/继续图标控制战斗，失败后可直接重开。
 - 敌人按波次从屏幕顶部生成，并沿中央战场向城墙推进。
 - 玩家主角和固定雷法师站在城墙上，自动攻击最近敌人。
 - 敌人到达底线后扣除城池血量。
@@ -44,8 +44,9 @@
 - `assets/scripts/battle/BattleVfxLogic.ts`：无 Cocos 依赖的特效节流和预算逻辑。
 - `assets/scripts/data/BattleVfxConfig.ts`：职业特效映射、纹理、并发预算与生命周期配置。
 - `assets/scripts/data/CompanionConfig.ts`：雷法师身份、站位、伤害、攻击间隔与资源配置。
-- `assets/scripts/battle/WaveSystem.ts`：波次 UI 刷新。
-- `assets/scripts/battle/CityHealthSystem.ts`：城池血量和状态 UI 刷新。
+- `assets/scripts/ui/BattleHudConfig.ts`：新版战斗 HUD 的位置、尺寸、字号和血条内部轨道配置。
+- `assets/scripts/ui/BattleHudLogic.ts`：波数循环显示、数值格式化和 HUD 状态转换。
+- `assets/scripts/ui/BattleHudView.ts`：图片式 HUD 节点、动态首领/城门进度条和暂停按钮交互。
 - `assets/scripts/battle/GridPlacementSystem.ts`：招募、放置、棋盘按钮和合成刷新。
 - `assets/scripts/roguelike/UpgradeCardSystem.ts`：三选一强化卡 UI 和点击生效。
 - `assets/scripts/ui/BattleUiSceneBindings.ts`：场景节点绑定辅助，连接 `BattleMain.scene` 与运行时代码。
@@ -142,6 +143,15 @@ npm run test:ui-layout
 npm run test:animation
 ```
 
+运行新版战斗 HUD 检查：
+
+```bash
+npm run test:hud-assets
+npm run test:hud-logic
+npm run test:hud-view
+npm run test:hud-polish
+```
+
 运行模块化地形检查：
 
 ```bash
@@ -169,6 +179,15 @@ npm run preview:portrait
 
 该命令会把本机 Cocos Creator 预览默认设置为 **Webpage Full Screen**、关闭旋转，并注册一个 `Sandgate Portrait 720x1280` 自定义设备。当前项目的程序 UI 以 **720x1280 / 9:16 竖屏** 为设计基准。
 
+## 战斗 HUD 配置与资源
+
+- 所有新版 HUD 的位置和尺寸集中在 `assets/scripts/ui/BattleHudConfig.ts`。`layout` 内的 `x`、`y` 以 720×1280 竖屏左上角为原点；`width`、`height` 同时决定图片可见尺寸和按钮点击区域。
+- 首领血量与城门耐久使用“图片装饰框 + 代码动态填充”。需要微调填充区域时，修改 `BattleHudConfig.tracks.boss` 或 `BattleHudConfig.tracks.city`；其中 `x`、`y` 是组件中心点的局部偏移，`width`、`height` 是内部轨道尺寸。
+- 下载目录中的 12 张源图经过去连通白底、透明边缘羽化、裁切和缩放后，存放在 `assets/bundles/ui/ui_hud_custom/`，运行时由 `ui` Asset Bundle 加载。
+- 源图保持同名并位于 `/Users/hudaijin/Downloads/icon/` 时，可运行 `npm run prepare:hud-assets` 确定性重新导入；脚本会保留已有 Cocos UUID，并更新 `UiArtManifest.ts` 和资源预览图。
+- 波数 UI 固定显示 `/ 50`，超过第 50 波后显示编号从 1 重新循环，但 `BattleMvpModel` 的实际战斗波次仍持续增长。
+- 金币和绝技目前尚无对应战斗经济/能量系统，因此显示真实占位值 `0` 与 `0 / 100`；后续可在 `BattleController` 的 `hudGold`、`hudUltimate` 接入实际数据。
+
 说明：Cocos 组件文件当前使用 Cocos Creator 运行时 API；在编辑器内以 Creator 3.8 的类型声明为准。新增构筑规则集中在纯 TypeScript 模型和配置文件中。
 
 ## 用 Cocos Creator 运行
@@ -180,7 +199,7 @@ npm run preview:portrait
 5. 确认层级中存在 `BattleRoot`，并挂载了 `BattleController`。
 6. 如需默认按移动端竖屏预览，先在终端运行 `npm run preview:portrait`，再回到 Creator 重新点击预览。
 7. 点击 Creator 顶部预览按钮运行项目；浏览器预览通常会打开 `http://127.0.0.1:7456/`。
-8. 在画面中点击“开始战斗”，即可看到局内战斗闭环。
+8. 在画面中点击右上角播放图标，即可看到局内战斗闭环。
 
 ## 竖屏预览切换
 

@@ -43,8 +43,8 @@ export const BattleHudConfig = {
     ultimate: rect(590, 1130, 124, 124),
   },
   tracks: {
-    boss: { x: 70, y: -3, width: 276, height: 24, radius: 12 },
-    city: { x: 8, y: -1, width: 266, height: 30, radius: 15 },
+    boss: { x: 42, y: -3, width: 306, height: 24, radius: 12 },
+    city: { x: 40, y: -1, width: 330, height: 30, radius: 15 },
   } satisfies Record<string, HudTrackSpec>,
   fontSizes: {
     wave: 25,

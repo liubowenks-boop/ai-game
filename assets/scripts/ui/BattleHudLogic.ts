@@ -40,7 +40,9 @@ function toPercentText(ratio: number): string {
 
 export function createBattleHudDisplayState(input: BattleHudStateInput) {
   const displayWave = getDisplayWave(input.wave);
-  const cityRatio = clampHudRatio(input.cityMaxHealth > 0 ? input.cityHealth / input.cityMaxHealth : 0);
+  const cityRatio = clampHudRatio(
+    input.cityMaxHealth > 0 ? input.cityHealth / input.cityMaxHealth : 0,
+  );
   const ultimate = Number.isFinite(input.ultimate)
     ? Math.min(BattleHudConfig.maximumUltimate, Math.max(0, Math.floor(input.ultimate)))
     : 0;
