@@ -160,8 +160,8 @@ export class BattleController extends Component {
       return;
     }
 
-    const presentationDelta = Math.min(deltaTime, 1 / 30);
-    this.videoCharacterPresentation.update(presentationDelta);
+    const vfxDelta = Math.min(deltaTime, 1 / 30);
+    this.videoCharacterPresentation.update(vfxDelta);
     for (const presentation of this.fixedCompanionPresentations) {
       presentation.update(deltaTime);
     }
@@ -272,15 +272,19 @@ export class BattleController extends Component {
       this.battleVfx,
     );
     this.fixedCompanionPresentations.push(
-      ...FIXED_COMPANIONS.filter((companion) => companion.id !== 'hero_thunder_mage').map(
-        (companion) =>
-          new FixedSpineCompanionPresentation(
+      ...FIXED_COMPANIONS.map((companion) => {
+        if (companion.id === 'hero_thunder_mage') {
+          return null;
+        }
+        return new FixedSpineCompanionPresentation(
             this.terrainPresentation.layers.units,
             (node) => this.setUiLayer(node),
             this.battleVfx,
             companion,
             getFixedCompanionAnimationProfile(companion.animationProfileId),
-          ),
+        );
+      }).filter(
+        (presentation): presentation is FixedSpineCompanionPresentation => presentation !== null,
       ),
     );
     this.upgradeCardSystem = new UpgradeCardSystem(
