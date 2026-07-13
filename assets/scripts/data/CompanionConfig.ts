@@ -36,8 +36,8 @@ export const THUNDER_MAGE_COMPANION: FixedCompanionConfig = {
   slotIndex: 2,
   position: { ...BATTLE_WALL_LAYOUT.thunderMage },
   attackSource: 'companion',
-  attackDamage: 7,
-  attackInterval: 0.85,
+  attackDamage: 3.5,
+  attackInterval: 2.2,
   runtimeOptionKeys: {
     damage: 'companionAttackDamage',
     interval: 'companionAttackInterval',
@@ -58,8 +58,8 @@ export const QINGLAN_COMPANION: FixedCompanionConfig = {
   slotIndex: 3,
   position: { ...BATTLE_WALL_LAYOUT.qinglan },
   attackSource: 'qinglan_companion',
-  attackDamage: 8,
-  attackInterval: 1,
+  attackDamage: 4,
+  attackInterval: 2.4,
   runtimeOptionKeys: {
     damage: 'qinglanAttackDamage',
     interval: 'qinglanAttackInterval',

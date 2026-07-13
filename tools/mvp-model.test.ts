@@ -132,8 +132,8 @@ runTest('fixed companions reserve both outer wall slots outside the ordinary her
     slotIndex: 2,
     position: { x: -215, y: -205 },
     attackSource: 'companion',
-    attackDamage: 7,
-    attackInterval: 0.85,
+    attackDamage: 3.5,
+    attackInterval: 2.2,
     runtimeOptionKeys: {
       damage: 'companionAttackDamage',
       interval: 'companionAttackInterval',
@@ -162,15 +162,15 @@ runTest('fixed companions reserve both outer wall slots outside the ordinary her
         id: 'hero_thunder_mage',
         name: '雷法师',
         slotIndex: 2,
-        attackDamage: 7,
-        attackInterval: 0.85,
+        attackDamage: 3.5,
+        attackInterval: 2.2,
       },
       {
         id: 'hero_qinglan',
         name: '灵符道君·青岚',
         slotIndex: 3,
-        attackDamage: 8,
-        attackInterval: 1,
+        attackDamage: 4,
+        attackInterval: 2.4,
       },
     ],
   );
@@ -400,12 +400,17 @@ runTest('drummer aura shortens every fixed companion actual attack cadence', () 
       }),
     );
     model.placeHero(0, '鼓手');
-    assert.ok(model.getFixedCompanionAttackInterval(companion.id) < 0.6, companion.id);
+    const actualInterval = model.getFixedCompanionAttackInterval(companion.id);
+    assert.ok(actualInterval < 0.6, companion.id);
 
     model.startBattle();
     model.spawnEnemy({ hp: 100, speed: 0 });
     assert.equal(companionEvents(model, 0.01, companion.source).length, 1, companion.id);
-    assert.equal(companionEvents(model, 0.52, companion.source).length, 0, companion.id);
+    assert.equal(
+      companionEvents(model, actualInterval - 0.02, companion.source).length,
+      0,
+      companion.id,
+    );
     assert.equal(companionEvents(model, 0.02, companion.source).length, 1, companion.id);
   }
 });
@@ -434,7 +439,9 @@ runTest('fixed companions fall back to their configured base interval before val
         }),
       );
       model.placeHero(0, '鼓手');
-      const expectedInterval = companion.interval / 1.12;
+      const drummerAura =
+        model.getHeroConfigs().find((hero) => hero.name === '鼓手')?.auraAttackSpeed ?? 0;
+      const expectedInterval = companion.interval / (1 + drummerAura);
       assert.ok(
         Math.abs(model.getFixedCompanionAttackInterval(companion.id) - expectedInterval) < 0.000001,
         companion.id,
@@ -520,8 +527,11 @@ runTest('default enemy tuning is slower and less punishing for readable mobile c
   assert.equal(model.options.enemyDamage, 0.5);
   assert.equal(model.options.enemyBaseHp, 24);
   assert.equal(model.options.cityLineY, -235);
-  assert.equal(model.options.companionAttackInterval, 0.85);
-  assert.equal(model.options.mainAttackDamage, 11);
+  assert.equal(model.options.companionAttackInterval, 2.2);
+  assert.equal(model.options.qinglanAttackInterval, 2.4);
+  assert.equal(model.options.mainAttackInterval, 2);
+  assert.equal(model.options.mainAttackDamage, 5.5);
+  assert.equal(model.options.heroBaseDps, 2.5);
   assert.equal(model.options.waveInterval, 3);
   assert.ok((fast?.speedMultiplier ?? 99) <= 1.12);
   assert.ok((boss?.damageMultiplier ?? 99) <= 4.5);
@@ -548,7 +558,11 @@ runTest('default main attack softens the opening wave without making it toothles
 
   const secondPulse = model.tick(model.options.mainAttackInterval);
 
-  assert.ok(secondPulse.killedEnemyIds.length >= 1);
+  assert.equal(secondPulse.killedEnemyIds.length, 0);
+
+  const thirdPulse = model.tick(model.options.mainAttackInterval);
+
+  assert.ok(thirdPulse.killedEnemyIds.length >= 1);
 });
 
 runTest('upgrade cards are always tied to fire, thunder, or summon builds', () => {

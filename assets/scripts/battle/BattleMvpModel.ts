@@ -196,10 +196,10 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   enemyWallHoldSeconds: 3,
   waveInterval: 3,
   upgradeInterval: 10,
-  mainAttackDamage: 11,
-  mainAttackInterval: 0.7,
+  mainAttackDamage: 5.5,
+  mainAttackInterval: 2,
   ...createFixedCompanionRuntimeDefaults(),
-  heroBaseDps: 5,
+  heroBaseDps: 2.5,
   playerPosition: { ...BATTLE_WALL_LAYOUT.mainHero },
   random: Math.random,
 };

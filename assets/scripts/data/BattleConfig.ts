@@ -86,7 +86,7 @@ export const HERO_CONFIGS: HeroConfig[] = [
     role: 'aura',
     description: '提高全队输出节奏',
     dpsScale: 0.35,
-    auraAttackSpeed: 0.12,
+    auraAttackSpeed: 0.06,
   },
   {
     name: '治疗师',
