@@ -13,6 +13,7 @@
     "test:hud-logic": "tsx tools/battle-hud-logic.test.ts",
     "prepare:hud-assets": "python3 tools/prepare-battle-hud-assets.py",
     "test:hud-assets": "python3 tools/battle-hud-assets.test.py",
+    "test:hud-view": "tsx tools/battle-hud-view.test.ts",
     "test:scene": "tsx tools/scene-structure.test.ts",
     "test:animation": "tsx tools/animation-system.test.ts",
     "test:vfx": "tsx tools/vfx-system.test.ts",

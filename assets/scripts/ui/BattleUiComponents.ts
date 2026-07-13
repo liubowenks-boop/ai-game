@@ -274,6 +274,18 @@ export function bindOrCreateUiArtSkinNode(
   return node;
 }
 
+export function setUiArtSkinFilename(node: Node, filename: string): void {
+  const sprite = node.getComponent(Sprite) ?? node.addComponent(Sprite);
+  const spec = getUiArtAsset(filename);
+  sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+  sprite.type = spec?.nineSlice ? Sprite.Type.SLICED : Sprite.Type.SIMPLE;
+  loadUiSpriteFrame(filename, (frame) => {
+    if (frame && node.isValid) {
+      sprite.spriteFrame = frame;
+    }
+  });
+}
+
 export function createProgramLayer(
   name: string,
   parent: Node,
