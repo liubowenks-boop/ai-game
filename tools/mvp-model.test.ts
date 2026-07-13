@@ -517,6 +517,27 @@ runTest('thunder mage attacks do not trigger main hero fire or thunder effects',
   assert.equal(secondary.hp, 100);
 });
 
+runTest('all default enemy archetypes have fifty percent more health', () => {
+  const model = new BattleMvpModel({ waveInterval: 99 });
+  const expectedHealth = {
+    normal: 32.4,
+    fast: 21.6,
+    tank: 64.8,
+    ranged: 34.2,
+    boss: 252,
+  } as const;
+
+  assert.equal(model.options.enemyBaseHp, 36);
+  for (const [kind, expectedHp] of Object.entries(expectedHealth)) {
+    const enemy = model.spawnEnemy({
+      kind: kind as keyof typeof expectedHealth,
+      speed: 0,
+    });
+    assert.ok(Math.abs(enemy.hp - expectedHp) < 0.000001, kind);
+    assert.ok(Math.abs(enemy.maxHp - expectedHp) < 0.000001, kind);
+  }
+});
+
 runTest('default enemy tuning is slower and less punishing for readable mobile combat', () => {
   const model = new BattleMvpModel();
   const enemyConfigs = model.getEnemyConfigs();
@@ -525,7 +546,7 @@ runTest('default enemy tuning is slower and less punishing for readable mobile c
 
   assert.equal(model.options.enemyBaseSpeed, 30);
   assert.equal(model.options.enemyDamage, 0.5);
-  assert.equal(model.options.enemyBaseHp, 24);
+  assert.equal(model.options.enemyBaseHp, 36);
   assert.equal(model.options.cityLineY, -235);
   assert.equal(model.options.companionAttackInterval, 2.2);
   assert.equal(model.options.qinglanAttackInterval, 2.4);
@@ -560,9 +581,12 @@ runTest('default main attack softens the opening wave without making it toothles
 
   assert.equal(secondPulse.killedEnemyIds.length, 0);
 
-  const thirdPulse = model.tick(model.options.mainAttackInterval);
+  let killedEnemies = 0;
+  for (let pulse = 0; pulse < 8 && killedEnemies === 0; pulse += 1) {
+    killedEnemies += model.tick(model.options.mainAttackInterval).killedEnemyIds.length;
+  }
 
-  assert.ok(thirdPulse.killedEnemyIds.length >= 1);
+  assert.ok(killedEnemies >= 1);
 });
 
 runTest('upgrade cards are always tied to fire, thunder, or summon builds', () => {

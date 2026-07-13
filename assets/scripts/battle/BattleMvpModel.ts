@@ -191,7 +191,7 @@ const DEFAULT_OPTIONS: BattleMvpOptions = {
   enemyDamage: 0.5,
   enemyStartY: 470,
   cityLineY: BATTLE_WALL_LAYOUT.cityLineY,
-  enemyBaseHp: 24,
+  enemyBaseHp: 36,
   enemyBaseSpeed: 30,
   enemyWallHoldSeconds: 3,
   waveInterval: 3,
