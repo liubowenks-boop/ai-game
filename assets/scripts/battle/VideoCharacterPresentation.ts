@@ -15,7 +15,6 @@ const CELL_WIDTH = FRAME_WIDTH + FRAME_PADDING * 2;
 const CELL_HEIGHT = FRAME_HEIGHT + FRAME_PADDING * 2;
 const DISPLAY_SCALE = 0.58;
 const MIN_PLAYBACK_DURATION = 0.2;
-const WALL_DEPTH_OFFSET_Y = 18;
 
 /**
  * Replaces the former Spine companion with the original AI video rendered as
@@ -41,7 +40,7 @@ export class VideoCharacterPresentation {
     setUiLayer(this.rootNode);
     this.rootNode.setPosition(
       THUNDER_MAGE_COMPANION.position.x,
-      THUNDER_MAGE_COMPANION.position.y + WALL_DEPTH_OFFSET_Y,
+      THUNDER_MAGE_COMPANION.position.y,
       0,
     );
     if (!this.rootNode.parent) unitParent.addChild(this.rootNode);
@@ -57,7 +56,7 @@ export class VideoCharacterPresentation {
     this.spriteNode.setScale(DISPLAY_SCALE, DISPLAY_SCALE, 1);
     const transform = this.spriteNode.getComponent(UITransform) ?? this.spriteNode.addComponent(UITransform);
     transform.setContentSize(FRAME_WIDTH, FRAME_HEIGHT);
-    transform.setAnchorPoint(0.5, 0.1);
+    transform.setAnchorPoint(0.5, 0.5);
     if (!this.spriteNode.parent) this.rootNode.addChild(this.spriteNode);
     this.sprite = this.spriteNode.getComponent(Sprite) ?? this.spriteNode.addComponent(Sprite);
 

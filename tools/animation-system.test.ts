@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as AnimationConfig from '../assets/scripts/data/AnimationConfig';
+import { BATTLE_WALL_LAYOUT } from '../assets/scripts/data/BattleTerrainConfig';
 import { QINGLAN_COMPANION, THUNDER_MAGE_COMPANION } from '../assets/scripts/data/CompanionConfig';
 import {
   computeProceduralAnimationPose,
@@ -618,6 +619,21 @@ runTest('thunder mage presentation remains a compatibility wrapper', () => {
     /super\(\s*unitParent,\s*setUiLayer,\s*battleVfx,\s*THUNDER_MAGE_COMPANION,\s*THUNDER_MAGE_ANIMATION_PROFILE,?\s*\);/,
   );
   assert.equal(presentationSource.includes('resources.load('), false);
+});
+
+runTest('remote thunder mage video uses the wall position symmetric to qinglan', () => {
+  assert.deepEqual(BATTLE_WALL_LAYOUT.thunderMage, {
+    x: -BATTLE_WALL_LAYOUT.qinglan.x,
+    y: BATTLE_WALL_LAYOUT.qinglan.y,
+  });
+
+  const videoSource = readFileSync(
+    'assets/scripts/battle/VideoCharacterPresentation.ts',
+    'utf8',
+  );
+  assert.match(videoSource, /THUNDER_MAGE_COMPANION\.position\.y,\s*0,/);
+  assert.equal(videoSource.includes('WALL_DEPTH_OFFSET_Y'), false);
+  assert.match(videoSource, /transform\.setAnchorPoint\(0\.5, 0\.5\)/);
 });
 
 runTest('battle controller delegates every fixed companion presentation lifecycle', () => {
