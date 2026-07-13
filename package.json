@@ -10,6 +10,7 @@
     "test:terrain": "tsx tools/terrain-system.test.ts",
     "test:ui-layout": "tsx tools/ui-layout-v4.test.ts",
     "test:hud-polish": "tsx tools/battle-hud-polish.test.ts",
+    "test:hud-logic": "tsx tools/battle-hud-logic.test.ts",
     "test:scene": "tsx tools/scene-structure.test.ts",
     "test:animation": "tsx tools/animation-system.test.ts",
     "test:vfx": "tsx tools/vfx-system.test.ts",
