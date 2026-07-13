@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const view = readFileSync('assets/scripts/ui/BattleHudView.ts', 'utf8');
 const sharedComponents = readFileSync('assets/scripts/ui/BattleUiComponents.ts', 'utf8');
+const controller = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 
 assert.match(view, /export class BattleHudView/);
 assert.match(view, /BattleHudDisplayState/);
@@ -38,5 +39,27 @@ assert.match(
 );
 assert.match(sharedComponents, /export function setUiArtSkinFilename\(/);
 assert.doesNotMatch(view, /hud_(?:top_frame|resource_chip|boss_hp_bg|city_hp_bg|combo_plate)/);
+
+assert.match(controller, /private battleHudView!: BattleHudView;/);
+assert.match(controller, /private battlePaused = false;/);
+assert.match(controller, /new BattleHudView\(/);
+assert.match(controller, /this\.battleHudView\.onPauseResume\(/);
+assert.match(controller, /private refreshBattleHud\(\): void/);
+assert.match(controller, /this\.model\.enemies\.filter\(\(enemy\) => enemy\.alive\)\.length/);
+assert.match(controller, /this\.model\.running && !this\.model\.gameOver && !this\.battlePaused/);
+assert.doesNotMatch(controller, /director\.pause\(/);
+for (const legacy of [
+  'BossHealthBarView',
+  'CityHealthBarView',
+  'ResourceChipView',
+  'UltimateButtonView',
+  'CityHealthSystem',
+  'WaveSystem',
+  'TopHudFrame',
+  'StoneChipPrefab',
+  'SpeedButtonPrefab',
+]) {
+  assert.equal(controller.includes(legacy), false, legacy);
+}
 
 console.log('pass: image-backed battle HUD view structure');

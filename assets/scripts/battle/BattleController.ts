@@ -18,17 +18,12 @@ import { UpgradeCardSystem } from '../roguelike/UpgradeCardSystem';
 import {
   applyBattleLabelStyle,
   bindOrCreateLabel,
-  BossHealthBarView,
-  CityHealthBarView,
-  ComboView,
-  createPanelNode,
   HeroAvatarSlotView,
   ensureNamedUiChild,
-  ResourceChipView,
-  UiButtonView,
-  UltimateButtonView,
 } from '../ui/BattleUiComponents';
 import { preloadBattleFontResources } from '../ui/BattleFontResources';
+import { createBattleHudDisplayState } from '../ui/BattleHudLogic';
+import { BattleHudView } from '../ui/BattleHudView';
 import { BattleUiV4Layout } from '../ui/BattleUiLayout';
 import { ensureSceneCanvas, ensureSceneLayer } from '../ui/BattleUiSceneBindings';
 import { preloadBattleTextResources, t } from '../ui/BattleTextResources';
@@ -44,7 +39,6 @@ import {
 import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 import { FIXED_COMPANIONS } from '../data/CompanionConfig';
 import { AttackEvent, BattleMvpModel, BattleTickResult, EnemyState } from './BattleMvpModel';
-import { CityHealthSystem } from './CityHealthSystem';
 import { EnemySystem, VisualFocusTarget } from './EnemySystem';
 import { GridPlacementSystem } from './GridPlacementSystem';
 import { PlayerAutoAttackSystem } from './PlayerAutoAttackSystem';
@@ -60,7 +54,6 @@ import {
   requestUnitAnimation,
   tickUnitAnimation,
 } from './UnitAnimationSystem';
-import { WaveSystem } from './WaveSystem';
 
 const { ccclass } = _decorator;
 
@@ -90,8 +83,6 @@ export class BattleController extends Component {
   private readonly stageHeight = 1280;
   private readonly model = new BattleMvpModel();
   private enemySystem!: EnemySystem;
-  private cityHealthSystem!: CityHealthSystem;
-  private waveSystem!: WaveSystem;
   private autoAttackSystem!: PlayerAutoAttackSystem;
   private upgradeCardSystem!: UpgradeCardSystem;
   private gridPlacementSystem!: GridPlacementSystem;
@@ -106,25 +97,16 @@ export class BattleController extends Component {
   private readonly fixedCompanionPresentations: FixedSpineCompanionPresentation[] = [];
   private terrainPresentation!: BattleTerrainPresentation;
   private battleVfx!: BattleVfxSystem;
-  private startButtonLabel!: Label;
+  private battleHudView!: BattleHudView;
+  private battlePaused = false;
+  private hudGold = 0;
+  private hudUltimate = 0;
   private battleLayer!: Node;
   private feedbackLayer!: Node;
   private topHudLayer!: Node;
   private midStatusLayer!: Node;
   private upgradePanelLayer!: Node;
   private bottomHudLayer!: Node;
-  private remainingEnemiesLabel!: Label;
-  private buildHintLabel!: Label;
-  private bossHealthBarView!: BossHealthBarView;
-  private cityHealthBarView!: CityHealthBarView;
-  private comboView!: ComboView;
-  private goldChipView!: ResourceChipView;
-  private stoneChipView!: ResourceChipView;
-  private pauseButtonView!: UiButtonView;
-  private speedButtonView!: UiButtonView;
-  private ultimateButtonView!: UltimateButtonView;
-  private autoButtonView!: UiButtonView;
-  private bondButtonView!: UiButtonView;
   private readonly heroAvatarViews: HeroAvatarSlotView[] = [];
   private noticeLabel!: Label;
   private readonly floatingTexts: FloatingTextView[] = [];
@@ -138,8 +120,6 @@ export class BattleController extends Component {
   private focusPulseDuration = 0.72;
   private visualFocusTarget: VisualFocusTarget = 'none';
   private visualFocusTimeLeft = 0;
-  private bossHitFlashTimeLeft = 0;
-  private lastBossHp = Number.NaN;
   private initialized = false;
 
   public onLoad(): void {
@@ -160,12 +140,16 @@ export class BattleController extends Component {
       return;
     }
 
+    if (!(this.model.running && !this.model.gameOver && !this.battlePaused)) {
+      this.refreshBattleHud();
+      return;
+    }
+
     const vfxDelta = Math.min(deltaTime, 1 / 30);
     this.videoCharacterPresentation.update(vfxDelta);
     for (const presentation of this.fixedCompanionPresentations) {
       presentation.update(deltaTime);
     }
-    this.cityHealthBarView.update(deltaTime);
 
     if (this.upgradeCardSystem.isShowing()) {
       this.updateReadability(deltaTime);
@@ -251,14 +235,25 @@ export class BattleController extends Component {
     );
     void this.battleVfx.preload();
 
-    const hudViews = this.createTopHudLayer();
-    const midViews = this.createMidStatusLayer();
+    this.clearLegacyHudNodes();
     this.createBottomHudLayer();
+    this.battleHudView = new BattleHudView(
+      this.topHudLayer,
+      this.midStatusLayer,
+      this.bottomHudLayer,
+    );
+    this.battleHudView.onPauseResume(() => {
+      if (!this.model.running || this.model.gameOver) {
+        this.battlePaused = false;
+        this.startBattle();
+      } else {
+        this.battlePaused = !this.battlePaused;
+        this.refreshBattleHud();
+      }
+    });
     this.createReadabilityUi(this.feedbackLayer);
 
     this.enemySystem = new EnemySystem(this.terrainPresentation.layers.enemies, enemyTemplate);
-    this.cityHealthSystem = new CityHealthSystem(this.cityHealthBarView, midViews.statusLabel);
-    this.waveSystem = new WaveSystem(hudViews.waveLabel);
     this.autoAttackSystem = new PlayerAutoAttackSystem(this.battleVfx);
     this.gridPlacementSystem = new GridPlacementSystem(
       this.terrainPresentation.layers.unitBacking,
@@ -277,11 +272,11 @@ export class BattleController extends Component {
           return null;
         }
         return new FixedSpineCompanionPresentation(
-            this.terrainPresentation.layers.units,
-            (node) => this.setUiLayer(node),
-            this.battleVfx,
-            companion,
-            getFixedCompanionAnimationProfile(companion.animationProfileId),
+          this.terrainPresentation.layers.units,
+          (node) => this.setUiLayer(node),
+          this.battleVfx,
+          companion,
+          getFixedCompanionAnimationProfile(companion.animationProfileId),
         );
       }).filter(
         (presentation): presentation is FixedSpineCompanionPresentation => presentation !== null,
@@ -299,12 +294,14 @@ export class BattleController extends Component {
   }
 
   private startBattle(): void {
+    this.battlePaused = false;
+    this.hudGold = 0;
+    this.hudUltimate = 0;
     this.model.startBattle();
     this.clear();
     this.playerAnimation = createUnitAnimationRuntime(PLAYER_ANIMATION_PROFILE);
     this.enemySystem.clear();
     this.upgradeCardSystem.hide();
-    this.startButtonLabel.string = t('hud.restart');
     this.refreshUi();
   }
 
@@ -322,187 +319,14 @@ export class BattleController extends Component {
   }
 
   private refreshUi(): void {
-    this.cityHealthSystem.refresh(this.model, false);
-    this.waveSystem.refresh(this.model);
-    this.remainingEnemiesLabel.string = t('hud.remaining', { count: this.model.enemies.length });
-    this.goldChipView.refresh(0);
-    this.stoneChipView.refresh(0);
-    this.pauseButtonView.setText('');
-    this.speedButtonView.setText(t('hud.speed', { speed: 1 }));
-    this.buildHintLabel.string = this.getBuildHintText();
+    this.refreshBattleHud();
     this.refreshHeroAvatarBar();
     this.gridPlacementSystem.refresh();
     this.battleVfx.setPlacementMarkers(this.gridPlacementSystem.getAvailablePlacementPoints());
   }
 
-  private createTopHudLayer(): { waveLabel: Label } {
-    const topFrame = createPanelNode(
-      'TopHudFrame',
-      BattleUiV4Layout.topHud.x,
-      BattleUiV4Layout.topHud.y,
-      BattleUiV4Layout.topHud.width,
-      BattleUiV4Layout.topHud.height,
-      this.topHudLayer,
-      92,
-    );
-    const topFrameSkin = topFrame.node.getChildByName('UiArtSkin');
-    if (topFrameSkin) {
-      topFrameSkin.active = false;
-    }
-
-    const waveView = bindOrCreateLabel(
-      this.topHudLayer,
-      'WaveLabel',
-      t('hud.waveZero'),
-      -270,
-      606,
-      BattleUiTokens.font.body,
-      BattleUiTokens.colors.textPrimary,
-      145,
-      34,
-    );
-
-    const remainView = bindOrCreateLabel(
-      this.topHudLayer,
-      'RemainingEnemiesLabel',
-      t('hud.remaining', { count: 0 }),
-      -270,
-      574,
-      BattleUiTokens.font.caption,
-      BattleUiTokens.colors.textSecondary,
-      145,
-      30,
-    );
-    this.remainingEnemiesLabel = remainView.label;
-
-    this.bossHealthBarView = new BossHealthBarView(0, 590, 340, this.topHudLayer, {
-      hostNode: this.topHudLayer.getChildByName('BossHealthBarPrefab'),
-    });
-    this.goldChipView = new ResourceChipView('金币', 230, 606, 86, 32, this.topHudLayer, {
-      hostNode: this.topHudLayer.getChildByName('GoldChipPrefab'),
-    });
-    this.stoneChipView = new ResourceChipView('灵石', 230, 574, 86, 32, this.topHudLayer, {
-      hostNode: this.topHudLayer.getChildByName('StoneChipPrefab'),
-    });
-
-    this.pauseButtonView = new UiButtonView(
-      '',
-      310,
-      606,
-      48,
-      42,
-      BattleUiTokens.colors.panelBrown,
-      this.topHudLayer,
-      {
-        iconFilename: 'icon_pause.png',
-        iconSize: 26,
-        iconX: 0,
-        labelOffsetX: 0,
-        hostNode: this.topHudLayer.getChildByName('PauseButtonPrefab'),
-        labelName: 'PauseLabel',
-        widgetAlignment: { right: 26, top: 13 },
-      },
-    );
-    this.speedButtonView = new UiButtonView(
-      t('hud.speed', { speed: 1 }),
-      310,
-      558,
-      56,
-      42,
-      BattleUiTokens.colors.panelBrown,
-      this.topHudLayer,
-      {
-        iconFilename: 'icon_speed.png',
-        iconSize: 26,
-        iconX: -13,
-        labelOffsetX: 10,
-        hostNode: this.topHudLayer.getChildByName('SpeedButtonPrefab'),
-        labelName: 'SpeedLabel',
-        widgetAlignment: { right: 22, top: 61 },
-      },
-    );
-
-    const startButton = new UiButtonView(
-      t('hud.start'),
-      0,
-      506,
-      160,
-      52,
-      BattleUiTokens.colors.primaryRed,
-      this.topHudLayer,
-      {
-        iconFilename: 'icon_warning.png',
-        iconSize: 28,
-        iconX: -50,
-        labelOffsetX: 18,
-        hostNode: this.topHudLayer.getChildByName('StartBattleButtonPrefab'),
-        labelName: 'StartBattleLabel',
-      },
-    );
-    this.startButtonLabel = startButton.label;
-    startButton.onClick(() => this.startBattle());
-
-    return { waveLabel: waveView.label };
-  }
-
-  private createMidStatusLayer(): { statusLabel: Label } {
-    this.cityHealthBarView = new CityHealthBarView(
-      BattleUiV4Layout.cityHealthBar.x,
-      BattleUiV4Layout.cityHealthBar.y,
-      BattleUiV4Layout.cityHealthBar.width,
-      this.midStatusLayer,
-      {
-        hostNode: this.midStatusLayer.getChildByName('CityHealthBarPrefab'),
-      },
-    );
-    this.comboView = new ComboView(
-      BattleUiV4Layout.comboBadge.x,
-      BattleUiV4Layout.comboBadge.y,
-      this.midStatusLayer,
-      {
-        hostNode: this.midStatusLayer.getChildByName('ComboView'),
-      },
-    );
-
-    const statusView = bindOrCreateLabel(
-      this.midStatusLayer,
-      'StatusLabel',
-      t('hud.statusIdle'),
-      BattleUiV4Layout.statusLabel.x,
-      BattleUiV4Layout.statusLabel.y,
-      BattleUiTokens.font.caption,
-      BattleUiTokens.colors.textPrimary,
-      BattleUiV4Layout.statusLabel.width,
-      BattleUiV4Layout.statusLabel.height,
-    );
-
-    const buildHintView = bindOrCreateLabel(
-      this.midStatusLayer,
-      'BuildHintLabel',
-      t('hud.buildUnknown'),
-      BattleUiV4Layout.buildHintLabel.x,
-      BattleUiV4Layout.buildHintLabel.y,
-      BattleUiTokens.font.caption,
-      BattleUiTokens.colors.highlight,
-      BattleUiV4Layout.buildHintLabel.width,
-      BattleUiV4Layout.buildHintLabel.height,
-    );
-    this.buildHintLabel = buildHintView.label;
-
-    return { statusLabel: statusView.label };
-  }
-
   private createBottomHudLayer(): void {
     this.bottomHudLayer.getChildByName('HeroAvatarSlot6')?.destroy();
-    createPanelNode(
-      'BottomHudFrame',
-      BattleUiV4Layout.heroBar.x,
-      BattleUiV4Layout.heroBar.y,
-      BattleUiV4Layout.heroBar.width,
-      BattleUiV4Layout.heroBar.height,
-      this.bottomHudLayer,
-      218,
-    );
 
     const avatarSlotRects = [
       BattleUiV4Layout.heroAvatarSlot1,
@@ -519,45 +343,35 @@ export class BattleController extends Component {
         }),
       );
     });
+  }
 
-    this.ultimateButtonView = new UltimateButtonView(
-      BattleUiV4Layout.ultimateButton.x,
-      BattleUiV4Layout.ultimateButton.y,
-      this.bottomHudLayer,
-      {
-        hostNode: this.bottomHudLayer.getChildByName('UltimateButtonPrefab'),
-        widgetAlignment: { right: 21, bottom: 23 },
-      },
-    );
-    this.autoButtonView = new UiButtonView(
-      t('hud.auto'),
-      BattleUiV4Layout.autoButton.x,
-      BattleUiV4Layout.autoButton.y,
-      BattleUiV4Layout.autoButton.width,
-      BattleUiV4Layout.autoButton.height,
-      BattleUiTokens.colors.thunderBlue,
-      this.bottomHudLayer,
-      {
-        skinFilename: 'hud_right_action_button_final.png',
-        hostNode: this.bottomHudLayer.getChildByName('AutoButtonPrefab'),
-        labelName: 'AutoLabel',
-        widgetAlignment: { right: 18, bottom: 225 },
-      },
-    );
-    this.bondButtonView = new UiButtonView(
-      t('hud.bond'),
-      -278,
-      BattleUiV4Layout.ultimateButton.y,
-      76,
-      76,
-      BattleUiTokens.colors.summonGreen,
-      this.bottomHudLayer,
-      {
-        skinFilename: 'hud_right_action_button_final.png',
-        hostNode: this.bottomHudLayer.getChildByName('BondButtonPrefab'),
-        labelName: 'BondLabel',
-        widgetAlignment: { left: 44, bottom: 23 },
-      },
+  private clearLegacyHudNodes(): void {
+    for (const child of [...this.topHudLayer.children, ...this.midStatusLayer.children]) {
+      child.destroy();
+    }
+    for (const child of [...this.bottomHudLayer.children]) {
+      if (!/^HeroAvatarSlot[1-5]$/.test(child.name)) {
+        child.destroy();
+      }
+    }
+  }
+
+  private refreshBattleHud(): void {
+    const boss = this.model.enemies.find((enemy) => enemy.alive && enemy.kind === 'boss');
+    this.battleHudView.refresh(
+      createBattleHudDisplayState({
+        wave: this.model.wave,
+        remainingEnemies: this.model.enemies.filter((enemy) => enemy.alive).length,
+        cityHealth: this.model.cityHealth,
+        cityMaxHealth: this.model.options.cityMaxHealth,
+        bossHealth: boss?.hp,
+        bossMaxHealth: boss?.maxHp,
+        gold: this.hudGold,
+        ultimate: this.hudUltimate,
+        paused: this.battlePaused,
+        running: this.model.running,
+        gameOver: this.model.gameOver,
+      }),
     );
   }
 
@@ -760,8 +574,7 @@ export class BattleController extends Component {
     this.updateFloatingTexts(deltaTime);
     this.updateNotice(deltaTime);
     this.updateFocusZoom(deltaTime);
-    this.refreshBossBar(deltaTime);
-    this.refreshComboLabel(deltaTime);
+    this.updateComboTimer(deltaTime);
   }
 
   private updateVisualHierarchy(deltaTime: number): void {
@@ -896,32 +709,6 @@ export class BattleController extends Component {
       const config = heroConfigs.find((entry) => entry.name === hero.name);
       return multiplier + (config?.auraAttackSpeed ?? 0) * hero.level;
     }, 1);
-  }
-
-  private getBuildHintText(): string {
-    const fireScore =
-      (this.model.build.fire.burnDamageMultiplier > 1 ? 1 : 0) +
-      this.model.build.fire.spreadTargets;
-    const thunderScore =
-      this.model.build.thunder.chainTargets + (this.model.build.thunder.critChance > 0.12 ? 1 : 0);
-    const summonScore =
-      this.model.getHeroes().length +
-      (this.model.build.summon.heroDamageMultiplier > 1 ? 1 : 0) +
-      (this.model.build.summon.maxBoardHeroes > 3 ? 1 : 0);
-
-    if (fireScore >= thunderScore && fireScore >= summonScore && fireScore > 0) {
-      return t('hud.buildFire');
-    }
-
-    if (thunderScore >= fireScore && thunderScore >= summonScore && thunderScore > 0) {
-      return t('hud.buildThunder');
-    }
-
-    if (summonScore > 0) {
-      return t('hud.buildSummon');
-    }
-
-    return t('hud.buildUnknown');
   }
 
   private refreshHeroAvatarBar(): void {
@@ -1128,41 +915,13 @@ export class BattleController extends Component {
     this.battleLayer.setScale(1, 1, 1);
   }
 
-  private refreshBossBar(deltaTime = 1 / 60): void {
-    const boss = this.model.enemies.find((enemy) => enemy.kind === 'boss');
-
-    if (!boss) {
-      this.lastBossHp = Number.NaN;
-      this.bossHitFlashTimeLeft = 0;
-      this.bossHealthBarView.refresh('', 0, 1, false);
-      return;
-    }
-
-    if (!Number.isNaN(this.lastBossHp) && boss.hp < this.lastBossHp) {
-      this.bossHitFlashTimeLeft = 0.16;
-    }
-
-    this.lastBossHp = boss.hp;
-    this.bossHealthBarView.refresh(
-      boss.label,
-      boss.hp,
-      boss.maxHp,
-      this.getActiveVisualFocus() === 'boss',
-    );
-    this.bossHitFlashTimeLeft = Math.max(0, this.bossHitFlashTimeLeft - deltaTime);
-  }
-
-  private refreshComboLabel(deltaTime = 0): void {
+  private updateComboTimer(deltaTime = 0): void {
     if (this.comboTimeLeft > 0 && deltaTime > 0) {
       this.comboTimeLeft = Math.max(0, this.comboTimeLeft - deltaTime);
     }
-
-    if (this.comboCount <= 1 || this.comboTimeLeft <= 0) {
-      this.comboView.clear();
-      return;
+    if (this.comboTimeLeft <= 0) {
+      this.comboCount = 0;
     }
-
-    this.comboView.refresh(this.comboCount, true);
   }
 
   private showNotice(text: string, color: Color, fontSize: number, duration: number): void {
@@ -1297,11 +1056,7 @@ export class BattleController extends Component {
     this.focusTimeLeft = 0;
     this.visualFocusTimeLeft = 0;
     this.visualFocusTarget = 'none';
-    this.bossHitFlashTimeLeft = 0;
-    this.lastBossHp = Number.NaN;
     this.noticeLabel.string = '';
-    this.comboView.clear();
-    this.bossHealthBarView.refresh('', 0, 1, false);
     this.gridPlacementSystem.setMainOutputHero(0);
     this.battleLayer.setScale(1, 1, 1);
   }
