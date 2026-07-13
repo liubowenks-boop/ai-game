@@ -12,7 +12,9 @@ const ATLAS_COLUMNS = 10;
 const CELL_WIDTH = FRAME_WIDTH + FRAME_PADDING * 2;
 const CELL_HEIGHT = FRAME_HEIGHT + FRAME_PADDING * 2;
 const SOURCE_FPS = 24;
-const IDLE_FRAME = 18;
+const WALK_FIRST_FRAME = 18;
+const WALK_LAST_FRAME = 44;
+const IDLE_FRAME = WALK_FIRST_FRAME;
 
 let sharedFrames: SpriteFrame[] | null = null;
 let loading = false;
@@ -62,7 +64,12 @@ export class EnemyVideoPresentation {
   private readonly sprite: Sprite;
   private frames: SpriteFrame[] = [];
 
-  public constructor(parent: Node, setUiLayer: (node: Node) => void, isBoss: boolean) {
+  public constructor(
+    parent: Node,
+    setUiLayer: (node: Node) => void,
+    isBoss: boolean,
+    private readonly fallbackNode: Node,
+  ) {
     this.node = parent.getChildByName('EnemyVideoSprite') ?? new Node('EnemyVideoSprite');
     setUiLayer(this.node);
     const transform = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
@@ -79,6 +86,7 @@ export class EnemyVideoPresentation {
       if (!this.node.isValid) return;
       this.frames = frames;
       this.showFrame(IDLE_FRAME);
+      this.fallbackNode.active = false;
     });
   }
 
@@ -99,7 +107,7 @@ export class EnemyVideoPresentation {
         break;
       }
       case 'walk':
-        frameIndex = loopingFrame(animation.elapsed, phase, 18, 44);
+        frameIndex = loopingFrame(animation.elapsed, phase, WALK_FIRST_FRAME, WALK_LAST_FRAME);
         break;
       case 'attack_city':
       case 'boss_attack':

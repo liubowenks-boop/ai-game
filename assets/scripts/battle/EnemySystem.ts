@@ -153,13 +153,14 @@ export class EnemySystem {
       enemy.kind === 'boss' ? 96 : size + 10,
       'EnemyPortrait',
     );
-    portrait.active = false;
+    portrait.active = true;
     portrait.setSiblingIndex(1);
 
     const video = new EnemyVideoPresentation(
       node,
       (child) => this.setUiLayer(child),
       enemy.kind === 'boss',
+      portrait,
     );
 
     const healthBarNode = node.getChildByName('EnemyHealthBar') ?? new Node('EnemyHealthBar');

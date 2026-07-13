@@ -627,13 +627,31 @@ runTest('remote thunder mage video uses the wall position symmetric to qinglan',
     y: BATTLE_WALL_LAYOUT.qinglan.y,
   });
 
-  const videoSource = readFileSync(
-    'assets/scripts/battle/VideoCharacterPresentation.ts',
-    'utf8',
-  );
+  const videoSource = readFileSync('assets/scripts/battle/VideoCharacterPresentation.ts', 'utf8');
   assert.match(videoSource, /THUNDER_MAGE_COMPANION\.position\.y,\s*0,/);
   assert.equal(videoSource.includes('WALL_DEPTH_OFFSET_Y'), false);
   assert.match(videoSource, /transform\.setAnchorPoint\(0\.5, 0\.5\)/);
+});
+
+runTest('enemy video uses the remote run frames and keeps a portrait until ready', () => {
+  const videoSource = readFileSync('assets/scripts/battle/EnemyVideoPresentation.ts', 'utf8');
+  const enemySystemSource = readFileSync('assets/scripts/battle/EnemySystem.ts', 'utf8');
+
+  assert.match(videoSource, /enemy_video\/black_red_monster_atlas\/texture/);
+  assert.match(videoSource, /const SOURCE_FPS = 24/);
+  assert.match(videoSource, /const WALK_FIRST_FRAME = 18/);
+  assert.match(videoSource, /const WALK_LAST_FRAME = 44/);
+  assert.match(
+    videoSource,
+    /loopingFrame\(\s*animation\.elapsed,\s*phase,\s*WALK_FIRST_FRAME,\s*WALK_LAST_FRAME,?\s*\)/s,
+  );
+  assert.match(videoSource, /private readonly fallbackNode: Node/);
+  assert.match(videoSource, /this\.fallbackNode\.active = false/);
+  assert.match(enemySystemSource, /portrait\.active = true/);
+  assert.match(
+    enemySystemSource,
+    /new EnemyVideoPresentation\([\s\S]*?enemy\.kind === 'boss',[\s\S]*?portrait,?[\s\S]*?\)/,
+  );
 });
 
 runTest('battle controller delegates every fixed companion presentation lifecycle', () => {
