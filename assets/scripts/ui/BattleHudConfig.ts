@@ -13,6 +13,24 @@ export interface HudTrackSpec {
   radius: number;
 }
 
+export type HudColorTuple = readonly [number, number, number, number];
+export type GemPaletteName = 'ruby' | 'emerald' | 'topaz';
+
+export interface GemPaletteSpec {
+  base: HudColorTuple;
+  main: HudColorTuple;
+  highlight: HudColorTuple;
+  shadow: HudColorTuple;
+  glint: HudColorTuple;
+  facet: HudColorTuple;
+}
+
+export interface RightControlRects {
+  pauseResume: HudRect;
+  auto: HudRect;
+  statistics: HudRect;
+}
+
 function rect(x: number, y: number, width: number, height: number): HudRect {
   return { x, y, width, height };
 }
@@ -30,30 +48,93 @@ export const BattleHudConfig = {
   totalWaves: 50,
   maximumUltimate: 100,
   layout: {
-    wave: rect(0, 4, 300, 70),
-    remainingEnemies: rect(0, 78, 190, 76),
-    gold: rect(440, 4, 268, 70),
-    bossTitle: rect(310, 76, 150, 60),
-    bossHealth: rect(196, 126, 380, 92),
-    pauseResume: rect(610, 84, 96, 96),
-    auto: rect(602, 292, 104, 104),
-    statistics: rect(602, 410, 104, 104),
-    cityDurability: rect(145, 1024, 430, 96),
-    bond: rect(10, 1142, 110, 110),
+    wave: rect(0, 4, 150, 35),
+    remainingEnemies: rect(0, 45, 150, 60),
+    gold: rect(574, 4, 134, 35),
+    bossTitle: rect(322.5, 34, 75, 30),
+    bossHealth: rect(158, 66, 404, 76),
+    cityDurability: rect(90, 1040, 540, 64),
+    bond: rect(10, 1197, 55, 55),
     ultimate: rect(590, 1130, 124, 124),
   },
+  rightControls: {
+    right: 14,
+    top: 92,
+    itemWidth: 52,
+    itemHeight: 52,
+    spacing: 0,
+    pauseSkinWidth: 48,
+    pauseSkinHeight: 48,
+  },
+  valueLabels: {
+    wave: { x: 0, y: 0, width: 150, height: 21 },
+    remainingEnemies: { x: 0, y: -14, width: 100, height: 28 },
+    gold: { x: 21, y: 0, width: 77, height: 20 },
+  },
   tracks: {
-    boss: { x: 42, y: -3, width: 306, height: 24, radius: 12 },
-    city: { x: 40, y: -1, width: 330, height: 30, radius: 15 },
+    boss: { x: 20, y: -2, width: 315, height: 22, radius: 0 },
+    city: { x: 54, y: -1, width: 378, height: 24, radius: 0 },
   } satisfies Record<string, HudTrackSpec>,
   fontSizes: {
-    wave: 25,
-    remainingEnemies: 25,
-    gold: 26,
-    percent: 22,
+    wave: 12.5,
+    remainingEnemies: 22,
+    gold: 13,
+    percent: 18,
     ultimate: 17,
   },
+  cityThresholds: {
+    healthy: 0.55,
+    warning: 0.28,
+  },
+  gemPalettes: {
+    ruby: {
+      base: [72, 8, 17, 255],
+      main: [214, 31, 57, 255],
+      highlight: [255, 106, 64, 170],
+      shadow: [87, 5, 24, 190],
+      glint: [255, 235, 206, 190],
+      facet: [255, 70, 70, 70],
+    },
+    emerald: {
+      base: [5, 61, 47, 255],
+      main: [24, 189, 132, 255],
+      highlight: [91, 255, 200, 170],
+      shadow: [1, 70, 55, 190],
+      glint: [214, 255, 237, 190],
+      facet: [76, 232, 174, 70],
+    },
+    topaz: {
+      base: [89, 45, 4, 255],
+      main: [235, 153, 26, 255],
+      highlight: [255, 222, 92, 170],
+      shadow: [117, 54, 3, 190],
+      glint: [255, 250, 210, 190],
+      facet: [255, 193, 55, 70],
+    },
+  } satisfies Record<GemPaletteName, GemPaletteSpec>,
 } as const;
+
+export function getRightControlRects(): RightControlRects {
+  const config = BattleHudConfig.rightControls;
+  const x = BattleHudConfig.designWidth - config.right - config.itemWidth;
+  const step = config.itemHeight + config.spacing;
+  return {
+    pauseResume: rect(x, config.top, config.itemWidth, config.itemHeight),
+    auto: rect(x, config.top + step, config.itemWidth, config.itemHeight),
+    statistics: rect(x, config.top + step * 2, config.itemWidth, config.itemHeight),
+  };
+}
+
+export function getCityGemPaletteName(ratio: number): GemPaletteName {
+  const safeRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+  if (safeRatio > BattleHudConfig.cityThresholds.healthy) {
+    return 'emerald';
+  }
+  if (safeRatio > BattleHudConfig.cityThresholds.warning) {
+    return 'topaz';
+  }
+  return 'ruby';
+}
 
 export function hudRectsOverlap(left: HudRect, right: HudRect): boolean {
   return !(
