@@ -1,9 +1,18 @@
 // @ts-nocheck
-import { Button, Color, Graphics, Label, Node, UITransform } from 'cc';
+import { Button, Color, Graphics, Label, Layout, Node, UITransform } from 'cc';
 
-import { BattleHudConfig, HudRect, HudTrackSpec } from './BattleHudConfig';
+import {
+  BattleHudConfig,
+  GemPaletteName,
+  GemPaletteSpec,
+  getCityGemPaletteName,
+  HudColorTuple,
+  HudRect,
+  HudTrackSpec,
+} from './BattleHudConfig';
 import { BattleHudDisplayState } from './BattleHudLogic';
 import {
+  applyWidgetAlignment,
   bindOrCreateLabel,
   bindOrCreateUiArtSkinNode,
   setUiArtSkinFilename,
@@ -70,19 +79,32 @@ export class BattleHudView {
       BattleHudConfig.layout.bossHealth,
       HUD_ART.bossHealth,
     );
-    const pauseResume = this.createRoot(
-      topHudLayer,
+    const rightControlStack = this.createRightControlStack(topHudLayer);
+    const controlConfig = BattleHudConfig.rightControls;
+    const pauseResume = this.createSizedRoot(
+      rightControlStack,
       'PauseResumeHud',
-      BattleHudConfig.layout.pauseResume,
+      controlConfig.itemWidth,
+      controlConfig.itemHeight,
       HUD_ART.resume,
+      controlConfig.pauseSkinWidth,
+      controlConfig.pauseSkinHeight,
     );
-    const auto = this.createRoot(topHudLayer, 'AutoHud', BattleHudConfig.layout.auto, HUD_ART.auto);
-    const statistics = this.createRoot(
-      topHudLayer,
+    const auto = this.createSizedRoot(
+      rightControlStack,
+      'AutoHud',
+      controlConfig.itemWidth,
+      controlConfig.itemHeight,
+      HUD_ART.auto,
+    );
+    const statistics = this.createSizedRoot(
+      rightControlStack,
       'StatisticsHud',
-      BattleHudConfig.layout.statistics,
+      controlConfig.itemWidth,
+      controlConfig.itemHeight,
       HUD_ART.statistics,
     );
+    this.layoutRightControlStack(rightControlStack);
     const cityDurability = this.createRoot(
       midStatusLayer,
       'CityDurabilityHud',
@@ -121,29 +143,29 @@ export class BattleHudView {
     this.waveLabel = this.createValueLabel(
       wave.node,
       'WaveValue',
-      0,
-      0,
+      BattleHudConfig.valueLabels.wave.x,
+      BattleHudConfig.valueLabels.wave.y,
       BattleHudConfig.fontSizes.wave,
-      wave.node.getComponent(UITransform)?.width ?? BattleHudConfig.layout.wave.width,
-      42,
+      BattleHudConfig.valueLabels.wave.width,
+      BattleHudConfig.valueLabels.wave.height,
     );
     this.remainingEnemiesLabel = this.createValueLabel(
       remainingEnemies.node,
       'RemainingEnemiesValue',
-      18,
-      -18,
+      BattleHudConfig.valueLabels.remainingEnemies.x,
+      BattleHudConfig.valueLabels.remainingEnemies.y,
       BattleHudConfig.fontSizes.remainingEnemies,
-      105,
-      34,
+      BattleHudConfig.valueLabels.remainingEnemies.width,
+      BattleHudConfig.valueLabels.remainingEnemies.height,
     );
     this.goldLabel = this.createValueLabel(
       gold.node,
       'GoldValue',
-      42,
-      0,
+      BattleHudConfig.valueLabels.gold.x,
+      BattleHudConfig.valueLabels.gold.y,
       BattleHudConfig.fontSizes.gold,
-      154,
-      40,
+      BattleHudConfig.valueLabels.gold.width,
+      BattleHudConfig.valueLabels.gold.height,
     );
     this.bossPercentLabel = this.createValueLabel(
       bossHealth.node,
@@ -202,32 +224,76 @@ export class BattleHudView {
     this.bossHealthNode.active = bossVisible;
     if (state.boss) {
       this.bossPercentLabel.string = state.boss.percentText;
-      this.drawProgress(
+      this.drawGemProgress(
         this.bossProgress,
         BattleHudConfig.tracks.boss,
         state.boss.ratio,
-        new Color(190, 27, 22, 255),
+        'ruby',
       );
     }
 
     setUiArtSkinFilename(this.pauseResumeSkin, state.controlImage);
   }
 
-  private createRoot(parent: Node, name: string, rect: HudRect, filename: string): HudRoot {
-    const node = parent.getChildByName(name) ?? new Node(name);
+  private createRightControlStack(parent: Node): Node {
+    const node = parent.getChildByName('RightControlStack') ?? new Node('RightControlStack');
     setUiLayer(node);
     const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
-    transform.setContentSize(rect.width, rect.height);
-    node.setPosition(
-      rect.x + rect.width / 2 - BattleHudConfig.designWidth / 2,
-      BattleHudConfig.designHeight / 2 - rect.y - rect.height / 2,
-      0,
+    transform.setContentSize(
+      BattleHudConfig.rightControls.itemWidth,
+      BattleHudConfig.rightControls.itemHeight * 3,
     );
     if (!node.parent) {
       parent.addChild(node);
     }
-    const skin = bindOrCreateUiArtSkinNode(node, filename, rect.width, rect.height, 'HudSkin');
+    return node;
+  }
+
+  private layoutRightControlStack(node: Node): void {
+    const layout = node.getComponent(Layout) ?? node.addComponent(Layout);
+    layout.type = Layout.Type.VERTICAL;
+    layout.resizeMode = Layout.ResizeMode.CONTAINER;
+    layout.verticalDirection = Layout.VerticalDirection.TOP_TO_BOTTOM;
+    layout.spacingY = BattleHudConfig.rightControls.spacing;
+    layout.paddingTop = 0;
+    layout.paddingBottom = 0;
+    layout.updateLayout(true);
+    applyWidgetAlignment(node, {
+      right: BattleHudConfig.rightControls.right,
+      top: BattleHudConfig.rightControls.top,
+      alignMode: 'onWindowResize',
+    });
+  }
+
+  private createSizedRoot(
+    parent: Node,
+    name: string,
+    width: number,
+    height: number,
+    filename: string,
+    skinWidth = width,
+    skinHeight = height,
+  ): HudRoot {
+    const node = parent.getChildByName(name) ?? new Node(name);
+    setUiLayer(node);
+    const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+    transform.setContentSize(width, height);
+    node.setPosition(0, 0, 0);
+    if (!node.parent) {
+      parent.addChild(node);
+    }
+    const skin = bindOrCreateUiArtSkinNode(node, filename, skinWidth, skinHeight, 'HudSkin');
     return { node, skin };
+  }
+
+  private createRoot(parent: Node, name: string, rect: HudRect, filename: string): HudRoot {
+    const root = this.createSizedRoot(parent, name, rect.width, rect.height, filename);
+    root.node.setPosition(
+      rect.x + rect.width / 2 - BattleHudConfig.designWidth / 2,
+      BattleHudConfig.designHeight / 2 - rect.y - rect.height / 2,
+      0,
+    );
+    return root;
   }
 
   private createValueLabel(
@@ -276,49 +342,95 @@ export class BattleHudView {
   }
 
   private drawCityProgress(ratio: number): void {
-    const fillColor =
-      ratio > 0.55
-        ? new Color(49, 185, 79, 255)
-        : ratio > 0.28
-          ? new Color(225, 167, 45, 255)
-          : new Color(205, 43, 31, 255);
-    this.drawProgress(this.cityProgress, BattleHudConfig.tracks.city, ratio, fillColor);
+    this.drawGemProgress(
+      this.cityProgress,
+      BattleHudConfig.tracks.city,
+      ratio,
+      getCityGemPaletteName(ratio),
+    );
   }
 
-  private drawProgress(
+  private toColor(color: HudColorTuple): Color {
+    return new Color(color[0], color[1], color[2], color[3]);
+  }
+
+  private fillRect(
+    graphics: Graphics,
+    color: HudColorTuple,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    graphics.fillColor = this.toColor(color);
+    graphics.rect(x, y, width, height);
+    graphics.fill();
+  }
+
+  private drawGemProgress(
     graphics: Graphics,
     track: HudTrackSpec,
     ratio: number,
-    fillColor: Color,
+    paletteName: GemPaletteName,
   ): void {
     const clampedRatio = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
+    const palette: GemPaletteSpec = BattleHudConfig.gemPalettes[paletteName];
     const left = track.x - track.width / 2;
     const bottom = track.y - track.height / 2;
     graphics.clear();
-    graphics.fillColor = new Color(20, 12, 10, 250);
-    graphics.roundRect(left, bottom, track.width, track.height, track.radius);
-    graphics.fill();
+    this.fillRect(graphics, [20, 12, 10, 250], left, bottom, track.width, track.height);
 
-    const fillWidth = track.width * clampedRatio;
-    if (fillWidth <= 0) {
+    const inset = 2;
+    const innerLeft = left + inset;
+    const innerBottom = bottom + inset;
+    const innerWidth = Math.max(0, track.width - inset * 2);
+    const innerHeight = Math.max(0, track.height - inset * 2);
+    const fillWidth = clampedRatio > 0 ? Math.max(1, innerWidth * clampedRatio) : 0;
+    if (fillWidth <= 0 || innerHeight <= 0) {
       return;
     }
-    const fillRadius = Math.min(track.radius - 2, fillWidth / 2);
-    graphics.fillColor = fillColor;
-    graphics.roundRect(
-      left + 2,
-      bottom + 2,
-      Math.max(1, fillWidth - 4),
-      track.height - 4,
-      fillRadius,
-    );
-    graphics.fill();
 
-    const sheenWidth = Math.max(0, fillWidth - 10);
-    if (sheenWidth > 0) {
-      graphics.fillColor = new Color(255, 255, 255, 82);
-      graphics.roundRect(left + 5, bottom + track.height - 8, sheenWidth, 4, 2);
-      graphics.fill();
+    this.fillRect(graphics, palette.base, innerLeft, innerBottom, fillWidth, innerHeight);
+    const faceInset = Math.min(1, fillWidth / 3, innerHeight / 3);
+    const faceLeft = innerLeft + faceInset;
+    const faceBottom = innerBottom + faceInset;
+    const faceWidth = Math.max(0, fillWidth - faceInset * 2);
+    const faceHeight = Math.max(0, innerHeight - faceInset * 2);
+    this.fillRect(graphics, palette.main, faceLeft, faceBottom, faceWidth, faceHeight);
+    this.fillRect(
+      graphics,
+      palette.highlight,
+      faceLeft,
+      faceBottom + faceHeight * 0.68,
+      faceWidth,
+      faceHeight * 0.32,
+    );
+    this.fillRect(graphics, palette.shadow, faceLeft, faceBottom, faceWidth, faceHeight * 0.25);
+
+    if (faceWidth > 6) {
+      this.fillRect(
+        graphics,
+        palette.glint,
+        faceLeft + 3,
+        faceBottom + faceHeight - 3,
+        Math.max(0, faceWidth - 6),
+        1.5,
+      );
+    }
+
+    const facetRight = faceLeft + faceWidth;
+    for (let facetX = faceLeft + 18; facetX < facetRight; facetX += 24) {
+      this.fillRect(
+        graphics,
+        palette.facet,
+        facetX,
+        faceBottom + 1,
+        Math.min(5, facetRight - facetX),
+        Math.max(0, faceHeight - 2),
+      );
     }
   }
 }

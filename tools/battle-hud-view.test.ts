@@ -29,9 +29,20 @@ assert.match(view, /state\.boss === null/);
 assert.match(view, /this\.bossTitleNode\.active = bossVisible/);
 assert.match(view, /this\.bossHealthNode\.active = bossVisible/);
 assert.match(view, /setUiArtSkinFilename\(this\.pauseResumeSkin, state\.controlImage\)/);
-assert.match(view, /private drawProgress\(/);
-assert.match(view, /ratio > 0\.55/);
-assert.match(view, /ratio > 0\.28/);
+assert.match(view, /Layout/);
+assert.match(view, /applyWidgetAlignment/);
+assert.match(view, /new Node\('RightControlStack'\)/);
+assert.match(view, /Layout\.Type\.VERTICAL/);
+assert.match(view, /Layout\.ResizeMode\.CONTAINER/);
+assert.match(view, /Layout\.VerticalDirection\.TOP_TO_BOTTOM/);
+assert.match(view, /layout\.spacingY = BattleHudConfig\.rightControls\.spacing/);
+assert.match(view, /private drawGemProgress\(/);
+assert.match(view, /getCityGemPaletteName\(ratio\)/);
+assert.match(view, /graphics\.rect\(/);
+assert.doesNotMatch(view, /graphics\.roundRect\(/);
+assert.match(view, /this\.createSizedRoot\(\s*rightControlStack,\s*'PauseResumeHud'/s);
+assert.match(view, /this\.createSizedRoot\(\s*rightControlStack,\s*'AutoHud'/s);
+assert.match(view, /this\.createSizedRoot\(\s*rightControlStack,\s*'StatisticsHud'/s);
 assert.match(view, /Button\.EventType\.CLICK/);
 assert.match(
   view,
