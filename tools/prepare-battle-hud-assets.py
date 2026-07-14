@@ -10,7 +10,8 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOT = Path("/Users/hudaijin/Downloads/icon")
+ICON_SOURCE_ROOT = Path("/Users/hudaijin/Downloads/icon")
+DOWNLOADS_ROOT = Path("/Users/hudaijin/Downloads")
 OUTPUT_ROOT = ROOT / "assets" / "bundles" / "ui" / "ui_hud_custom"
 MANIFEST = ROOT / "assets" / "scripts" / "ui" / "UiArtManifest.ts"
 PREVIEW = ROOT / "docs" / "ui_art_generated" / "atlas_previews" / "ui_hud_custom_preview.png"
@@ -18,26 +19,42 @@ PREVIEW = ROOT / "docs" / "ui_art_generated" / "atlas_previews" / "ui_hud_custom
 
 @dataclass(frozen=True)
 class HudAsset:
-  source: str
+  source_path: Path
   filename: str
   maximum_edge: int
 
 
+def icon_source(filename: str) -> Path:
+  return ICON_SOURCE_ROOT / filename
+
+
+def download_source(filename: str) -> Path:
+  return DOWNLOADS_ROOT / filename
+
+
 ASSETS = (
-  HudAsset("怪物波数显示.png", "hud_wave_panel.png", 1024),
-  HudAsset("剩余敌人显示图标.png", "hud_remaining_enemies.png", 768),
-  HudAsset("金币显示面板.png", "hud_gold_panel.png", 1024),
-  HudAsset("首领显示图标.png", "hud_boss_title.png", 768),
-  HudAsset("首领血条显示.png", "hud_boss_health_frame.png", 1024),
-  HudAsset("城门耐久状态条.png", "hud_city_durability_frame.png", 1024),
+  HudAsset(icon_source("怪物波数显示.png"), "hud_wave_panel.png", 1024),
+  HudAsset(icon_source("剩余敌人显示图标.png"), "hud_remaining_enemies.png", 768),
+  HudAsset(icon_source("金币显示面板.png"), "hud_gold_panel.png", 1024),
+  HudAsset(icon_source("首领显示图标.png"), "hud_boss_title.png", 768),
+  HudAsset(
+    download_source("ChatGPT Image 2026年7月14日 11_58_47.png"),
+    "hud_boss_health_frame.png",
+    1024,
+  ),
+  HudAsset(
+    download_source("ChatGPT Image 2026年7月14日 11_45_20.png"),
+    "hud_city_durability_frame.png",
+    1024,
+  ),
   # The source filenames and the depicted symbols are reversed. Runtime names
   # follow the depicted action: pause uses ||, resume uses the play triangle.
-  HudAsset("继续按钮标志.png", "hud_pause_button.png", 768),
-  HudAsset("暂停按钮图标.png", "hud_resume_button.png", 768),
-  HudAsset("自动图标设计.png", "hud_auto_button_custom.png", 768),
-  HudAsset("羁绊徽章.png", "hud_bond_button_custom.png", 768),
-  HudAsset("统计图标设计.png", "hud_statistics_button.png", 768),
-  HudAsset("绝技徽章设计.png", "hud_ultimate_badge_custom.png", 768),
+  HudAsset(icon_source("继续按钮标志.png"), "hud_pause_button.png", 768),
+  HudAsset(icon_source("暂停按钮图标.png"), "hud_resume_button.png", 768),
+  HudAsset(icon_source("自动图标设计.png"), "hud_auto_button_custom.png", 768),
+  HudAsset(icon_source("羁绊徽章.png"), "hud_bond_button_custom.png", 768),
+  HudAsset(icon_source("统计图标设计.png"), "hud_statistics_button.png", 768),
+  HudAsset(icon_source("绝技徽章设计.png"), "hud_ultimate_badge_custom.png", 768),
 )
 
 
@@ -203,7 +220,7 @@ def create_preview(rows: list[tuple[HudAsset, Image.Image, str, str]]) -> None:
 
 
 def main() -> None:
-  missing = [asset.source for asset in ASSETS if not (SOURCE_ROOT / asset.source).exists()]
+  missing = [str(asset.source_path) for asset in ASSETS if not asset.source_path.exists()]
   if missing:
     raise FileNotFoundError(f"missing HUD source images: {', '.join(missing)}")
 
@@ -211,7 +228,7 @@ def main() -> None:
   write_directory_meta(OUTPUT_ROOT)
   generated: list[tuple[HudAsset, Image.Image, str, str]] = []
   for asset in ASSETS:
-    with Image.open(SOURCE_ROOT / asset.source) as source:
+    with Image.open(asset.source_path) as source:
       image = resize_for_runtime(remove_connected_white_canvas(source), asset.maximum_edge)
     output = OUTPUT_ROOT / asset.filename
     image.save(output, optimize=True)

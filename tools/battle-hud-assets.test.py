@@ -9,6 +9,17 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "assets" / "bundles" / "ui" / "ui_hud_custom"
 MANIFEST = ROOT / "assets" / "scripts" / "ui" / "UiArtManifest.ts"
+PREPARE = ROOT / "tools" / "prepare-battle-hud-assets.py"
+
+NEW_SOURCE_NAMES = {
+  "hud_city_durability_frame.png": "ChatGPT Image 2026年7月14日 11_45_20.png",
+  "hud_boss_health_frame.png": "ChatGPT Image 2026年7月14日 11_58_47.png",
+}
+
+MINIMUM_ASPECT_RATIOS = {
+  "hud_city_durability_frame.png": 7.5,
+  "hud_boss_health_frame.png": 5.0,
+}
 
 EXPECTED = {
   "hud_wave_panel.png",
@@ -28,6 +39,10 @@ EXPECTED = {
 
 assert OUTPUT.is_dir(), f"missing generated asset directory: {OUTPUT}"
 manifest_text = MANIFEST.read_text(encoding="utf-8")
+prepare_text = PREPARE.read_text(encoding="utf-8")
+
+for filename, source_name in NEW_SOURCE_NAMES.items():
+  assert source_name in prepare_text, f"{filename} is not mapped to the supplied source"
 
 for filename in sorted(EXPECTED):
   image_path = OUTPUT / filename
@@ -45,6 +60,11 @@ for filename in sorted(EXPECTED):
     )
     assert corners == (0, 0, 0, 0), f"{filename} still has an opaque white canvas"
     assert alpha.getextrema() == (0, 255), f"{filename} should contain transparent and opaque pixels"
+    minimum_aspect = MINIMUM_ASPECT_RATIOS.get(filename)
+    if minimum_aspect is not None:
+      assert image.width / image.height >= minimum_aspect, (
+        f"{filename} was not cropped to the supplied horizontal frame"
+      )
 
   meta_path = image_path.with_suffix(".png.meta")
   meta = json.loads(meta_path.read_text(encoding="utf-8"))
