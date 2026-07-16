@@ -231,6 +231,63 @@ for (const region of regions) {
   }
 }
 
+const regionByName = new Map(regions.map((region) => [region.name, region]));
+const leakedBackgroundSamples: Readonly<Record<string, readonly [number, number][]>> = {
+  frame_0: [
+    [167, 242],
+    [281, 237],
+    [302, 269],
+    [333, 252],
+  ],
+  frame_2: [
+    [212, 236],
+    [252, 220],
+  ],
+  frame_5: [
+    [147, 246],
+    [257, 243],
+    [110, 275],
+  ],
+  frame_7: [
+    [141, 221],
+    [243, 222],
+    [259, 254],
+    [299, 236],
+  ],
+};
+
+for (const [regionName, samples] of Object.entries(leakedBackgroundSamples)) {
+  const region = regionByName.get(regionName);
+  assert.ok(region, `missing atlas region ${regionName}`);
+  for (const [localX, localY] of samples) {
+    assert.equal(
+      png.alphaAt(region.x + localX, region.y + localY),
+      0,
+      `${regionName} enclosed white background should be transparent at ${localX},${localY}`,
+    );
+  }
+}
+
+const preservedFireHighlights: Readonly<Record<string, readonly [number, number][]>> = {
+  frame_0: [[365, 88]],
+  frame_2: [[318, 92]],
+  frame_5: [
+    [58, 219],
+    [238, 45],
+  ],
+};
+
+for (const [regionName, samples] of Object.entries(preservedFireHighlights)) {
+  const region = regionByName.get(regionName);
+  assert.ok(region, `missing atlas region ${regionName}`);
+  for (const [localX, localY] of samples) {
+    assert.ok(
+      png.alphaAt(region.x + localX, region.y + localY) > 0,
+      `${regionName} fire highlight should remain visible at ${localX},${localY}`,
+    );
+  }
+}
+
 for (const fileName of requiredFiles) {
   requireFile(join(assetDir, `${fileName}.meta`));
 }

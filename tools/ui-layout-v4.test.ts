@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   BattleUiDesign,
   BattleUiV4Layout,
@@ -36,57 +38,72 @@ function assertRect(layout: Record<string, RectSpec>, key: string): RectSpec {
 }
 
 function main(): void {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+  const gridSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
+
+  assert(!controllerSource.includes('CityLineFill'), 'city line fill must not be created');
+  assert(!controllerSource.includes('CityLineStroke'), 'city line stroke must not be created');
+  assert(!controllerSource.includes('redrawCityLine'), 'city line must never be redrawn');
+  assert(
+    !controllerSource.includes('drawPlayerAttackAccent'),
+    'round player accent must be removed',
+  );
+  assert(!controllerSource.includes("t('hud.tower')"), 'tower button must not be created');
+  assert(!controllerSource.includes("t('hud.oil')"), 'oil button must not be created');
+  assert(!gridSource.includes('drawSlotButton('), 'slot circle renderer must be removed');
+  assert(!gridSource.includes('drawPlainButton('), 'plain circle renderer must be removed');
+  assert(!gridSource.includes('view.graphics.circle('), 'placement graphics must not draw circles');
+
   const layout = BattleUiV4Layout;
   const layoutMap = layout as Record<string, RectSpec>;
+  assert(!('towerButton' in layoutMap), 'tower button layout must not exist');
+  assert(!('oilButton' in layoutMap), 'oil button layout must not exist');
 
+  const portraitSlotXs = [
+    assertRect(layoutMap, 'heroAvatarSlot1').x,
+    assertRect(layoutMap, 'heroAvatarSlot2').x,
+    assertRect(layoutMap, 'heroAvatarSlot3').x,
+    assertRect(layoutMap, 'heroAvatarSlot4').x,
+    assertRect(layoutMap, 'heroAvatarSlot5').x,
+  ];
   assert(
-    !rectsOverlap(layout.upgradePanel, layout.autoButton),
-    'auto button overlaps upgrade panel',
+    JSON.stringify(portraitSlotXs) === JSON.stringify([-136, -68, 0, 68, 136]),
+    'hero rail should expose five centered portrait slots',
   );
-  assert(
-    !rectsOverlap(layout.upgradePanel, layout.ultimateButton),
-    'ultimate button overlaps upgrade panel',
-  );
-  assert(!rectsOverlap(layout.heroBar, layout.ultimateButton), 'ultimate button overlaps hero bar');
-  assertNear(
-    layout.towerButton.y,
-    layout.cityHp.y,
-    'tower button center should align with city hp',
-  );
-  assertNear(layout.oilButton.y, layout.cityHp.y, 'oil button center should align with city hp');
-
-  const cityHealthBar = assertRect(layoutMap, 'cityHealthBar');
-  const comboBadge = assertRect(layoutMap, 'comboBadge');
-  const statusLabel = assertRect(layoutMap, 'statusLabel');
-  const buildHintLabel = assertRect(layoutMap, 'buildHintLabel');
+  assert(!('heroAvatarSlot6' in layoutMap), 'sixth portrait slot should not exist');
   const placementTitle = assertRect(layoutMap, 'placementTitle');
   const placementPending = assertRect(layoutMap, 'placementPending');
   const upgradeScrim = assertRect(layoutMap, 'upgradeScrim');
-  const gridSlotFront1 = assertRect(layoutMap, 'gridSlotFront1');
-  const gridSlotFront2 = assertRect(layoutMap, 'gridSlotFront2');
-  const gridSlotFront3 = assertRect(layoutMap, 'gridSlotFront3');
-  const gridSlotBack1 = assertRect(layoutMap, 'gridSlotBack1');
-  const gridSlotBack2 = assertRect(layoutMap, 'gridSlotBack2');
+  const wallSlotThunderMage = assertRect(layoutMap, 'wallSlotThunderMage');
+  const wallSlotOrdinary1 = assertRect(layoutMap, 'wallSlotOrdinary1');
+  const wallSlotOrdinary2 = assertRect(layoutMap, 'wallSlotOrdinary2');
+  const wallSlotQinglan = assertRect(layoutMap, 'wallSlotQinglan');
+  assert(!('wallSlotOrdinary3' in layoutMap), 'third ordinary wall slot must not exist');
   const mainHeroUnit = assertRect(layoutMap, 'mainHeroUnit');
+  const formation = [
+    wallSlotThunderMage,
+    wallSlotOrdinary1,
+    mainHeroUnit,
+    wallSlotOrdinary2,
+    wallSlotQinglan,
+  ];
 
-  assert(!rectsOverlap(cityHealthBar, comboBadge), 'combo badge overlaps city health bar');
-  assert(!rectsOverlap(cityHealthBar, statusLabel), 'status label overlaps city health bar');
-  assert(!rectsOverlap(cityHealthBar, buildHintLabel), 'build hint overlaps city health bar');
-  assert(!rectsOverlap(comboBadge, statusLabel), 'combo badge overlaps status label');
-  assert(!rectsOverlap(comboBadge, buildHintLabel), 'combo badge overlaps build hint');
-  assert(!rectsOverlap(statusLabel, buildHintLabel), 'status label overlaps build hint');
-  assert(!rectsOverlap(statusLabel, layout.towerButton), 'status label overlaps tower button');
-  assert(!rectsOverlap(buildHintLabel, layout.oilButton), 'build hint overlaps oil button');
-  assert(!rectsOverlap(cityHealthBar, layout.towerButton), 'city health bar overlaps tower button');
-  assert(!rectsOverlap(cityHealthBar, layout.oilButton), 'city health bar overlaps oil button');
+  assert(
+    JSON.stringify(formation.map((rect) => rect.x)) === JSON.stringify([-215, -120, 0, 120, 215]),
+    'wall formation uses fixed companions at the outer positions',
+  );
+  assert(
+    JSON.stringify(formation.map((rect) => rect.y)) ===
+      JSON.stringify([-205, -270, -250, -270, -205]),
+    'fixed companions should stand slightly behind the ordinary wall formation',
+  );
+  for (let index = 2; index < formation.length - 1; index += 1) {
+    assert(!rectsOverlap(formation[index - 1], formation[index]), 'adjacent wall units overlap');
+  }
+
   assert(
     !rectsOverlap(placementTitle, placementPending),
     'placement title overlaps pending placement label',
-  );
-  assert(!rectsOverlap(placementTitle, cityHealthBar), 'placement title overlaps city health bar');
-  assert(
-    !rectsOverlap(placementPending, cityHealthBar),
-    'pending placement label overlaps city health bar',
   );
   assert(!rectsOverlap(placementTitle, layout.heroBar), 'placement title overlaps hero bar');
   assert(
@@ -116,30 +133,16 @@ function main(): void {
     'upgrade dimmer should cover portrait height',
   );
   assert(
-    !rectsOverlap(layout.upgradePanel, layout.topHud),
-    'centered upgrade panel should not overlap top hud',
-  );
-  assert(
     !rectsOverlap(layout.upgradePanel, layout.heroBar),
     'centered upgrade panel should not overlap bottom hero bar',
   );
 
-  for (const gridRect of [
-    gridSlotFront1,
-    gridSlotFront2,
-    gridSlotFront3,
-    gridSlotBack1,
-    gridSlotBack2,
-    mainHeroUnit,
-  ]) {
-    assert(!rectsOverlap(statusLabel, gridRect), 'status label overlaps board units');
-    assert(!rectsOverlap(buildHintLabel, gridRect), 'build hint overlaps board units');
+  for (const gridRect of formation) {
     assert(!rectsOverlap(placementTitle, gridRect), 'placement title overlaps board units');
     assert(
       !rectsOverlap(placementPending, gridRect),
       'pending placement label overlaps board units',
     );
-    assert(!rectsOverlap(cityHealthBar, gridRect), 'city health bar overlaps board units');
   }
 
   for (const [name, rect] of Object.entries(layout)) {

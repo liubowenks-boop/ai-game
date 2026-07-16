@@ -19,6 +19,7 @@ import {
   tickUnitAnimation,
 } from './UnitAnimationSystem';
 import { getEnemyAnimationProfile } from '../data/AnimationConfig';
+import { EnemyVideoPresentation } from './EnemyVideoPresentation';
 
 interface EnemyNodeView {
   node: Node;
@@ -35,6 +36,7 @@ interface EnemyNodeView {
   dying: boolean;
   animation: UnitAnimationRuntime;
   animationPose: UnitAnimationPose;
+  video: EnemyVideoPresentation;
 }
 
 export type VisualFocusTarget = 'none' | 'boss' | 'city' | 'combo' | 'output';
@@ -132,7 +134,9 @@ export class EnemySystem {
   }
 
   private createEnemyView(enemy: EnemyState): EnemyNodeView {
-    const node = this.enemyTemplate ? instantiate(this.enemyTemplate) : new Node(`Enemy_${enemy.id}`);
+    const node = this.enemyTemplate
+      ? instantiate(this.enemyTemplate)
+      : new Node(`Enemy_${enemy.id}`);
     node.name = `Enemy_${enemy.id}`;
     node.active = true;
     this.setUiLayer(node);
@@ -149,11 +153,20 @@ export class EnemySystem {
       enemy.kind === 'boss' ? 96 : size + 10,
       'EnemyPortrait',
     );
+    portrait.active = true;
     portrait.setSiblingIndex(1);
+
+    const video = new EnemyVideoPresentation(
+      node,
+      (child) => this.setUiLayer(child),
+      enemy.kind === 'boss',
+      portrait,
+    );
 
     const healthBarNode = node.getChildByName('EnemyHealthBar') ?? new Node('EnemyHealthBar');
     this.setUiLayer(healthBarNode);
-    const healthBarTransform = healthBarNode.getComponent(UITransform) ?? healthBarNode.addComponent(UITransform);
+    const healthBarTransform =
+      healthBarNode.getComponent(UITransform) ?? healthBarNode.addComponent(UITransform);
     healthBarTransform.setContentSize(
       enemy.kind === 'boss' ? 118 : 86,
       enemy.kind === 'boss' ? 16 : 12,
@@ -196,7 +209,12 @@ export class EnemySystem {
       baseY: enemy.position.y,
       dying: false,
       animation,
-      animationPose: computeProceduralAnimationPose('spawn', 0, enemy.kind === 'boss' ? 'boss' : 'enemy'),
+      animationPose: computeProceduralAnimationPose(
+        'spawn',
+        0,
+        enemy.kind === 'boss' ? 'boss' : 'enemy',
+      ),
+      video,
     };
     this.drawEnemy(enemy, view, false, { focus: 'none' });
     this.enemyViews.set(enemy.id, view);
@@ -223,6 +241,7 @@ export class EnemySystem {
     );
     view.node.setScale(view.animationPose.scaleX, view.animationPose.scaleY, 1);
     view.node.angle = view.animationPose.rotation;
+    view.video.update(view.animation, view.bobPhase, 255, false);
 
     if (isUnitAnimationComplete(view.animation)) {
       view.node.destroy();
@@ -242,7 +261,6 @@ export class EnemySystem {
     const focusOnBurst = visualContext.focus === 'combo';
     const muted = (!important && crowded) || (!important && (focusOnP0 || focusOnBurst));
     const alpha = this.getEnemyAlpha(enemy, muted, focusOnP0 || focusOnBurst);
-    const fillColorRaw = this.getEnemyColor(enemy, alpha);
     const flash = view.flashTimeLeft > 0;
     const bossFocused = enemy.kind === 'boss' && visualContext.focus === 'boss';
     const scale = this.getEnemyScale(enemy, flash, bossFocused, muted);
@@ -250,6 +268,7 @@ export class EnemySystem {
 
     view.node.setScale(scale * pose.scaleX, scale * pose.scaleY, 1);
     view.graphics.clear();
+    view.video.update(view.animation, view.bobPhase, alpha, flash);
 
     // Ground shadow (stays on ground, doesn't bob with body)
     const shadowAlpha = Math.min(alpha, 110);
@@ -259,66 +278,13 @@ export class EnemySystem {
 
     if (enemy.kind === 'boss') {
       view.graphics.strokeColor = new Color(255, 72, 72, bossFocused ? 165 : 105);
-      view.graphics.lineWidth = bossFocused ? 14 : 10;
-      view.graphics.roundRect(-size / 2 - 10, -size / 2 - 10, size + 20, size + 20, 16);
+      view.graphics.lineWidth = bossFocused ? 7 : 5;
+      view.graphics.ellipse(0, -size / 2 - 3, size * 0.82, size * 0.3);
       view.graphics.stroke();
     } else if (important) {
       view.graphics.strokeColor = new Color(255, 212, 96, alpha > 220 ? 120 : 80);
-      view.graphics.lineWidth = 7;
-      view.graphics.roundRect(-size / 2 - 5, -size / 2 - 5, size + 10, size + 10, 12);
-      view.graphics.stroke();
-    }
-
-    const fillColor = flash
-      ? new Color(255, 246, 210, enemy.kind === 'boss' ? 255 : 220)
-      : fillColorRaw;
-
-    // Bottom darker layer (depth shadow on lower half)
-    view.graphics.fillColor = new Color(
-      Math.max(0, fillColor.r - 50),
-      Math.max(0, fillColor.g - 50),
-      Math.max(0, fillColor.b - 40),
-      fillColor.a,
-    );
-    view.graphics.roundRect(-size / 2, -size / 2, size, size * 0.6, enemy.kind === 'boss' ? 12 : 8);
-    view.graphics.fill();
-
-    // Main body
-    view.graphics.fillColor = fillColor;
-    view.graphics.roundRect(-size / 2, -size / 2 + size * 0.2, size, size * 0.8, enemy.kind === 'boss' ? 12 : 8);
-    view.graphics.fill();
-
-    // Top highlight layer (lighter, gives gradient feel)
-    view.graphics.fillColor = new Color(
-      Math.min(255, fillColor.r + 50),
-      Math.min(255, fillColor.g + 50),
-      Math.min(255, fillColor.b + 40),
-      Math.floor(fillColor.a * 0.5),
-    );
-    view.graphics.roundRect(-size / 2 + 4, -size / 2 + 4, size - 8, size * 0.35, enemy.kind === 'boss' ? 10 : 6);
-    view.graphics.fill();
-
-    // Outline
-    view.graphics.strokeColor = flash
-      ? new Color(255, 255, 255, 255)
-      : important
-        ? new Color(255, 224, 128, alpha)
-        : new Color(255, 230, 160, Math.min(alpha, 210));
-    view.graphics.lineWidth = enemy.kind === 'boss' ? 6 : important ? 4 : 3;
-    view.graphics.roundRect(-size / 2, -size / 2, size, size, enemy.kind === 'boss' ? 12 : 8);
-    view.graphics.stroke();
-
-    if (enemy.burnStacks > 0) {
-      view.graphics.strokeColor = new Color(255, 124, 42, muted ? 135 : 255);
-      view.graphics.lineWidth = important ? 4 : 3;
-      view.graphics.circle(0, 0, size / 2 + 5);
-      view.graphics.stroke();
-    }
-
-    if (enemy.poisonStacks > 0) {
-      view.graphics.strokeColor = new Color(108, 255, 112, muted ? 125 : 240);
-      view.graphics.lineWidth = important ? 4 : 3;
-      view.graphics.circle(0, 0, size / 2 + 9);
+      view.graphics.lineWidth = 4;
+      view.graphics.ellipse(0, -size / 2 - 3, size * 0.72, size * 0.24);
       view.graphics.stroke();
     }
 
@@ -494,19 +460,9 @@ export class EnemySystem {
   }
 
   private getEnemyAlpha(enemy: EnemyState, muted: boolean, focusOnMajorTarget: boolean): number {
-    if (enemy.kind === 'boss') {
-      return 255;
-    }
-
-    if (enemy.kind === 'tank' || enemy.kind === 'ranged') {
-      return focusOnMajorTarget ? 210 : 245;
-    }
-
-    if (muted) {
-      return focusOnMajorTarget ? 112 : 140;
-    }
-
-    return 178;
+    // Keep the keyed video monster fully opaque. Visual focus may still adjust
+    // labels, rings, and scale, but must not fade the monster itself.
+    return 255;
   }
 
   private getEnemyScale(

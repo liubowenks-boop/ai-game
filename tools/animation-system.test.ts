@@ -1,20 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import {
-  ENEMY_ANIMATION_PROFILES,
-  HERO_ANIMATION_PROFILES,
-  PLAYER_ATTACK_ANIMATION_BASE_DURATION,
-  PLAYER_ATTACK_ANIMATION_MAX_DURATION,
-  PLAYER_ATTACK_ANIMATION_MIN_DURATION,
-  PLAYER_ANIMATION_PROFILE,
-  REQUIRED_ENEMY_ANIMATION_STATES,
-  REQUIRED_HERO_ANIMATION_STATES,
-  SPINE_ASSET_REQUIREMENTS,
-  getEnemyAnimationProfile,
-  getHeroAnimationProfile,
-  resolvePlayerAttackAnimationTiming,
-} from '../assets/scripts/data/AnimationConfig';
+import * as AnimationConfig from '../assets/scripts/data/AnimationConfig';
+import { BATTLE_WALL_LAYOUT } from '../assets/scripts/data/BattleTerrainConfig';
+import { QINGLAN_COMPANION, THUNDER_MAGE_COMPANION } from '../assets/scripts/data/CompanionConfig';
 import {
   computeProceduralAnimationPose,
   createUnitAnimationRuntime,
@@ -23,6 +12,39 @@ import {
   resolveEnemyAnimationState,
   tickUnitAnimation,
 } from '../assets/scripts/battle/UnitAnimationSystem';
+import {
+  advanceFixedCompanionAttackElapsed,
+  FixedCompanionSkeletonLoadCoordinator,
+  resolveFixedCompanionFrameIndex,
+} from '../assets/scripts/battle/FixedCompanionPresentationLogic';
+import {
+  advanceThunderMageProjectile,
+  resolveThunderMageAttackFrameIndex,
+  ThunderMageSkeletonLoadCoordinator,
+} from '../assets/scripts/battle/ThunderMagePresentationLogic';
+
+const {
+  ENEMY_ANIMATION_PROFILES,
+  HERO_ANIMATION_PROFILES,
+  PLAYER_ATTACK_ANIMATION_BASE_DURATION,
+  PLAYER_ATTACK_ANIMATION_MAX_DURATION,
+  PLAYER_ATTACK_ANIMATION_MIN_DURATION,
+  PLAYER_ANIMATION_PROFILE,
+  QINGLAN_ANIMATION_PROFILE,
+  REQUIRED_ENEMY_ANIMATION_STATES,
+  REQUIRED_HERO_ANIMATION_STATES,
+  SPINE_ASSET_REQUIREMENTS,
+  THUNDER_MAGE_ANIMATION_PROFILE,
+  THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION,
+  THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION,
+  THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION,
+  getAnimationClipSpec,
+  getEnemyAnimationProfile,
+  getHeroAnimationProfile,
+  resolveFixedCompanionAttackAnimationTiming,
+  resolvePlayerAttackAnimationTiming,
+  resolveThunderMageAttackAnimationTiming,
+} = AnimationConfig;
 
 function runTest(name: string, testBody: () => void): void {
   testBody();
@@ -34,20 +56,242 @@ runTest('animation profiles cover required hero and enemy states', () => {
 
   for (const profile of Object.values(ENEMY_ANIMATION_PROFILES)) {
     for (const state of REQUIRED_ENEMY_ANIMATION_STATES) {
-      assert.ok(profile.clips.some((clip) => clip.state === state), `${profile.id} missing ${state}`);
+      assert.ok(
+        profile.clips.some((clip) => clip.state === state),
+        `${profile.id} missing ${state}`,
+      );
     }
   }
 
   for (const profile of Object.values(HERO_ANIMATION_PROFILES)) {
     for (const state of REQUIRED_HERO_ANIMATION_STATES) {
-      assert.ok(profile.clips.some((clip) => clip.state === state), `${profile.id} missing ${state}`);
+      assert.ok(
+        profile.clips.some((clip) => clip.state === state),
+        `${profile.id} missing ${state}`,
+      );
     }
   }
 
-  assert.equal(getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_intro'), true);
-  assert.equal(getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_attack'), true);
+  assert.equal(
+    getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_intro'),
+    true,
+  );
+  assert.equal(
+    getEnemyAnimationProfile('boss').clips.some((clip) => clip.state === 'boss_attack'),
+    true,
+  );
   assert.equal(getHeroAnimationProfile('弓手').id, 'hero_archer');
-  assert.equal(PLAYER_ANIMATION_PROFILE.clips.some((clip) => clip.state === 'attack'), true);
+  assert.equal(
+    PLAYER_ANIMATION_PROFILE.clips.some((clip) => clip.state === 'attack'),
+    true,
+  );
+});
+
+runTest('fixed companion attack timing drives thunder and qinglan source duration', () => {
+  assert.equal(resolveFixedCompanionAttackAnimationTiming(1, 1).animationDuration, 1);
+  assert.equal(resolveFixedCompanionAttackAnimationTiming(1, 1).spinePlaybackSpeed, 1);
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION, 2.2);
+  assert.equal(resolveThunderMageAttackAnimationTiming(2.2).spinePlaybackSpeed, 1 / 1.2);
+  assert.ok(
+    resolveThunderMageAttackAnimationTiming(0.5).spinePlaybackSpeed >
+      resolveThunderMageAttackAnimationTiming(2.2).spinePlaybackSpeed,
+  );
+  assert.ok(
+    resolveThunderMageAttackAnimationTiming(2.4).spinePlaybackSpeed <=
+      resolveThunderMageAttackAnimationTiming(2.2).spinePlaybackSpeed,
+  );
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION, 0.24);
+  assert.equal(THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION, 1.2);
+
+  const base = resolveThunderMageAttackAnimationTiming(0.6);
+  const fast = resolveThunderMageAttackAnimationTiming(0.3);
+  const clampLow = resolveThunderMageAttackAnimationTiming(0.01);
+  const clampHigh = resolveThunderMageAttackAnimationTiming(10);
+  const fallbackZero = resolveThunderMageAttackAnimationTiming(0);
+  const fallbackNegative = resolveThunderMageAttackAnimationTiming(-1);
+  const fallbackNaN = resolveThunderMageAttackAnimationTiming(Number.NaN);
+  const fallbackInfinity = resolveThunderMageAttackAnimationTiming(Number.POSITIVE_INFINITY);
+
+  assert.equal(base.animationDuration, 0.6);
+  assert.equal(base.spinePlaybackSpeed, 1 / 0.6);
+  assert.equal(fast.animationDuration, 0.3);
+  assert.equal(fast.spinePlaybackSpeed, 1 / 0.3);
+  assert.equal(clampLow.animationDuration, 0.24);
+  assert.equal(clampLow.spinePlaybackSpeed, 1 / 0.24);
+  assert.equal(clampHigh.animationDuration, 1.2);
+  assert.equal(clampHigh.spinePlaybackSpeed, 1 / 1.2);
+  assert.equal(fallbackZero.animationDuration, 1.2);
+  assert.equal(fallbackNegative.animationDuration, 1.2);
+  assert.equal(fallbackNaN.animationDuration, 1.2);
+  assert.equal(fallbackInfinity.animationDuration, 1.2);
+});
+
+runTest('fixed companion frame mapping clamps progress across frame 0 through 7', () => {
+  assert.equal(resolveFixedCompanionFrameIndex(0, 1, 1), 0);
+  assert.equal(resolveFixedCompanionFrameIndex(-1, 1, 1), 0);
+  assert.equal(resolveFixedCompanionFrameIndex(Number.NaN, 1, 1), 0);
+  assert.equal(resolveFixedCompanionFrameIndex(0, Number.POSITIVE_INFINITY, 1), 0);
+
+  for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
+    const elapsed = (frameIndex + 0.01) / 8;
+    assert.equal(resolveFixedCompanionFrameIndex(elapsed, 1, 1), frameIndex);
+  }
+
+  assert.equal(resolveFixedCompanionFrameIndex(0.999, 1, 1), 7);
+  assert.equal(resolveFixedCompanionFrameIndex(1, 1, 1), 7);
+  assert.equal(resolveFixedCompanionFrameIndex(10, 1, 1), 7);
+  assert.equal(resolveThunderMageAttackFrameIndex(0.999, 1, 1), 7);
+});
+
+runTest(
+  'fixed companion attack consumes full low-frame-rate delta and reaches the final frame',
+  () => {
+    let elapsed = 0;
+    for (let frame = 0; frame < 20; frame += 1) {
+      elapsed = advanceFixedCompanionAttackElapsed(elapsed, 1, 1 / 20);
+    }
+
+    assert.equal(elapsed, 1);
+    assert.equal(resolveFixedCompanionFrameIndex(elapsed, 1, 1), 7);
+  },
+);
+
+runTest('thunder mage compatibility logic delegates frame mapping and skeleton loading', () => {
+  const thunderLogicSource = readFileSync(
+    'assets/scripts/battle/ThunderMagePresentationLogic.ts',
+    'utf8',
+  );
+
+  assert.equal(ThunderMageSkeletonLoadCoordinator, FixedCompanionSkeletonLoadCoordinator);
+  assert.match(
+    thunderLogicSource,
+    /return resolveFixedCompanionFrameIndex\(elapsed, speed, sourceDuration\);/,
+  );
+  assert.match(
+    thunderLogicSource,
+    /FixedCompanionSkeletonLoadCoordinator as ThunderMageSkeletonLoadCoordinator/,
+  );
+  assert.equal(thunderLogicSource.includes('class ThunderMageSkeletonLoadCoordinator'), false);
+  assert.equal(thunderLogicSource.includes('const sourceProgress ='), false);
+});
+
+runTest('thunder mage projectile advances once per delta and reports completion', () => {
+  const firstStep = advanceThunderMageProjectile(0, 0.2, 0.1);
+  assert.deepEqual(firstStep, { age: 0.1, complete: false });
+
+  const finalStep = advanceThunderMageProjectile(firstStep.age, 0.2, 0.1);
+  assert.deepEqual(finalStep, { age: 0.2, complete: true });
+});
+
+runTest('fixed companion shared skeleton loading warns once across failed retries', () => {
+  const coordinator = new FixedCompanionSkeletonLoadCoordinator<{ id: string }>();
+  const firstResults: string[] = [];
+  let loadCalls = 0;
+  let warningCalls = 0;
+  let finishFirstLoad: ((error?: unknown, value?: { id: string }) => void) | undefined;
+
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      finishFirstLoad = complete;
+    },
+    (result) => firstResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+  coordinator.request(
+    () => {
+      loadCalls += 1;
+    },
+    (result) => firstResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 1);
+  assert.equal(coordinator.loadState, 'loading');
+  finishFirstLoad?.(new Error('first load failed'));
+  assert.deepEqual(firstResults, ['warned', 'warned']);
+  assert.equal(warningCalls, 1);
+  assert.equal(coordinator.loadState, 'idle');
+
+  const failedRetryResults: string[] = [];
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      complete(new Error('retry also failed'));
+    },
+    (result) => failedRetryResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 2);
+  assert.deepEqual(failedRetryResults, ['warned']);
+  assert.equal(warningCalls, 1);
+
+  const successfulRetryResults: string[] = [];
+  coordinator.request(
+    (complete) => {
+      loadCalls += 1;
+      complete(undefined, { id: 'loaded-on-retry' });
+    },
+    (result) => successfulRetryResults.push(result.state),
+    () => {
+      warningCalls += 1;
+    },
+  );
+
+  assert.equal(loadCalls, 3);
+  assert.deepEqual(successfulRetryResults, ['loaded']);
+  assert.equal(coordinator.loadState, 'loaded');
+  assert.equal(warningCalls, 1);
+});
+
+runTest('thunder mage profile uses the portable attack Spine asset', () => {
+  const idleClip = THUNDER_MAGE_ANIMATION_PROFILE.clips.find((clip) => clip.state === 'idle');
+  const attackClip = THUNDER_MAGE_ANIMATION_PROFILE.clips.find((clip) => clip.state === 'attack');
+
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.id, 'hero_thunder_mage');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.displayName, '雷法师');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.subject, 'hero');
+  assert.equal(THUNDER_MAGE_ANIMATION_PROFILE.renderer, 'spine');
+  assert.equal(
+    THUNDER_MAGE_ANIMATION_PROFILE.spineAssetBase,
+    THUNDER_MAGE_COMPANION.spineAssetBase,
+  );
+  assert.equal(Object.prototype.hasOwnProperty.call(HERO_ANIMATION_PROFILES, '雷法师'), false);
+  assert.ok(idleClip, 'thunder mage should define an idle clip');
+  assert.ok(attackClip, 'thunder mage should define an attack clip');
+  assert.equal(idleClip?.duration, 1);
+  assert.equal(idleClip?.loop, true);
+  assert.equal(idleClip?.clipName, 'attack');
+  assert.equal(idleClip?.renderer, 'spine');
+  assert.equal(idleClip?.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
+  assert.equal(idleClip?.speed, 0);
+  assert.equal(attackClip?.clipName, 'attack');
+  assert.equal(attackClip?.loop, false);
+  assert.equal(attackClip?.duration, 2.2);
+  assert.equal(attackClip?.renderer, 'spine');
+  assert.equal(attackClip?.spineAssetBase, THUNDER_MAGE_COMPANION.spineAssetBase);
+});
+
+runTest('qinglan profile uses its portable attack Spine asset', () => {
+  const attackClip = getAnimationClipSpec(QINGLAN_ANIMATION_PROFILE, 'attack');
+
+  assert.equal(QINGLAN_ANIMATION_PROFILE.id, 'hero_qinglan');
+  assert.equal(QINGLAN_ANIMATION_PROFILE.displayName, '灵符道君·青岚');
+  assert.equal(QINGLAN_ANIMATION_PROFILE.subject, 'hero');
+  assert.equal(QINGLAN_ANIMATION_PROFILE.renderer, 'spine');
+  assert.equal(QINGLAN_ANIMATION_PROFILE.spineAssetBase, QINGLAN_COMPANION.spineAssetBase);
+  assert.equal(attackClip.clipName, 'attack');
+  assert.equal(attackClip.loop, false);
+  assert.equal(attackClip.duration, QINGLAN_COMPANION.attackInterval);
+  assert.equal(attackClip.renderer, 'spine');
+  assert.equal(attackClip.spineAssetBase, QINGLAN_COMPANION.spineAssetBase);
 });
 
 runTest('main hero attack uses imported Spine animation asset', () => {
@@ -100,13 +344,12 @@ runTest('main hero applies current gameplay attack speed to each Spine cycle', (
   assert.equal(controllerSource.includes('resolvePlayerAttackAnimationTiming'), true);
   assert.equal(controllerSource.includes('this.model.options.mainAttackInterval'), true);
   assert.equal(controllerSource.includes('this.model.mainAttackInterval'), true);
-  assert.equal(controllerSource.includes('this.playerAnimation.duration = timing.animationDuration'), true);
   assert.equal(
-    controllerSource.includes('this.playerAttackSpinePlaybackSpeed = timing.spinePlaybackSpeed'),
+    controllerSource.includes('this.playerAnimation.duration = timing.animationDuration'),
     true,
   );
   assert.equal(
-    controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'),
+    controllerSource.includes('this.playerAttackSpinePlaybackSpeed = timing.spinePlaybackSpeed'),
     true,
   );
 });
@@ -121,7 +364,10 @@ runTest('main hero does not restart Spine playback before the current attack com
 runTest('main hero attack presentation survives long simulation frames', () => {
   const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 
-  assert.equal(controllerSource.includes('const presentationDelta = Math.min(deltaTime, 1 / 30);'), true);
+  assert.equal(
+    controllerSource.includes('const presentationDelta = Math.min(deltaTime, 1 / 30);'),
+    true,
+  );
   assert.equal(controllerSource.includes('private applyPlayerAttackSpineFrame(): void'), true);
   assert.equal(controllerSource.includes('this.applyPlayerAttackSpineFrame();'), true);
 });
@@ -136,8 +382,16 @@ runTest('main hero resumes a cleared Spine track for each attack', () => {
 runTest('main hero maps the Spine attack slot across all source frames', () => {
   const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 
-  assert.equal(controllerSource.includes("this.playerAttackSpine.setAttachment('frame', `frame_${frameIndex}`);"), true);
-  assert.equal(controllerSource.includes('const frameIndex = Math.min(7, Math.floor(progress * 8));'), true);
+  assert.equal(
+    controllerSource.includes(
+      "this.playerAttackSpine.setAttachment('frame', `frame_${frameIndex}`);",
+    ),
+    true,
+  );
+  assert.equal(
+    controllerSource.includes('const frameIndex = Math.min(7, Math.floor(progress * 8));'),
+    true,
+  );
 });
 
 runTest('main hero renders a persistent Spine setup pose without placeholder UI', () => {
@@ -151,19 +405,15 @@ runTest('main hero renders a persistent Spine setup pose without placeholder UI'
   assert.equal(controllerSource.includes('this.playerAttackSpine.setAttachment'), true);
 });
 
-runTest('main hero attack keeps its local glow without rectangular head strokes', () => {
+runTest('main hero attack leaves round accents to the shared vfx layer', () => {
   const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
 
-  assert.equal(controllerSource.includes('MainHeroAttackEffects'), true);
-  assert.equal(controllerSource.includes('drawPlayerAttackAccent'), true);
-  assert.equal(controllerSource.includes('playerAttackEffectsGraphics'), true);
+  assert.equal(controllerSource.includes("new Node('MainHeroAttackEffects')"), false);
+  assert.equal(controllerSource.includes('drawPlayerAttackAccent'), false);
+  assert.equal(controllerSource.includes('playerAttackEffectsGraphics'), false);
   assert.equal(controllerSource.includes('PLAYER_ATTACK_SPINE_DURATION'), false);
-  assert.equal(controllerSource.includes('this.playerAnimation.elapsed / this.playerAnimation.duration'), true);
-  assert.equal(controllerSource.includes('255, 154, 54'), true);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.circle('), true);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineTo('), false);
-  assert.equal(controllerSource.includes('this.playerAttackEffectsGraphics.lineWidth = 12'), false);
-  assert.equal(controllerSource.includes('new Color(255, 106, 38'), false);
+  assert.equal(controllerSource.includes('this.playerAuraGraphics.circle('), false);
+  assert.equal(controllerSource.includes('this.playerAuraGraphics.ellipse('), false);
 });
 
 runTest('battle layer remains scale-stable during focus readability events', () => {
@@ -213,7 +463,10 @@ runTest('enemy animation resolver maps wall hold damage and boss spawn states', 
     wallHoldTimeLeft: 0,
   };
 
-  assert.equal(resolveEnemyAnimationState(walkingEnemy, { previousHp: 10, newlySpawned: false }), 'walk');
+  assert.equal(
+    resolveEnemyAnimationState(walkingEnemy, { previousHp: 10, newlySpawned: false }),
+    'walk',
+  );
   assert.equal(resolveEnemyAnimationState({ ...walkingEnemy, hp: 8 }, { previousHp: 10 }), 'hit');
   assert.equal(
     resolveEnemyAnimationState(
@@ -253,31 +506,181 @@ runTest('battle presentation systems call the shared animation driver', () => {
   assert.equal(gridSource.includes('computeProceduralAnimationPose'), true);
 });
 
-runTest('player attacks render golden projectiles with transparent 2d particle hit bursts', () => {
+runTest('player attack adapter routes main and thunder chain events to shared vfx', () => {
   const autoAttackSource = readFileSync('assets/scripts/battle/PlayerAutoAttackSystem.ts', 'utf8');
 
-  assert.equal(autoAttackSource.includes('ParticleSystem2D'), true);
-  assert.equal(autoAttackSource.includes('projectiles'), true);
-  assert.equal(autoAttackSource.includes('hitBursts'), true);
-  assert.equal(autoAttackSource.includes('spawnGoldenArrowProjectile'), true);
-  assert.equal(autoAttackSource.includes('drawGoldenArrowProjectile'), true);
-  assert.equal(autoAttackSource.includes('spawnHitParticleBurst'), true);
-  assert.equal(autoAttackSource.includes('configureHitParticleSystem'), true);
-  assert.equal(autoAttackSource.includes('getUiArtAsset'), true);
-  assert.equal(autoAttackSource.includes('assetManager.loadAny(spec.uuid'), true);
-  assert.equal(autoAttackSource.includes("assetManager.loadBundle('ui'"), false);
-  assert.equal(autoAttackSource.includes('fx_glow_gold_soft.png'), true);
-  assert.equal(autoAttackSource.includes('fx_fire_small.png'), true);
-  assert.equal(autoAttackSource.includes('builtinResMgr'), false);
-  assert.equal(autoAttackSource.includes('white-texture'), false);
-  assert.equal(autoAttackSource.includes('particle.custom = true'), true);
-  assert.equal(autoAttackSource.includes('particle.autoRemoveOnFinish = true'), true);
-  assert.equal(autoAttackSource.includes('particle.resetSystem()'), true);
-  assert.equal(autoAttackSource.includes('criticalFireBurst'), true);
-  assert.equal(autoAttackSource.includes('drawProjectileLightBloom'), true);
-  assert.equal(autoAttackSource.includes('drawImpactGlowHalo'), true);
-  assert.equal(autoAttackSource.includes('particle.totalParticles = critical ? 84 : 52'), true);
-  assert.equal(autoAttackSource.includes('particle.emissionRate = critical ? 440 : 280'), true);
-  assert.equal(autoAttackSource.includes('new Color(255, 96, 32'), true);
-  assert.equal(autoAttackSource.includes('distance / 1000'), true);
+  assert.equal(autoAttackSource.includes('BattleVfxSystem'), true);
+  assert.equal(autoAttackSource.includes("event.source === 'main'"), true);
+  assert.equal(autoAttackSource.includes("event.source === 'thunder_chain'"), true);
+  assert.equal(autoAttackSource.includes('this.battleVfx.playAttackEvent(event)'), true);
+  assert.equal(autoAttackSource.includes('ParticleSystem2D'), false);
+  assert.equal(autoAttackSource.includes('Graphics'), false);
+  assert.equal(autoAttackSource.includes('assetManager'), false);
+});
+
+runTest('fixed companion presentation owns configured spine nodes and delegates effects', () => {
+  assert.equal(THUNDER_MAGE_COMPANION.displayScale, 0.286);
+  const presentationSource = readFileSync(
+    'assets/scripts/battle/FixedSpineCompanionPresentation.ts',
+    'utf8',
+  );
+
+  assert.match(presentationSource, /export class FixedSpineCompanionPresentation/);
+  assert.equal(presentationSource.includes('getAnimationClipSpec'), true);
+  assert.equal(presentationSource.includes('resolveFixedCompanionAttackAnimationTiming'), true);
+  assert.equal(
+    presentationSource.includes('unitParent.getChildByName(companion.rootNodeName)'),
+    true,
+  );
+  assert.equal(presentationSource.includes('companion.position.x'), true);
+  assert.equal(presentationSource.includes('companion.position.y'), true);
+  assert.equal(
+    presentationSource.includes('this.rootNode.getChildByName(companion.spineNodeName)'),
+    true,
+  );
+  assert.equal(presentationSource.includes('BattleVfxSystem'), true);
+  assert.equal(presentationSource.includes('this.battleVfx.playAttackEvent(event)'), true);
+  assert.equal(presentationSource.includes('companion.displayScale'), true);
+  assert.match(presentationSource, /public get companionId\(\): FixedCompanionId/);
+  assert.equal(presentationSource.includes('premultipliedAlpha = false'), true);
+  assert.equal(
+    presentationSource.includes('resources.load<sp.SkeletonData>(spineAssetBase, sp.SkeletonData'),
+    true,
+  );
+  assert.equal(presentationSource.includes('event.source === this.companion.attackSource'), true);
+  assert.equal(presentationSource.includes('loading'), true);
+  assert.equal(presentationSource.includes('loaded'), true);
+  assert.equal(presentationSource.includes('warned'), true);
+  assert.equal(presentationSource.includes('console.warn'), true);
+  assert.equal(presentationSource.includes("setAttachment('frame', 'frame_0')"), true);
+  assert.equal(presentationSource.includes("setAttachment('frame', `frame_${frameIndex}`)"), true);
+  assert.equal(presentationSource.includes('resolveFixedCompanionFrameIndex'), true);
+  assert.equal(presentationSource.includes('advanceThunderMageProjectile'), false);
+  assert.equal(presentationSource.includes('Graphics'), false);
+  assert.equal(presentationSource.includes('projectiles'), false);
+  assert.equal(presentationSource.includes('roundRect('), false);
+  assert.equal(presentationSource.includes('fillRect('), false);
+  assert.equal(presentationSource.includes('Sprite'), false);
+});
+
+runTest(
+  'fixed companion presentation reuses nodes and coordinates each asset load independently',
+  () => {
+    const presentationSource = readFileSync(
+      'assets/scripts/battle/FixedSpineCompanionPresentation.ts',
+      'utf8',
+    );
+    const resourceLoadCalls = presentationSource.match(/resources\.load(?:<[^>]+>)?\(/g) ?? [];
+    const clearSource = presentationSource.slice(
+      presentationSource.indexOf('public clear(): void'),
+      presentationSource.indexOf('private ensureSkeletonLoaded(): void'),
+    );
+
+    assert.equal(presentationSource.includes('new Vec3(-210, -370, 0)'), false);
+    assert.equal(presentationSource.includes('THUNDER_MAGE_STAFF_OFFSET'), false);
+    assert.equal(presentationSource.includes('ThunderMageBronzeRing'), false);
+    assert.equal(presentationSource.includes('drawBronzeRing'), false);
+    assert.equal(presentationSource.includes('THUNDER_MAGE_RING_'), false);
+    assert.equal(presentationSource.includes('FixedCompanionSkeletonLoadCoordinator'), true);
+    assert.equal(
+      presentationSource.includes('companionSkeletonLoaders.get(companion.spineAssetBase)'),
+      true,
+    );
+    assert.equal(
+      presentationSource.includes('companionSkeletonLoaders.set(companion.spineAssetBase'),
+      true,
+    );
+    assert.equal(presentationSource.includes("result.state === 'warned'"), true);
+    assert.equal(presentationSource.includes("this.loadState = 'warned'"), true);
+    assert.equal(presentationSource.includes('projectile.age += deltaTime'), false);
+    assert.equal(presentationSource.includes('fixedCompanionPresentationOwners'), true);
+    assert.equal(presentationSource.includes('removeDuplicateNamedChildren'), true);
+    assert.equal(presentationSource.includes('if (!this.attackSpineNode.parent)'), true);
+    assert.equal(clearSource.includes("if (this.loadState === 'warned')"), true);
+    assert.equal(clearSource.includes("this.loadState = 'idle'"), true);
+    assert.equal(clearSource.includes('this.ensureSkeletonLoaded()'), true);
+    assert.equal(
+      presentationSource.includes("this.loadState === 'loading' || this.loadState === 'loaded'"),
+      true,
+    );
+    assert.equal(resourceLoadCalls.length, 1);
+  },
+);
+
+runTest('thunder mage presentation remains a compatibility wrapper', () => {
+  const presentationSource = readFileSync(
+    'assets/scripts/battle/ThunderMagePresentation.ts',
+    'utf8',
+  );
+
+  assert.match(presentationSource, /extends FixedSpineCompanionPresentation/);
+  assert.match(
+    presentationSource,
+    /super\(\s*unitParent,\s*setUiLayer,\s*battleVfx,\s*THUNDER_MAGE_COMPANION,\s*THUNDER_MAGE_ANIMATION_PROFILE,?\s*\);/,
+  );
+  assert.equal(presentationSource.includes('resources.load('), false);
+});
+
+runTest('remote thunder mage video uses the wall position symmetric to qinglan', () => {
+  assert.deepEqual(BATTLE_WALL_LAYOUT.thunderMage, {
+    x: -BATTLE_WALL_LAYOUT.qinglan.x,
+    y: BATTLE_WALL_LAYOUT.qinglan.y,
+  });
+
+  const videoSource = readFileSync('assets/scripts/battle/VideoCharacterPresentation.ts', 'utf8');
+  assert.match(videoSource, /THUNDER_MAGE_COMPANION\.position\.y,\s*0,/);
+  assert.equal(videoSource.includes('WALL_DEPTH_OFFSET_Y'), false);
+  assert.match(videoSource, /transform\.setAnchorPoint\(0\.5, 0\.5\)/);
+});
+
+runTest('enemy video uses the remote run frames and keeps a portrait until ready', () => {
+  const videoSource = readFileSync('assets/scripts/battle/EnemyVideoPresentation.ts', 'utf8');
+  const enemySystemSource = readFileSync('assets/scripts/battle/EnemySystem.ts', 'utf8');
+
+  assert.match(videoSource, /enemy_video\/black_red_monster_atlas\/texture/);
+  assert.match(videoSource, /const SOURCE_FPS = 24/);
+  assert.match(videoSource, /const WALK_FIRST_FRAME = 18/);
+  assert.match(videoSource, /const WALK_LAST_FRAME = 44/);
+  assert.match(
+    videoSource,
+    /loopingFrame\(\s*animation\.elapsed,\s*phase,\s*WALK_FIRST_FRAME,\s*WALK_LAST_FRAME,?\s*\)/s,
+  );
+  assert.match(videoSource, /private readonly fallbackNode: Node/);
+  assert.match(videoSource, /this\.fallbackNode\.active = false/);
+  assert.match(enemySystemSource, /portrait\.active = true/);
+  assert.match(
+    enemySystemSource,
+    /new EnemyVideoPresentation\([\s\S]*?enemy\.kind === 'boss',[\s\S]*?portrait,?[\s\S]*?\)/,
+  );
+});
+
+runTest('battle controller delegates every fixed companion presentation lifecycle', () => {
+  const controllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+
+  assert.equal(controllerSource.includes('FixedSpineCompanionPresentation'), true);
+  assert.equal(controllerSource.includes('FIXED_COMPANIONS'), true);
+  assert.equal(controllerSource.includes('fixedCompanionPresentations'), true);
+  assert.equal(controllerSource.includes('thunderMagePresentation'), false);
+  assert.equal(controllerSource.includes('const FIXED_COMPANION_ANIMATION_PROFILES'), false);
+  assert.equal(controllerSource.includes('getFixedCompanionAnimationProfile'), true);
+  assert.match(controllerSource, /FIXED_COMPANIONS\.map\(\s*\(companion\) =>/);
+  assert.match(controllerSource, /new FixedSpineCompanionPresentation\(/);
+  assert.match(
+    controllerSource,
+    /this\.model\.getFixedCompanionAttackInterval\(presentation\.companionId\)/,
+  );
+  assert.equal(controllerSource.includes('FIXED_COMPANIONS[index]'), false);
+  assert.match(controllerSource, /presentation\.update\(deltaTime\)/);
+  assert.match(controllerSource, /const vfxDelta = Math\.min\(deltaTime, 1 \/ 30\)/);
+  assert.equal(controllerSource.includes('presentation.update(vfxDelta)'), false);
+  assert.equal(
+    readFileSync('assets/scripts/battle/FixedSpineCompanionPresentation.ts', 'utf8').includes(
+      'this.tickAttack(Math.min(deltaTime, 1 / 30))',
+    ),
+    false,
+  );
+  assert.match(controllerSource, /presentation\.clear\(\)/);
+  assert.equal(controllerSource.includes("event.source === 'companion'"), false);
+  assert.equal(controllerSource.includes('resolveThunderMageAttackAnimationTiming'), false);
+  assert.equal(controllerSource.includes('ThunderMageCompanion'), false);
 });

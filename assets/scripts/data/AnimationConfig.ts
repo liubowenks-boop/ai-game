@@ -1,4 +1,11 @@
 import type { EnemyKind } from './BattleConfig';
+import {
+  FIXED_COMPANIONS,
+  QINGLAN_COMPANION,
+  THUNDER_MAGE_COMPANION,
+  type FixedCompanionConfig,
+  type FixedCompanionAnimationProfileId,
+} from './CompanionConfig';
 
 export type UnitAnimationState =
   | 'idle'
@@ -48,6 +55,42 @@ export const PLAYER_ATTACK_ANIMATION_MAX_DURATION = 1.4;
 export const PLAYER_ATTACK_SPINE_DURATION = PLAYER_ATTACK_ANIMATION_BASE_DURATION;
 export const PLAYER_ATTACK_SPINE_SPEED =
   PLAYER_ATTACK_SPINE_SOURCE_DURATION / PLAYER_ATTACK_ANIMATION_BASE_DURATION;
+
+export const THUNDER_MAGE_SPINE_SOURCE_DURATION = 1;
+export const QINGLAN_SPINE_SOURCE_DURATION = 1;
+export const THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION = THUNDER_MAGE_COMPANION.attackInterval;
+export const THUNDER_MAGE_ATTACK_ANIMATION_MIN_DURATION = 0.24;
+export const THUNDER_MAGE_ATTACK_ANIMATION_MAX_DURATION = 1.2;
+
+export interface FixedCompanionAttackAnimationTiming {
+  animationDuration: number;
+  spinePlaybackSpeed: number;
+}
+
+export type ThunderMageAttackAnimationTiming = FixedCompanionAttackAnimationTiming;
+
+export function resolveFixedCompanionAttackAnimationTiming(
+  currentInterval: number,
+  sourceDuration = 1,
+): FixedCompanionAttackAnimationTiming {
+  const safeInterval =
+    Number.isFinite(currentInterval) && currentInterval > 0 ? currentInterval : sourceDuration;
+  const animationDuration = Math.min(1.2, Math.max(0.24, safeInterval));
+  return { animationDuration, spinePlaybackSpeed: sourceDuration / animationDuration };
+}
+
+export function resolveThunderMageAttackAnimationTiming(
+  currentInterval: number,
+): ThunderMageAttackAnimationTiming {
+  const safeInterval =
+    Number.isFinite(currentInterval) && currentInterval > 0
+      ? currentInterval
+      : THUNDER_MAGE_ATTACK_ANIMATION_BASE_DURATION;
+  return resolveFixedCompanionAttackAnimationTiming(
+    safeInterval,
+    THUNDER_MAGE_SPINE_SOURCE_DURATION,
+  );
+}
 
 export interface PlayerAttackAnimationTiming {
   attackSpeedMultiplier: number;
@@ -131,7 +174,11 @@ function clip(
   };
 }
 
-function enemyProfile(id: string, displayName: string, subject: UnitAnimationSubject): UnitAnimationProfile {
+function enemyProfile(
+  id: string,
+  displayName: string,
+  subject: UnitAnimationSubject,
+): UnitAnimationProfile {
   const clips = [
     clip('idle', subject === 'boss' ? 1.1 : 0.8, true),
     clip('spawn', subject === 'boss' ? 0.72 : 0.34),
@@ -193,6 +240,55 @@ function playerProfile(): UnitAnimationProfile {
 }
 
 export const PLAYER_ANIMATION_PROFILE: UnitAnimationProfile = playerProfile();
+
+function fixedCompanionProfile(companion: FixedCompanionConfig): UnitAnimationProfile {
+  const sourceDuration = companion.spineSourceDuration;
+  return {
+    id: companion.animationProfileId,
+    displayName: companion.name,
+    subject: 'hero',
+    renderer: 'spine',
+    spineAssetBase: companion.spineAssetBase,
+    clips: [
+      clip('idle', sourceDuration, true, 'attack', {
+        renderer: 'spine',
+        spineAssetBase: companion.spineAssetBase,
+        speed: 0,
+      }),
+      clip('attack', companion.attackInterval, false, 'attack', {
+        renderer: 'spine',
+        spineAssetBase: companion.spineAssetBase,
+        speed: sourceDuration / companion.attackInterval,
+      }),
+    ],
+  };
+}
+
+export const FIXED_COMPANION_ANIMATION_PROFILES: Readonly<
+  Record<FixedCompanionAnimationProfileId, UnitAnimationProfile>
+> = Object.fromEntries(
+  FIXED_COMPANIONS.map((companion) => [
+    companion.animationProfileId,
+    fixedCompanionProfile(companion),
+  ]),
+) as Record<FixedCompanionAnimationProfileId, UnitAnimationProfile>;
+
+export function getFixedCompanionAnimationProfile(
+  profileId: FixedCompanionAnimationProfileId,
+): UnitAnimationProfile {
+  const profile = FIXED_COMPANION_ANIMATION_PROFILES[profileId];
+  if (!profile) {
+    throw new Error(`Missing fixed companion animation profile: ${profileId}`);
+  }
+  return profile;
+}
+
+export const THUNDER_MAGE_ANIMATION_PROFILE: UnitAnimationProfile =
+  getFixedCompanionAnimationProfile(THUNDER_MAGE_COMPANION.animationProfileId);
+
+export const QINGLAN_ANIMATION_PROFILE: UnitAnimationProfile = getFixedCompanionAnimationProfile(
+  QINGLAN_COMPANION.animationProfileId,
+);
 
 export const HERO_ANIMATION_PROFILES: Record<string, UnitAnimationProfile> = {
   弓手: heroProfile('hero_archer', '弓手'),

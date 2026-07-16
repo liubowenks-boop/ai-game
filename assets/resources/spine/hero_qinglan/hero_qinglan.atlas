@@ -1,0 +1,62 @@
+
+hero_qinglan.png
+size: 3102,495
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+frame_0
+  rotate: false
+  xy: 2, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_1
+  rotate: false
+  xy: 312, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_2
+  rotate: false
+  xy: 622, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_3
+  rotate: false
+  xy: 932, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_4
+  rotate: false
+  xy: 1242, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_5
+  rotate: false
+  xy: 1552, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_6
+  rotate: false
+  xy: 1862, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1
+frame_7
+  rotate: false
+  xy: 2172, 2
+  size: 308, 491
+  orig: 308, 491
+  offset: 0, 0
+  index: -1

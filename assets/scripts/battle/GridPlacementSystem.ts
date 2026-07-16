@@ -8,8 +8,10 @@ import {
 } from '../ui/BattleUiComponents';
 import { BattleUiV4Layout, RectSpec } from '../ui/BattleUiLayout';
 import { t } from '../ui/BattleTextResources';
-import { BattleMvpModel, GridSlotState } from './BattleMvpModel';
+import { BattleMvpModel, BattlePoint, BattleTickResult, GridSlotState } from './BattleMvpModel';
+import { BattleVfxSystem } from './BattleVfxSystem';
 import { getHeroAnimationProfile } from '../data/AnimationConfig';
+import { BATTLE_WALL_LAYOUT } from '../data/BattleTerrainConfig';
 import {
   UnitAnimationRuntime,
   computeProceduralAnimationPose,
@@ -21,8 +23,9 @@ import {
 
 interface ButtonView {
   node: Node;
-  graphics: Graphics;
-  label: Label;
+  unitNode?: Node;
+  graphics?: Graphics;
+  label?: Label;
   width: number;
   height: number;
   baseColor: Color;
@@ -38,18 +41,27 @@ export class GridPlacementSystem {
   private pendingHeroName = '';
   private pendingMessage = '';
   private readonly root: Node;
+  private readonly unitRoot: Node;
+  private readonly titleNode: Node;
   private readonly titleLabel: Label;
+  private readonly pendingNode: Node;
   private readonly pendingLabel: Label;
   private readonly slotButtons: ButtonView[] = [];
   private highlightedHeroId = 0;
 
   public constructor(
-    parent: Node,
+    backingParent: Node,
+    unitParent: Node,
     private readonly model: BattleMvpModel,
+    private readonly battleVfx: BattleVfxSystem,
   ) {
-    this.root = new Node('GridPlacementSystem');
+    this.root = new Node('GridPlacementBacking');
     this.setUiLayer(this.root);
-    parent.addChild(this.root);
+    backingParent.addChild(this.root);
+
+    this.unitRoot = new Node('GridPlacementUnits');
+    this.setUiLayer(this.unitRoot);
+    unitParent.addChild(this.unitRoot);
 
     const title = this.createLabel(
       t('grid.title', { heroes: 0, maxHeroes: this.model.build.summon.maxBoardHeroes, dps: 0 }),
@@ -60,6 +72,7 @@ export class GridPlacementSystem {
       BattleUiV4Layout.placementTitle.width,
       BattleUiV4Layout.placementTitle.height,
     );
+    this.titleNode = title.node;
     this.titleLabel = title.label;
     this.root.addChild(title.node);
 
@@ -72,6 +85,7 @@ export class GridPlacementSystem {
       BattleUiV4Layout.placementPending.width,
       BattleUiV4Layout.placementPending.height,
     );
+    this.pendingNode = pending.node;
     this.pendingLabel = pending.label;
     this.root.addChild(pending.node);
 
@@ -79,12 +93,18 @@ export class GridPlacementSystem {
       const button = this.createSlotButton(slot);
       this.slotButtons[slot.index] = button;
       this.root.addChild(button.node);
+      if (button.unitNode) {
+        this.unitRoot.addChild(button.unitNode);
+      }
     }
 
     this.refresh();
   }
 
   public refresh(): void {
+    const placementActive = Boolean(this.pendingHeroName);
+    this.titleNode.active = placementActive;
+    this.pendingNode.active = placementActive;
     this.titleLabel.string = t('grid.title', {
       heroes: this.model.getHeroes().length,
       maxHeroes: this.model.build.summon.maxBoardHeroes,
@@ -97,16 +117,32 @@ export class GridPlacementSystem {
     for (const slot of this.model.slots) {
       const view = this.slotButtons[slot.index];
       const highlighted = Boolean(slot.hero && slot.hero.id === this.highlightedHeroId);
-      view.label.string = this.getSlotText(slot);
-      view.label.color =
-        slot.hero && highlighted
-          ? new Color(255, 238, 96, 255)
-          : slot.hero
-            ? Color.WHITE
-            : new Color(210, 218, 226, 180);
-      this.drawSlotButton(view, slot, highlighted);
+      if (view.label) {
+        view.label.string = this.getSlotText(slot);
+        view.label.color =
+          slot.hero && highlighted
+            ? new Color(255, 238, 96, 255)
+            : slot.hero
+              ? Color.WHITE
+              : new Color(210, 218, 226, 180);
+      }
+      view.graphics?.clear();
       this.refreshSlotPortrait(view, slot);
     }
+  }
+
+  public getAvailablePlacementPoints(): readonly BattlePoint[] {
+    if (!this.pendingHeroName) {
+      return [];
+    }
+
+    return this.model.slots
+      .filter((slot) => !slot.reservedBy && !slot.hero)
+      .map((slot) => ({ ...slot.position }));
+  }
+
+  public isPlacementModeActive(): boolean {
+    return Boolean(this.pendingHeroName);
   }
 
   public setMainOutputHero(heroId: number): void {
@@ -120,9 +156,15 @@ export class GridPlacementSystem {
         continue;
       }
 
-      view.node.setPosition(view.baseX ?? view.node.position.x, view.baseY ?? view.node.position.y, 0);
-      view.node.setScale(1, 1, 1);
-      view.node.angle = 0;
+      view.unitNode?.setPosition(
+        view.baseX ?? view.unitNode.position.x,
+        view.baseY ?? view.unitNode.position.y,
+        0,
+      );
+      view.unitNode?.setScale(1, 1, 1);
+      if (view.unitNode) {
+        view.unitNode.angle = 0;
+      }
 
       if (view.portraitNode) {
         view.portraitNode.setPosition(0, 0, 0);
@@ -141,7 +183,9 @@ export class GridPlacementSystem {
       }
 
       const highlighted = slot.hero.id === this.highlightedHeroId;
-      requestUnitAnimation(view.animation, highlighted ? 'cast' : 'idle');
+      if (view.animation.currentState !== 'attack') {
+        requestUnitAnimation(view.animation, highlighted ? 'cast' : 'idle');
+      }
       tickUnitAnimation(view.animation, deltaSeconds);
       if (isUnitAnimationComplete(view.animation)) {
         requestUnitAnimation(view.animation, 'idle');
@@ -155,8 +199,38 @@ export class GridPlacementSystem {
       const focusScale = highlighted ? 1.04 : 1;
       if (view.portraitNode) {
         view.portraitNode.setPosition(pose.offsetX * 0.35, pose.offsetY * 0.35, 0);
-        view.portraitNode.setScale(focusScale * pose.scaleX, focusScale * pose.scaleY, 1);
+        const visualScale = BATTLE_WALL_LAYOUT.unitVisualScale * focusScale;
+        view.portraitNode.setScale(visualScale * pose.scaleX, visualScale * pose.scaleY, 1);
         view.portraitNode.angle = pose.rotation * 0.35;
+      }
+    }
+  }
+
+  public handleTickResult(result: BattleTickResult): void {
+    const heroesWithPrimaryVfx = new Set<number>();
+    for (const event of result.attackEvents) {
+      if (event.source !== 'hero_dps' || !event.heroId) {
+        continue;
+      }
+      if (event.impactKind === 'primary') {
+        const played = this.battleVfx.playAttackEvent(event);
+        if (!played.played) {
+          continue;
+        }
+        heroesWithPrimaryVfx.add(event.heroId);
+        const slot = this.model.slots.find((candidate) => candidate.hero?.id === event.heroId);
+        const view = slot ? this.slotButtons[slot.index] : undefined;
+        if (slot?.hero && view) {
+          if (!view.animation || view.animationHeroName !== slot.hero.name) {
+            view.animation = createUnitAnimationRuntime(getHeroAnimationProfile(slot.hero.name));
+            view.animationHeroName = slot.hero.name;
+          }
+          requestUnitAnimation(view.animation, 'attack');
+        }
+        continue;
+      }
+      if (event.impactKind === 'splash' && heroesWithPrimaryVfx.has(event.heroId)) {
+        this.battleVfx.playAttackEvent(event);
       }
     }
   }
@@ -168,6 +242,10 @@ export class GridPlacementSystem {
   }
 
   private createSlotButton(slot: GridSlotState): ButtonView {
+    if (this.isFixedCompanionSlot(slot)) {
+      return this.createFixedCompanionSlot(slot);
+    }
+
     const rect = this.getVisualSlotRect(slot);
     const view = this.createButton(
       '',
@@ -177,6 +255,10 @@ export class GridPlacementSystem {
       rect.height,
       this.getSlotColor(slot),
     );
+    const unitNode = new Node(`WallSlotUnit${slot.index}`);
+    this.setUiLayer(unitNode);
+    unitNode.setPosition(rect.x, rect.y, 0);
+    view.unitNode = unitNode;
     view.node.on(Button.EventType.CLICK, () => {
       if (!this.pendingHeroName) {
         return;
@@ -199,21 +281,40 @@ export class GridPlacementSystem {
     return view;
   }
 
-  private getSlotText(slot: GridSlotState): string {
-    return slot.hero ? '' : slot.label;
+  private createFixedCompanionSlot(slot: GridSlotState): ButtonView {
+    const rect = this.getVisualSlotRect(slot);
+    const node = new Node(`FixedCompanionSlot${slot.index}`);
+    this.setUiLayer(node);
+
+    const unitNode = new Node(`WallSlotUnit${slot.index}`);
+    this.setUiLayer(unitNode);
+    unitNode.setPosition(rect.x, rect.y, 0);
+
+    return {
+      node,
+      unitNode,
+      width: rect.width,
+      height: rect.height,
+      baseColor: this.getSlotColor(slot),
+      baseX: rect.x,
+      baseY: rect.y,
+    };
   }
 
-  private getSlotColor(slot: GridSlotState): Color {
-    return slot.row === 'front' ? new Color(80, 39, 28, 230) : new Color(65, 34, 27, 230);
+  private getSlotText(slot: GridSlotState): string {
+    return '';
+  }
+
+  private getSlotColor(_slot: GridSlotState): Color {
+    return new Color(65, 34, 27, 210);
   }
 
   private getVisualSlotRect(slot: GridSlotState): RectSpec {
     const positions: Record<number, RectSpec> = {
-      0: BattleUiV4Layout.gridSlotFront1,
-      1: BattleUiV4Layout.gridSlotFront2,
-      2: BattleUiV4Layout.gridSlotFront3,
-      3: BattleUiV4Layout.gridSlotBack1,
-      4: BattleUiV4Layout.gridSlotBack2,
+      0: BattleUiV4Layout.wallSlotOrdinary1,
+      1: BattleUiV4Layout.wallSlotOrdinary2,
+      2: BattleUiV4Layout.wallSlotThunderMage,
+      3: BattleUiV4Layout.wallSlotQinglan,
     };
 
     return (
@@ -221,28 +322,15 @@ export class GridPlacementSystem {
     );
   }
 
-  private drawSlotButton(view: ButtonView, slot: GridSlotState, highlighted: boolean): void {
-    const radius = view.width / 2;
-
-    view.graphics.clear();
-    view.graphics.fillColor = view.baseColor;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.fill();
-
-    if (highlighted) {
-      view.graphics.strokeColor = new Color(255, 226, 151, 255);
-      view.graphics.lineWidth = 6;
-      view.graphics.circle(0, 0, radius);
-      view.graphics.stroke();
+  private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
+    if (this.isFixedCompanionSlot(slot) && !slot.hero) {
+      if (view.portraitNode) {
+        view.portraitNode.active = false;
+      }
+      view.portraitFilename = '';
+      return;
     }
 
-    view.graphics.strokeColor = new Color(190, 116, 70, 255);
-    view.graphics.lineWidth = 2;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.stroke();
-  }
-
-  private refreshSlotPortrait(view: ButtonView, slot: GridSlotState): void {
     const filename = getHeroPortraitFilename(slot.hero?.name ?? '') ?? '';
 
     if (!filename) {
@@ -262,27 +350,25 @@ export class GridPlacementSystem {
       view.portraitNode.destroy();
     }
 
-    const portraitSize = view.width - 16;
+    const portraitSize = Math.min(view.width - 16, BATTLE_WALL_LAYOUT.ordinaryHeroBaseSize);
     const portraitNode = new Node('SlotHeroPortraitMask');
     this.setUiLayer(portraitNode);
     const portraitTransform = portraitNode.addComponent(UITransform);
     portraitTransform.setContentSize(portraitSize, portraitSize);
     const mask = portraitNode.addComponent(Mask);
-    mask.type = Mask.Type.ELLIPSE;
+    mask.type = Mask.Type.GRAPHICS_ELLIPSE;
     mask.segments = 48;
     portraitNode.setPosition(0, 0, 0);
-    view.node.addChild(portraitNode);
+    view.unitNode?.addChild(portraitNode);
     portraitNode.setSiblingIndex(0);
 
     view.portraitFilename = filename;
     view.portraitNode = portraitNode;
-    createUiArtSkinNode(
-      portraitNode,
-      filename,
-      portraitSize,
-      portraitSize,
-      'SlotHeroPortrait',
-    );
+    createUiArtSkinNode(portraitNode, filename, portraitSize, portraitSize, 'SlotHeroPortrait');
+  }
+
+  private isFixedCompanionSlot(slot: GridSlotState): boolean {
+    return slot.reservedBy === 'fixed_companion';
   }
 
   private createButton(
@@ -317,23 +403,7 @@ export class GridPlacementSystem {
     labelNode.setPosition(0, 0, 0);
     node.addChild(labelNode);
 
-    const view = { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
-    this.drawPlainButton(view);
-
-    return view;
-  }
-
-  private drawPlainButton(view: ButtonView): void {
-    const radius = view.width / 2;
-
-    view.graphics.fillColor = view.baseColor;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.fill();
-
-    view.graphics.strokeColor = new Color(190, 116, 70, 255);
-    view.graphics.lineWidth = 2;
-    view.graphics.circle(0, 0, radius);
-    view.graphics.stroke();
+    return { node, graphics, label, width, height, baseColor: color, baseX: x, baseY: y };
   }
 
   private createLabel(

@@ -6,10 +6,17 @@
     "test:mvp": "tsx tools/mvp-model.test.ts",
     "test:spine-import": "tsx tools/spine-import.test.ts",
     "test:thunder-mage-import": "tsx tools/thunder-mage-spine-import.test.ts",
+    "test:qinglan-import": "tsx tools/qinglan-spine-import.test.ts",
+    "test:terrain": "tsx tools/terrain-system.test.ts",
     "test:ui-layout": "tsx tools/ui-layout-v4.test.ts",
     "test:hud-polish": "tsx tools/battle-hud-polish.test.ts",
+    "test:hud-logic": "tsx tools/battle-hud-logic.test.ts",
+    "prepare:hud-assets": "python3 tools/prepare-battle-hud-assets.py",
+    "test:hud-assets": "python3 tools/battle-hud-assets.test.py",
+    "test:hud-view": "tsx tools/battle-hud-view.test.ts",
     "test:scene": "tsx tools/scene-structure.test.ts",
     "test:animation": "tsx tools/animation-system.test.ts",
+    "test:vfx": "tsx tools/vfx-system.test.ts",
     "preview:portrait": "node tools/set-cocos-preview-portrait.mjs",
     "format": "prettier --write .",
     "lint": "echo \"lint not configured yet\""
@@ -22,5 +29,6 @@
   "creator": {
     "version": "3.8.8"
   },
-  "uuid": "3ce02411-3161-4810-9949-4510e67a1ba3"
+  "uuid": "3ce02411-3161-4810-9949-4510e67a1ba3",
+  "version": "3.8.8"
 }

@@ -5,6 +5,10 @@ import { strict as assert } from 'node:assert';
 const root = process.cwd();
 const scenePath = join(root, 'assets/scenes/BattleMain.scene');
 const metaPath = `${scenePath}.meta`;
+const controllerSource = readFileSync(
+  join(root, 'assets/scripts/battle/BattleController.ts'),
+  'utf8',
+);
 
 type SceneEntry = {
   __type__?: string;
@@ -29,13 +33,25 @@ function entry(id: number): SceneEntry {
 function childByName(parentId: number, name: string): number {
   const parent = entry(parentId);
   const childId = parent._children?.find((child) => entry(child.__id__)._name === name)?.__id__;
-  assert.equal(typeof childId, 'number', `${parent._name ?? parent.__type__} missing child ${name}`);
+  assert.equal(
+    typeof childId,
+    'number',
+    `${parent._name ?? parent.__type__} missing child ${name}`,
+  );
   return childId as number;
+}
+
+function assertNoChildNamed(parentId: number, name: string): void {
+  const parent = entry(parentId);
+  const childId = parent._children?.find((child) => entry(child.__id__)._name === name)?.__id__;
+  assert.equal(childId, undefined, `${parent._name ?? parent.__type__} still has child ${name}`);
 }
 
 function hasComponent(nodeId: number, componentType: string): boolean {
   return Boolean(
-    entry(nodeId)._components?.some((component) => entry(component.__id__).__type__ === componentType),
+    entry(nodeId)._components?.some(
+      (component) => entry(component.__id__).__type__ === componentType,
+    ),
   );
 }
 
@@ -45,7 +61,10 @@ assert.equal(entry(1).__type__, 'cc.Scene');
 assert.equal(entry(1)._id, meta.uuid);
 
 const battleRootId = childByName(1, 'BattleRoot');
-assert.ok(hasComponent(battleRootId, '25a13umWiFJNJAyrT8aD6Ph'), 'BattleRoot missing BattleController');
+assert.ok(
+  hasComponent(battleRootId, '25a13umWiFJNJAyrT8aD6Ph'),
+  'BattleRoot missing BattleController',
+);
 
 const canvasId = childByName(battleRootId, 'BattleMainCanvas');
 const battleLayerId = childByName(canvasId, 'BattleLayer');
@@ -55,9 +74,6 @@ childByName(mainHeroPrefabId, 'MainHeroAura');
 childByName(mainHeroPrefabId, 'MainHeroBody');
 childByName(mainHeroPrefabId, 'MainHeroPortrait');
 childByName(mainHeroPrefabId, 'MainHeroLabel');
-const cityLinePrefabId = childByName(battleLayerId, 'CityBottomLine');
-childByName(cityLinePrefabId, 'CityLineFill');
-childByName(cityLinePrefabId, 'CityLineStroke');
 const enemyVisualTemplateId = childByName(battleLayerId, 'EnemyVisualTemplate');
 childByName(enemyVisualTemplateId, 'EnemyPortrait');
 childByName(enemyVisualTemplateId, 'EnemyHealthBar');
@@ -67,57 +83,14 @@ const midStatusLayerId = childByName(canvasId, 'MidStatusLayer');
 const upgradePanelLayerId = childByName(canvasId, 'UpgradePanelLayer');
 const bottomHudLayerId = childByName(canvasId, 'BottomHudLayer');
 
-const topHudFrameId = childByName(topHudLayerId, 'TopHudFrame');
-childByName(topHudFrameId, 'UiArtSkin');
-childByName(topHudLayerId, 'WaveLabel');
-childByName(topHudLayerId, 'RemainingEnemiesLabel');
-
-for (const chipName of ['GoldChipPrefab', 'StoneChipPrefab']) {
-  const chipId = childByName(topHudLayerId, chipName);
-  childByName(chipId, 'ResourceChipSkin');
-  childByName(chipId, 'ResourceChipIcon');
-  childByName(chipId, 'ResourceChipLabel');
+assert.match(controllerSource, /new BattleHudView\(/);
+assert.match(controllerSource, /private clearLegacyHudNodes\(\): void/);
+for (let index = 1; index <= 5; index += 1) {
+  assert.ok(
+    controllerSource.includes(`BattleUiV4Layout.heroAvatarSlot${index}`),
+    `runtime missing HeroAvatarSlot${index}`,
+  );
 }
-
-const bossHealthBarPrefabId = childByName(topHudLayerId, 'BossHealthBarPrefab');
-childByName(bossHealthBarPrefabId, 'BossNameLabel');
-childByName(bossHealthBarPrefabId, 'BossHpBarBg');
-childByName(bossHealthBarPrefabId, 'BossHpBarFill');
-childByName(bossHealthBarPrefabId, 'BossHpValueLabel');
-
-const pauseButtonPrefabId = childByName(topHudLayerId, 'PauseButtonPrefab');
-childByName(pauseButtonPrefabId, 'ButtonSkin');
-childByName(pauseButtonPrefabId, 'ButtonIcon');
-childByName(pauseButtonPrefabId, 'PauseLabel');
-
-const speedButtonPrefabId = childByName(topHudLayerId, 'SpeedButtonPrefab');
-childByName(speedButtonPrefabId, 'ButtonSkin');
-childByName(speedButtonPrefabId, 'ButtonIcon');
-childByName(speedButtonPrefabId, 'SpeedLabel');
-
-const startButtonPrefabId = childByName(topHudLayerId, 'StartBattleButtonPrefab');
-childByName(startButtonPrefabId, 'ButtonSkin');
-childByName(startButtonPrefabId, 'ButtonIcon');
-childByName(startButtonPrefabId, 'StartBattleLabel');
-
-const cityHealthBarPrefabId = childByName(midStatusLayerId, 'CityHealthBarPrefab');
-childByName(cityHealthBarPrefabId, 'CityHpLabel');
-childByName(cityHealthBarPrefabId, 'CityHpBarBg');
-childByName(cityHealthBarPrefabId, 'CityHpBarFill');
-childByName(cityHealthBarPrefabId, 'CityHpHitFlash');
-childByName(midStatusLayerId, 'StatusLabel');
-childByName(midStatusLayerId, 'BuildHintLabel');
-const comboViewId = childByName(midStatusLayerId, 'ComboView');
-childByName(comboViewId, 'ComboSkin');
-childByName(comboViewId, 'ComboLabel');
-
-const towerButtonPrefabId = childByName(midStatusLayerId, 'TowerButtonPrefab');
-childByName(towerButtonPrefabId, 'ButtonSkin');
-childByName(towerButtonPrefabId, 'TowerLabel');
-
-const oilButtonPrefabId = childByName(midStatusLayerId, 'OilButtonPrefab');
-childByName(oilButtonPrefabId, 'ButtonSkin');
-childByName(oilButtonPrefabId, 'OilLabel');
 
 const upgradeCardSystemId = childByName(upgradePanelLayerId, 'UpgradeCardSystem');
 childByName(upgradeCardSystemId, 'UpgradePanelSkin');
@@ -135,26 +108,12 @@ for (const slotName of ['UpgradeCardSlot1', 'UpgradeCardSlot2', 'UpgradeCardSlot
   childByName(slotId, 'CardSchoolTagLabel');
 }
 
-childByName(bottomHudLayerId, 'BottomHudFrame');
-
 for (const slotName of ['HeroAvatarSlot1', 'HeroAvatarSlot2', 'HeroAvatarSlot3']) {
   const slotId = childByName(bottomHudLayerId, slotName);
   childByName(slotId, 'AvatarSkin');
   childByName(slotId, 'AvatarPortrait');
   childByName(slotId, 'AvatarLabel');
 }
-
-const ultimateButtonPrefabId = childByName(bottomHudLayerId, 'UltimateButtonPrefab');
-childByName(ultimateButtonPrefabId, 'ButtonSkin');
-childByName(ultimateButtonPrefabId, 'UltimateLabel');
-
-const autoButtonPrefabId = childByName(bottomHudLayerId, 'AutoButtonPrefab');
-childByName(autoButtonPrefabId, 'ButtonSkin');
-childByName(autoButtonPrefabId, 'AutoLabel');
-
-const bondButtonPrefabId = childByName(bottomHudLayerId, 'BondButtonPrefab');
-childByName(bondButtonPrefabId, 'ButtonSkin');
-childByName(bondButtonPrefabId, 'BondLabel');
 
 const battleFeedbackPoolId = childByName(feedbackLayerId, 'BattleFeedbackPool');
 childByName(battleFeedbackPoolId, 'NoticeLabel');

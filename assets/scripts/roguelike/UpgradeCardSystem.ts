@@ -138,7 +138,12 @@ export class UpgradeCardSystem {
       x,
       y,
       () => {
-        this.model.applyUpgradeCard(card.id);
+        const hasOpenOrdinarySlot =
+          this.model.getHeroes().length < this.model.build.summon.maxBoardHeroes;
+        const applied = this.model.applyUpgradeCard(card.id);
+        if (applied && card.school === 'summon' && hasOpenOrdinarySlot) {
+          this.onRecruit?.();
+        }
         this.hide();
         this.onPicked();
       },

@@ -144,7 +144,7 @@ git commit -m "feat: import thunder mage Spine animation"
 Add tests:
 
 ```ts
-runTest('thunder mage permanently reserves back slot one without using recruit capacity', () => {
+runTest('thunder mage permanently reserves back slot one and caps ordinary heroes at four', () => {
   const model = new BattleMvpModel();
   const companion = model.getFixedCompanion();
 
@@ -159,6 +159,14 @@ runTest('thunder mage permanently reserves back slot one without using recruit c
   assert.ok(model.placeHero(1, '火药师'));
   assert.ok(model.placeHero(2, '冰法师'));
   assert.equal(model.getHeroes().length, 3);
+
+  model.applyUpgradeCard('summon_slots_plus_1');
+  model.applyUpgradeCard('summon_slots_plus_1');
+  assert.equal(model.build.summon.maxBoardHeroes, 4);
+  assert.equal(
+    model.offerUpgradeCards().some((card) => card.id === 'summon_slots_plus_1'),
+    false,
+  );
 });
 ```
 
@@ -276,6 +284,8 @@ private tickCompanionAttack(deltaSeconds: number, result: BattleTickResult): voi
 ```
 
 Reset the timer to `0` in `startBattle()`, call `tickCompanionAttack()` after the main attack, mark slot `3` reserved, and reject reserved slots at the start of `placeHero()`.
+
+Cap `summon_slots_plus_1` by the number of non-reserved slots. When that cap is reached, replace future `summon_slots_plus_1` offers with `summon_hero_damage_20` so every offered card remains effective.
 
 - [ ] **Step 6: Verify GREEN and commit**
 

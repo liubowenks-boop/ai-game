@@ -3,18 +3,15 @@ import { readFileSync } from 'node:fs';
 
 import { BattleMvpModel } from '../assets/scripts/battle/BattleMvpModel';
 import { computeProceduralAnimationPose } from '../assets/scripts/battle/UnitAnimationSystem';
+import { BATTLE_WALL_LAYOUT } from '../assets/scripts/data/BattleTerrainConfig';
 import { BattleUiV4Layout, RectSpec, rectsOverlap } from '../assets/scripts/ui/BattleUiLayout';
 
-const gridPlacementSource = readFileSync(
-  'assets/scripts/battle/GridPlacementSystem.ts',
-  'utf8',
-);
-const battleUiComponentsSource = readFileSync(
-  'assets/scripts/ui/BattleUiComponents.ts',
-  'utf8',
-);
-const battleControllerSource = readFileSync(
-  'assets/scripts/battle/BattleController.ts',
+const gridPlacementSource = readFileSync('assets/scripts/battle/GridPlacementSystem.ts', 'utf8');
+const battleUiComponentsSource = readFileSync('assets/scripts/ui/BattleUiComponents.ts', 'utf8');
+const battleHudViewSource = readFileSync('assets/scripts/ui/BattleHudView.ts', 'utf8');
+const battleControllerSource = readFileSync('assets/scripts/battle/BattleController.ts', 'utf8');
+const upgradeCardSystemSource = readFileSync(
+  'assets/scripts/roguelike/UpgradeCardSystem.ts',
   'utf8',
 );
 
@@ -40,67 +37,73 @@ function requireRect(key: keyof typeof BattleUiV4Layout): RectSpec {
   return rect;
 }
 
-runTest('formation uses two aligned rows with a protected main-hero center', () => {
-  const frontRects = [
-    requireRect('gridSlotFront1'),
-    requireRect('gridSlotFront2'),
-    requireRect('gridSlotFront3'),
-  ];
-  const backRects = [
-    requireRect('gridSlotBack1'),
+runTest('ui bundle textures convert image and texture assets into sprite frames', () => {
+  assert.match(battleUiComponentsSource, /bundle\.load\(spec\.path, \(spriteError, asset\)/);
+  assert.match(battleUiComponentsSource, /asset instanceof ImageAsset/);
+  assert.match(battleUiComponentsSource, /asset instanceof Texture2D/);
+  assert.equal(battleUiComponentsSource.includes('bundle.load(spec.path, SpriteFrame'), false);
+});
+
+runTest('formation uses one aligned wall row with a protected main-hero center', () => {
+  const formation = [
+    requireRect('wallSlotThunderMage'),
+    requireRect('wallSlotOrdinary1'),
     requireRect('mainHeroUnit'),
-    requireRect('gridSlotBack2'),
+    requireRect('wallSlotOrdinary2'),
+    requireRect('wallSlotQinglan'),
   ];
 
   assert.deepEqual(
-    frontRects.map((rect) => rect.x),
-    [-210, 0, 210],
+    formation.map((rect) => rect.x),
+    [-215, -120, 0, 120, 215],
   );
   assert.deepEqual(
-    frontRects.map((rect) => rect.y),
-    [-300, -300, -300],
-  );
-  assert.equal(frontRects[1].x - frontRects[0].x, frontRects[2].x - frontRects[1].x);
-  assert.equal(new Set(frontRects.map((rect) => rect.y)).size, 1);
-  assert.ok(frontRects.every((rect) => rect.width === 82 && rect.height === 82));
-
-  assert.deepEqual(
-    backRects.map((rect) => rect.x),
-    [-210, 0, 210],
+    formation.map((rect) => rect.y),
+    [-205, -270, -250, -270, -205],
   );
   assert.deepEqual(
-    backRects.map((rect) => rect.y),
-    [-410, -410, -410],
+    formation.map((rect) => [rect.width, rect.height]),
+    [
+      [106, 106],
+      [106, 106],
+      [125, 146],
+      [106, 106],
+      [106, 106],
+    ],
   );
-  assert.equal(backRects[1].x - backRects[0].x, backRects[2].x - backRects[1].x);
-  assert.equal(new Set(backRects.map((rect) => rect.y)).size, 1);
-  assert.ok(
-    [backRects[0], backRects[2]].every((rect) => rect.width === 82 && rect.height === 82),
-  );
-  assert.deepEqual(
-    { width: backRects[1].width, height: backRects[1].height },
-    { width: 120, height: 120 },
-  );
+  for (let index = 2; index < formation.length - 1; index += 1) {
+    assert.equal(rectsOverlap(formation[index - 1], formation[index]), false);
+  }
 
   const model = new BattleMvpModel();
   assert.deepEqual(
     model.slots.map((slot) => slot.position.x),
-    [-210, 0, 210, -210, 210],
+    [-120, 120, -215, 215],
   );
   assert.deepEqual(
     model.slots.map((slot) => slot.position.y),
-    [-300, -300, -300, -410, -410],
+    [-270, -270, -205, -205],
   );
-  assert.deepEqual(model.playerPosition, { x: 0, y: -410 });
+  assert.deepEqual(model.playerPosition, { x: 0, y: -250 });
+  assert.match(battleControllerSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
+  assert.match(gridPlacementSource, /BATTLE_WALL_LAYOUT\.unitVisualScale \* focusScale/);
+  const maximumOrdinaryHeroWidth =
+    BATTLE_WALL_LAYOUT.ordinaryHeroBaseSize * BATTLE_WALL_LAYOUT.unitVisualScale * 1.08;
+  assert.ok(
+    maximumOrdinaryHeroWidth < 120,
+    'animated ordinary heroes must stay inside slot spacing',
+  );
+  assert.match(
+    gridPlacementSource,
+    /Math\.min\(view\.width - 16, BATTLE_WALL_LAYOUT\.ordinaryHeroBaseSize\)/,
+  );
 
   const animationStates = ['idle', 'walk', 'attack', 'cast', 'hit', 'death', 'spawn'] as const;
   const auraOuterRadius = 58 + 3 / 2;
-  const highlightedPlayerScale = 1 + 0.065;
+  const highlightedPlayerScale = 1.3 * (1 + 0.065);
   const heroBarStrokeWidth = 3;
   const heroBarStrokeOuterTop =
-    BattleUiV4Layout.heroBar.y +
-    BattleUiV4Layout.heroBar.height / 2 +
-    heroBarStrokeWidth / 2;
+    BattleUiV4Layout.heroBar.y + BattleUiV4Layout.heroBar.height / 2 + heroBarStrokeWidth / 2;
   let dynamicAuraBottom = Number.POSITIVE_INFINITY;
 
   for (const state of animationStates) {
@@ -125,26 +128,32 @@ runTest('formation uses two aligned rows with a protected main-hero center', () 
     );
   }
 
-  assert.equal(BattleUiV4Layout.placementTitle.y, -489);
-  assert.equal(BattleUiV4Layout.placementPending.y, -489);
+  assert.equal(BattleUiV4Layout.placementTitle.y, -424);
+  assert.equal(BattleUiV4Layout.placementPending.y, -424);
   assert.equal(BattleUiV4Layout.heroBar.y, -552);
 });
 
-runTest('six fixed portrait slots fit the hero rail without overlap', () => {
+runTest('placement status labels only appear while a hero is awaiting placement', () => {
+  assert.match(gridPlacementSource, /const placementActive = Boolean\(this\.pendingHeroName\)/);
+  assert.match(gridPlacementSource, /this\.titleNode\.active = placementActive/);
+  assert.match(gridPlacementSource, /this\.pendingNode\.active = placementActive/);
+});
+
+runTest('five fixed portrait slots fit the hero rail without overlap', () => {
   const portraitSlotKeys = [
     'heroAvatarSlot1',
     'heroAvatarSlot2',
     'heroAvatarSlot3',
     'heroAvatarSlot4',
     'heroAvatarSlot5',
-    'heroAvatarSlot6',
   ] as const;
   const portraitRects = portraitSlotKeys.map((key) => requireRect(key));
 
   assert.deepEqual(
     portraitRects.map((rect) => rect.x),
-    [-160, -96, -32, 32, 96, 160],
+    [-136, -68, 0, 68, 136],
   );
+  assert.equal('heroAvatarSlot6' in BattleUiV4Layout, false);
   assert.ok(portraitRects.every((rect) => rect.y === BattleUiV4Layout.heroBar.y));
   assert.ok(portraitRects.every((rect) => rect.width === 56 && rect.height === 72));
 
@@ -168,25 +177,22 @@ runTest('six fixed portrait slots fit the hero rail without overlap', () => {
     const currentRect = portraitRects[index];
     const gap = currentRect.x - currentRect.width / 2 - (previousRect.x + previousRect.width / 2);
 
-    assert.equal(gap, 8);
+    assert.equal(gap, 12);
     assert.equal(rectsOverlap(portraitRects[index - 1], portraitRects[index]), false);
   }
 
   const mainHeroUnit = requireRect('mainHeroUnit');
   const placementTitle = requireRect('placementTitle');
   const placementPending = requireRect('placementPending');
-  const cityHealthBar = requireRect('cityHealthBar');
-  const gridSlotFront2 = requireRect('gridSlotFront2');
 
   assert.equal(rectsOverlap(mainHeroUnit, placementTitle), false);
   assert.equal(rectsOverlap(mainHeroUnit, placementPending), false);
   assert.equal(rectsOverlap(mainHeroUnit, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementTitle, BattleUiV4Layout.heroBar), false);
   assert.equal(rectsOverlap(placementPending, BattleUiV4Layout.heroBar), false);
-  assert.equal(rectsOverlap(cityHealthBar, gridSlotFront2), false);
 });
 
-runTest('bottom rail creates six text-free rectangular portrait slots', () => {
+runTest('bottom rail creates five text-free rectangular portrait slots', () => {
   const heroAvatarSlotViewSource = sourceSection(
     battleUiComponentsSource,
     'export class HeroAvatarSlotView {',
@@ -208,8 +214,12 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot3/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot4/);
   assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot5/);
-  assert.match(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
-  assert.match(heroAvatarSlotViewSource, /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s);
+  assert.doesNotMatch(createBottomHudLayerSource, /BattleUiV4Layout\.heroAvatarSlot6/);
+  assert.match(createBottomHudLayerSource, /getChildByName\('HeroAvatarSlot6'\)\?\.destroy\(\)/);
+  assert.match(
+    heroAvatarSlotViewSource,
+    /public constructor\(\s*x: number,\s*y: number,\s*public readonly width: number,\s*public readonly height: number,/s,
+  );
   assert.match(
     heroAvatarSlotViewSource,
     /for \(const legacyName of \['AvatarSkin', 'AvatarLabel'\]\) \{\s*const legacyNode = this\.node\.getChildByName\(legacyName\);\s*if \(legacyNode\) \{\s*legacyNode\.active = false;\s*\}\s*\}/s,
@@ -243,16 +253,21 @@ runTest('bottom rail creates six text-free rectangular portrait slots', () => {
   assert.equal(/Lv/.test(refreshHeroAvatarBarSource), false);
 });
 
-runTest('deployable positions draw circles instead of rounded rectangles', () => {
-  const drawSlotButtonSource = sourceSection(
+runTest('deployable positions keep invisible hit targets without ground circles', () => {
+  const createSlotButtonSource = sourceSection(
     gridPlacementSource,
-    'private drawSlotButton(',
-    'private refreshSlotPortrait(',
+    'private createSlotButton(',
+    'private getSlotText(',
   );
-  const drawPlainButtonSource = sourceSection(
+  const createFixedCompanionSlotSource = sourceSection(
     gridPlacementSource,
-    'private drawPlainButton(',
-    'private createLabel(',
+    'private createFixedCompanionSlot(',
+    'private getSlotText(',
+  );
+  const reservedSlotHelperSource = sourceSection(
+    gridPlacementSource,
+    'private isFixedCompanionSlot(',
+    'private createButton(',
   );
   const getSlotTextSource = sourceSection(
     gridPlacementSource,
@@ -267,7 +282,7 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   const getVisualSlotRectSource = sourceSection(
     gridPlacementSource,
     'private getVisualSlotRect(',
-    'private drawSlotButton(',
+    'private refreshSlotPortrait(',
   );
   const refreshSlotPortraitSource = sourceSection(
     gridPlacementSource,
@@ -277,37 +292,63 @@ runTest('deployable positions draw circles instead of rounded rectangles', () =>
   const createButtonSource = sourceSection(
     gridPlacementSource,
     'private createButton(',
-    'private drawPlainButton(',
+    'private createLabel(',
   );
 
-  assert.match(drawSlotButtonSource, /const radius = view\.width \/ 2;/);
-  assert.match(drawSlotButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
-  assert.equal(drawSlotButtonSource.includes('roundRect'), false);
-  assert.equal(drawSlotButtonSource.includes('radius +'), false);
-  assert.match(drawSlotButtonSource, /new Color\(190, 116, 70, 255\)/);
-  assert.match(drawSlotButtonSource, /new Color\(255, 226, 151, 255\)/);
-  assert.match(
-    drawSlotButtonSource,
-    /if \(highlighted\) \{\s*view\.graphics\.strokeColor = new Color\(255, 226, 151, 255\);\s*view\.graphics\.lineWidth = 6;\s*view\.graphics\.circle\(0, 0, radius\);\s*view\.graphics\.stroke\(\);\s*\}/,
-  );
-  assert.match(drawPlainButtonSource, /const radius = view\.width \/ 2;/);
-  assert.match(drawPlainButtonSource, /view\.graphics\.circle\(0, 0, radius\);/);
-  assert.equal(drawPlainButtonSource.includes('roundRect'), false);
-  assert.match(getSlotTextSource, /return slot\.hero \? '' : slot\.label;/);
-  assert.match(
-    getSlotColorSource,
-    /return slot\.row === 'front' \? new Color\(80, 39, 28, 230\) : new Color\(65, 34, 27, 230\);/,
-  );
+  assert.equal(gridPlacementSource.includes('private drawSlotButton('), false);
+  assert.equal(gridPlacementSource.includes('private drawPlainButton('), false);
+  assert.equal(gridPlacementSource.includes('view.graphics.circle('), false);
+  assert.match(gridPlacementSource, /public getAvailablePlacementPoints\(\)/);
+  assert.match(gridPlacementSource, /public isPlacementModeActive\(\)/);
+  assert.match(getSlotTextSource, /return '';/);
+  assert.match(getSlotColorSource, /return new Color\(65, 34, 27, 210\);/);
+  assert.match(getVisualSlotRectSource, /wallSlotThunderMage/);
+  assert.match(getVisualSlotRectSource, /wallSlotOrdinary1/);
+  assert.match(getVisualSlotRectSource, /wallSlotOrdinary2/);
+  assert.match(getVisualSlotRectSource, /wallSlotQinglan/);
+  assert.equal(getVisualSlotRectSource.includes('wallSlotOrdinary3'), false);
+  assert.equal(/gridSlotFront|gridSlotBack/.test(getVisualSlotRectSource), false);
   assert.match(
     getVisualSlotRectSource,
     /positions\[slot\.index\] \?\? \{ x: slot\.position\.x, y: slot\.position\.y, width: 82, height: 82 \}/,
   );
-  assert.match(refreshSlotPortraitSource, /const portraitSize = view\.width - 16;/);
+  assert.match(
+    createSlotButtonSource,
+    /if \(this\.isFixedCompanionSlot\(slot\)\) \{\s*return this\.createFixedCompanionSlot\(slot\);\s*\}/s,
+  );
+  assert.doesNotMatch(createFixedCompanionSlotSource, /UITransform/);
+  assert.doesNotMatch(createFixedCompanionSlotSource, /addComponent\(Button\)/);
+  assert.doesNotMatch(createFixedCompanionSlotSource, /\.on\(Button\.EventType\.CLICK/);
+  assert.match(
+    createSlotButtonSource,
+    /view\.node\.on\(Button\.EventType\.CLICK, \(\) => \{\s*if \(!this\.pendingHeroName\) \{/s,
+  );
+  assert.match(reservedSlotHelperSource, /return slot\.reservedBy === 'fixed_companion';/);
+  assert.match(
+    refreshSlotPortraitSource,
+    /if \(this\.isFixedCompanionSlot\(slot\) && !slot\.hero\) \{\s*if \(view\.portraitNode\) \{\s*view\.portraitNode\.active = false;\s*\}\s*view\.portraitFilename = '';\s*return;\s*\}/s,
+  );
+  assert.match(
+    refreshSlotPortraitSource,
+    /const portraitSize = Math\.min\(view\.width - 16, BATTLE_WALL_LAYOUT\.ordinaryHeroBaseSize\);/,
+  );
   assert.match(refreshSlotPortraitSource, /new Node\('SlotHeroPortraitMask'\)/);
-  assert.match(refreshSlotPortraitSource, /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/);
-  assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.ELLIPSE;/);
+  assert.match(
+    refreshSlotPortraitSource,
+    /portraitTransform\.setContentSize\(portraitSize, portraitSize\);/,
+  );
+  assert.match(refreshSlotPortraitSource, /mask\.type = Mask\.Type\.GRAPHICS_ELLIPSE;/);
   assert.match(refreshSlotPortraitSource, /mask\.segments = 48;/);
+  assert.match(refreshSlotPortraitSource, /view\.unitNode\?\.addChild\(portraitNode\);/);
   assert.match(createButtonSource, /labelNode\.setPosition\(0, 0, 0\);/);
+  assert.match(createButtonSource, /const graphics = node\.addComponent\(Graphics\);/);
+  assert.match(createButtonSource, /node\.addComponent\(Button\);/);
+  assert.match(
+    gridPlacementSource,
+    /public constructor\(\s*backingParent: Node,\s*unitParent: Node,\s*private readonly model: BattleMvpModel,\s*private readonly battleVfx: BattleVfxSystem,/s,
+  );
+  assert.match(gridPlacementSource, /new Node\('GridPlacementBacking'\)/);
+  assert.match(gridPlacementSource, /new Node\('GridPlacementUnits'\)/);
 });
 
 runTest('formation animation keeps ring centers fixed', () => {
@@ -317,108 +358,85 @@ runTest('formation animation keeps ring centers fixed', () => {
     'public recruitFromUpgrade(',
   );
 
-  assert.match(
-    updateAnimationsSource,
-    /view\.node\.setPosition\(view\.baseX \?\? view\.node\.position\.x, view\.baseY \?\? view\.node\.position\.y, 0\);/,
-  );
-  assert.match(updateAnimationsSource, /view\.node\.setScale\(1, 1, 1\);/);
-  assert.match(updateAnimationsSource, /view\.node\.angle = 0;/);
+  assert.match(updateAnimationsSource, /view\.unitNode\?\.setPosition\(/);
+  assert.match(updateAnimationsSource, /view\.unitNode\?\.setScale\(1, 1, 1\);/);
+  assert.match(updateAnimationsSource, /view\.unitNode\.angle = 0;/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.setScale\(/);
   assert.match(updateAnimationsSource, /view\.portraitNode\.angle = pose\.rotation \* 0\.35;/);
-  assert.match(updateAnimationsSource, /view\.portraitNode\.setPosition\(pose\.offsetX \* 0\.35, pose\.offsetY \* 0\.35, 0\);/);
+  assert.match(
+    updateAnimationsSource,
+    /view\.portraitNode\.setPosition\(pose\.offsetX \* 0\.35, pose\.offsetY \* 0\.35, 0\);/,
+  );
   assert.match(updateAnimationsSource, /const focusScale = highlighted \? 1\.04 : 1;/);
   assert.equal(
-    /\(view\.baseX \?\? view\.node\.position\.x\) \+ pose\.offsetX/.test(
-      updateAnimationsSource,
-    ),
+    /\(view\.baseX \?\? view\.node\.position\.x\) \+ pose\.offsetX/.test(updateAnimationsSource),
     false,
   );
   assert.equal(
-    /\(view\.baseY \?\? view\.node\.position\.y\) \+ pose\.offsetY/.test(
-      updateAnimationsSource,
-    ),
+    /\(view\.baseY \?\? view\.node\.position\.y\) \+ pose\.offsetY/.test(updateAnimationsSource),
     false,
   );
-  assert.equal(/view\.node\.setScale\(focusScale \*/.test(updateAnimationsSource), false);
-  assert.equal(/view\.node\.angle = pose\.rotation/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.setPosition/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.setScale/.test(updateAnimationsSource), false);
+  assert.equal(/view\.node\.angle/.test(updateAnimationsSource), false);
 });
 
-runTest('city health bar is fixed, immediate, and independently readable', () => {
-  const cityHealthBarViewSource = sourceSection(
+runTest('custom HUD owns every persistent battle readout', () => {
+  for (const rootName of [
+    'WaveHud',
+    'RemainingEnemiesHud',
+    'GoldHud',
+    'BossTitleHud',
+    'BossHealthHud',
+    'PauseResumeHud',
+    'AutoHud',
+    'StatisticsHud',
+    'CityDurabilityHud',
+    'BondHud',
+    'UltimateHud',
+  ]) {
+    assert.ok(battleHudViewSource.includes(rootName), rootName);
+  }
+
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.wave/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.remainingEnemies/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.gold/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.bossHealth/);
+  assert.match(battleHudViewSource, /BattleHudConfig\.layout\.cityDurability/);
+  assert.match(battleHudViewSource, /ratio > 0\.55/);
+  assert.match(battleHudViewSource, /ratio > 0\.28/);
+  assert.match(battleHudViewSource, /private drawProgress\(/);
+  assert.match(battleHudViewSource, /state\.cityPercentText/);
+  assert.match(battleHudViewSource, /state\.boss\.percentText/);
+  assert.match(battleHudViewSource, /state\.ultimateText/);
+  assert.match(battleControllerSource, /private clearLegacyHudNodes\(\): void/);
+  assert.match(battleControllerSource, /new BattleHudView\(/);
+  assert.match(battleControllerSource, /new UpgradeCardSystem\(/);
+  assert.doesNotMatch(
+    battleControllerSource,
+    /TopHudFrame|Spirit|StoneChip|SpeedButton|ComboView|StatusLabel|BuildHintLabel/,
+  );
+  assert.doesNotMatch(
     battleUiComponentsSource,
-    'export class CityHealthBarView {',
-    'export class ComboView {',
+    /export class (?:UiButtonView|ResourceChipView|BossHealthBarView|CityHealthBarView|ComboView|UltimateButtonView)/,
+  );
+});
+
+runTest('successful summon upgrades recruit one ordinary hero for wall placement', () => {
+  const createCardSource = sourceSection(
+    upgradeCardSystemSource,
+    'private createCard(',
+    'private drawDimmer(',
   );
 
-  assert.match(cityHealthBarViewSource, /CityHpEmblemLabel/);
-  assert.match(cityHealthBarViewSource, /'城池'/);
-  assert.match(cityHealthBarViewSource, /graphics\.circle\(emblemX,\s*0,\s*20\);/);
-  assert.match(cityHealthBarViewSource, /ratio > 0\.55/);
-  assert.match(cityHealthBarViewSource, /ratio > 0\.28/);
-  assert.match(cityHealthBarViewSource, /transform\.setContentSize\(width,\s*48\);/);
-  assert.match(cityHealthBarViewSource, /private readonly valueLabel: Label;/);
+  assert.match(createCardSource, /const applied = this\.model\.applyUpgradeCard\(card\.id\);/);
   assert.match(
-    cityHealthBarViewSource,
-    /bindOrCreateUiArtSkinNode\(\s*this\.node,\s*'hud_city_hp_bg\.png',\s*width,\s*44,\s*'CityHpSkin',?\s*\)/,
+    createCardSource,
+    /const hasOpenOrdinarySlot =\s*this\.model\.getHeroes\(\)\.length < this\.model\.build\.summon\.maxBoardHeroes;/s,
   );
   assert.match(
-    cityHealthBarViewSource,
-    /const visibleCurrent = Math\.max\(0,\s*Math\.min\(safeMax,\s*current\)\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /const ratio = Math\.max\(0,\s*Math\.min\(1,\s*visibleCurrent \/ safeMax\)\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /this\.valueLabel\.string = `\$\{Math\.ceil\(visibleCurrent\)\}\/\$\{Math\.ceil\(safeMax\)\}`;/,
-  );
-  assert.match(cityHealthBarViewSource, /const fillWidth = trackWidth \* ratio;/);
-  assert.match(
-    cityHealthBarViewSource,
-    /const fillRadius = Math\.min\(BattleUiTokens\.radius\.md,\s*fillWidth \/ 2,\s*trackHeight \/ 2\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /const sheenWidth = Math\.max\(0,\s*fillWidth - 4\);/,
-  );
-  assert.match(
-    cityHealthBarViewSource,
-    /if \(sheenWidth > 0\) \{\s*this\.graphics\.fillColor = uiColor\(Color\.WHITE,\s*42\);\s*this\.graphics\.roundRect\([\s\S]*Math\.min\(2,\s*sheenWidth \/ 2\)/s,
-  );
-  assert.equal(/if \(focused\)/.test(cityHealthBarViewSource), false);
-  assert.equal(/BattleUiTokens\.colors\.highlight/.test(cityHealthBarViewSource), false);
-  assert.match(
-    cityHealthBarViewSource,
-    /if \(this\.flashTimeLeft > 0\) \{\s*this\.graphics\.strokeColor = uiColor\(Color\.WHITE, 180\);\s*this\.graphics\.lineWidth = 3;/s,
-  );
-
-  assert.equal(cityHealthBarViewSource.includes('const scale ='), false);
-  assert.equal(cityHealthBarViewSource.includes('* scale'), false);
-  assert.equal(cityHealthBarViewSource.includes('node.setScale'), false);
-  assert.equal(/delayed|trailing|secondary health layer/i.test(cityHealthBarViewSource), false);
-  assert.equal(/second fill width|fillWidth2|damageFillWidth|lagFillWidth/i.test(cityHealthBarViewSource), false);
-  assert.equal(/Color\.WHITE,\s*70/.test(cityHealthBarViewSource), false);
-  assert.match(
-    cityHealthBarViewSource,
-    /public update\(deltaTime: number\): void \{[\s\S]*this\.flashTimeLeft = Math\.max\(0, this\.flashTimeLeft - deltaTime\);/,
-  );
-  assert.equal(/this\.flashTimeLeft - 1 \/ 60/.test(cityHealthBarViewSource), false);
-  assert.match(
-    battleControllerSource,
-    /public update\(deltaTime: number\): void \{[\s\S]*this\.cityHealthBarView\.update\(deltaTime\);/,
-  );
-  assert.match(
-    battleControllerSource,
-    /if \(result\.cityDamage > 0\) \{\s*this\.setVisualFocus\('city', 0\.72\);\s*\}/,
-  );
-  assert.match(battleControllerSource, /this\.redrawCityLine\(activeFocus === 'city'\);/);
-  assert.match(battleControllerSource, /this\.cityHealthSystem\.refresh\(this\.model, false\);/);
-  assert.equal(
-    /fillColor = uiColor\(Color\.WHITE[\s\S]*roundRect\(frameLeft,\s*frameBottom,\s*this\.width,\s*48[\s\S]*fill\(\);/i.test(
-      cityHealthBarViewSource,
-    ),
-    false,
+    createCardSource,
+    /if \(applied && card\.school === 'summon' && hasOpenOrdinarySlot\) \{\s*this\.onRecruit\?\.\(\);\s*\}/s,
   );
 });
